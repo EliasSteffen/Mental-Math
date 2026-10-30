@@ -5,6 +5,9 @@ import { getParallelStats, setParallelStats } from '../../data/storage.ts';
 import { app, h, appendChildren } from '../../ui/dom.ts';
 import { createFabBar } from '../../ui/fab.ts';
 import { addCleanup, go } from '../../router.ts';
+import { setTitle } from '../../ui/title.ts';
+import { bindResultKeys } from '../../ui/modal.ts';
+import { t } from '../../i18n/index.ts';
 
 export interface ParallelSession {
   /** aufeinanderfolgende fehlerfreie Runden in diesem Besuch */
@@ -37,27 +40,29 @@ export function renderResult(
   for (const c of result.chains) {
     list.append(h('article', { class: `pl-res ${c.correct ? 'is-good' : 'is-bad'}` },
       h('div', { class: 'pl-res-head' },
-        h('span', { class: 'pl-id' }, `Kette ${c.id}`),
-        h('span', { class: 'pl-verdict' }, c.correct ? '✓ richtig' : '✗ falsch')),
+        h('span', { class: 'pl-id' }, t('parallel.chain', { id: c.id })),
+        h('span', { class: 'pl-verdict' }, c.correct ? t('parallel.verdictRight') : t('parallel.verdictWrong'))),
       h('div', { class: 'pl-res-nums' },
-        h('span', null, `Erwartet ${fmt(c.expected)}`),
-        h('span', { class: 'muted' }, c.given === null ? 'Keine Antwort' : `Deine Antwort ${fmt(c.given)}`)),
+        h('span', null, t('parallel.expected', { n: fmt(c.expected) })),
+        h('span', { class: 'muted' }, c.given === null ? t('parallel.noAnswer') : t('parallel.yourAnswer', { n: fmt(c.given) }))),
       h('div', { class: 'pl-history' }, historyLine(c))));
   }
 
   app.replaceChildren();
   appendChildren(app, [h('div', { class: 'parallel' },
-    h('h1', { class: 'page-title' }, result.allCorrect ? 'Alles richtig!' : `${result.correct} von ${result.total} richtig`),
+    h('h1', { class: 'page-title' }, result.allCorrect ? t('parallel.allRight') : t('parallel.someRight', { correct: result.correct, total: result.total })),
     h('div', { class: 'pl-summary' },
       h('div', { class: 'big-num' }, `${fmt(result.points)}`),
-      h('div', { class: 'label' }, 'Punkte'),
-      newBest ? h('div', { class: 'sub' }, `Neuer Rekord: ${stats.bestChains} Ketten fehlerfrei`) : null,
-      session.streak > 1 ? h('div', { class: 'sub' }, `${session.streak} fehlerfreie Runden in Folge`) : null),
+      h('div', { class: 'label' }, t('common.points')),
+      newBest ? h('div', { class: 'sub' }, t('parallel.newRecord', { n: stats.bestChains })) : null,
+      session.streak > 1 ? h('div', { class: 'sub' }, t('parallel.streakRounds', { n: session.streak })) : null),
     list,
-    h('p', { class: 'muted' }, `Nächste Runde: ${stats.nextStart} Ketten`))]);
+    h('p', { class: 'muted' }, t('parallel.nextRound', { n: stats.nextStart })))]);
   const fab = createFabBar([
-    { label: 'Nochmal', primary: true, onClick: () => { fab.destroy(); onAgain(stats.nextStart); } },
-    { label: 'Übersicht', onClick: () => go('#/') },
+    { label: t('common.again'), primary: true, onClick: () => { fab.destroy(); onAgain(stats.nextStart); } },
+    { label: t('common.overview'), onClick: () => go('#/') },
   ]);
   addCleanup(fab.destroy);
+  addCleanup(bindResultKeys(() => { fab.destroy(); onAgain(stats.nextStart); }, () => go('#/')));
+  setTitle(t('common.roundDone'));
 }

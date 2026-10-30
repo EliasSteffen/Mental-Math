@@ -1,7 +1,8 @@
 import type { Level, Task } from '../../types.ts';
+import { t } from '../../i18n/index.ts';
 import { fmt, randInt, pick, round } from '../numbers.ts';
 import type { Rng } from '../numbers.ts';
-import { task, lv, decHint, placesHint, PCT_HINT, UNIT_VALUE, bigStr } from './helpers.ts';
+import { task, lv, decHint, placesHint, pctHint, UNIT_VALUE, bigStr } from './helpers.ts';
 import type { Gen } from './helpers.ts';
 
 export const estGen: Record<string, Gen> = {
@@ -12,7 +13,7 @@ export const estGen: Record<string, Gen> = {
     else { a = rng() < 0.5 ? randInt(110, 990, rng) : randInt(1100, 9900, rng); b = randInt(11, 99, rng); }
     return task('est.mult', { params: { a, b },
       prompt: `${fmt(a)} × ${fmt(b)}`,
-      hint: 'Schätzung, ±8 % ok',
+      hint: t('core.hint.estimate'),
       expected: a * b,
       rel: 0.08,
     });
@@ -22,7 +23,7 @@ export const estGen: Record<string, Gen> = {
     const d = randInt(lv(L, 11, 13, 13), lv(L, 49, 97, 97), rng);
     return task('est.div', { params: { n, d },
       prompt: `${fmt(n)} ÷ ${fmt(d)}`,
-      hint: 'Schätzung, ±8 % ok',
+      hint: t('core.hint.estimate'),
       expected: n / d,
       rel: 0.08,
     });
@@ -33,8 +34,8 @@ export const estGen: Record<string, Gen> = {
       if (p % 5 === 0) continue;
       const y = L === 1 ? 100 * randInt(12, 99, rng) : L === 3 ? randInt(11000, 99900, rng) : randInt(1100, 9900, rng);
       return task('est.pct', { params: { p, y },
-        prompt: `${fmt(p)} % von ${fmt(y)}`,
-        hint: 'Schätzung, ±8 % ok',
+        prompt: t('core.p.pct_of', { p: fmt(p), y: fmt(y) }),
+        hint: t('core.hint.estimate'),
         expected: (p * y) / 100,
         rel: 0.08,
       });

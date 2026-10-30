@@ -10,6 +10,9 @@ import { renderTrain } from './views/train/index.ts';
 import { renderLernen } from './views/lernen.ts';
 import { renderAnalyse } from './views/analyse.ts';
 import { renderSettings } from './views/settings.ts';
+import { onLangChange, t } from './i18n/index.ts';
+import { setTitle } from './ui/title.ts';
+import { modeName } from './core/modes.ts';
 
 /* ---------- Cleanup-Hook (aktuelle View räumt Timer/Listener auf) ---------- */
 
@@ -94,9 +97,23 @@ function parseRoute(): Route {
 
 const NAV_TOPS: readonly string[] = ['analyse', 'lernen', 'settings'];
 
+function routeTitle(route: Route): string | null {
+  switch (route.name) {
+    case 'analyse': return t('analyse.title');
+    case 'settings': return t('settings.title');
+    case 'lernen': return t('lernen.title');
+    case 'chain': return t('settings.routeChain');
+    case 'parallel': return t('settings.routeParallel');
+    case 'custom': return t('settings.routeCustom');
+    case 'train': return modeName(route.mode);
+    default: return t('settings.routeTraining');
+  }
+}
+
 export function render(): void {
   runCleanup();
   const route = parseRoute();
+  setTitle(routeTitle(route));
   const seg = route.name === 'train' ? '' : route.name;
   const navHref = NAV_TOPS.includes(seg) ? `#/${seg}` : '#/';
   document.querySelectorAll('nav a, [data-nav]').forEach((a) => {
@@ -119,7 +136,10 @@ export function render(): void {
   else renderHome();
 }
 
+let langBound = false;
+
 export function startRouter(): void {
   window.addEventListener('hashchange', render);
+  if (!langBound) { langBound = true; onLangChange(() => rerender()); }
   render();
 }

@@ -1,6 +1,7 @@
 // Floating Action Buttons für Ergebnisseiten (Nochmal / Übersicht).
 // Blendet sich beim Runterscrollen aus, beim Hochscrollen/Stillstand/Seitenende ein.
 import { h } from './dom.ts';
+import { t } from '../i18n/index.ts';
 
 export interface FabAction { label: string; onClick: () => void; primary?: boolean }
 export interface FabBar { el: HTMLElement; destroy(): void }
@@ -12,7 +13,7 @@ export function createFabBar(actions: FabAction[]): FabBar {
   const buttons = actions.map((a) => h('button', {
     type: 'button', class: `btn fab-btn${a.primary ? ' primary' : ''}`, onclick: a.onClick,
   }, a.label));
-  const el = h('div', { class: 'fab-bar', role: 'group', 'aria-label': 'Aktionen' }, ...buttons);
+  const el = h('div', { class: 'fab-bar', role: 'group', 'aria-label': t('common.actions') }, ...buttons);
 
   let hidden = false;
   let lastY = window.scrollY;

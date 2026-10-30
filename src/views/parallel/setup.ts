@@ -1,16 +1,17 @@
 import type { Level, ParallelConfig } from '../../types.ts';
 import { getParallelStats } from '../../data/storage.ts';
 import { app, h, appendChildren } from '../../ui/dom.ts';
+import { t } from '../../i18n/index.ts';
 
-const LEVELS: ReadonlyArray<readonly [Level, string]> = [[1, 'Level 1'], [2, 'Level 2'], [3, 'Level 3']];
-const TEMPOS: ReadonlyArray<readonly [number, string]> = [[3000, '3 s'], [4000, '4 s'], [5000, '5 s']];
-const DURATIONS: ReadonlyArray<readonly [number, string]> = [[45000, '45 s'], [60000, '60 s'], [90000, '90 s']];
+const LEVELS: readonly Level[] = [1, 2, 3];
+const TEMPOS: readonly number[] = [3000, 4000, 5000];
+const DURATIONS: readonly number[] = [45000, 60000, 90000];
 const CHAIN_COUNTS: ReadonlyArray<readonly [2 | 3 | 4, string]> = [[2, '2'], [3, '3'], [4, '4']];
 
-const LEVEL_HINT: Record<Level, string> = {
-  1: 'Plus und Minus',
-  2: 'Plus, Minus und Mal',
-  3: 'Plus, Minus, Mal und Geteilt',
+const LEVEL_HINT: Record<Level, 'parallel.hint1' | 'parallel.hint2' | 'parallel.hint3'> = {
+  1: 'parallel.hint1',
+  2: 'parallel.hint2',
+  3: 'parallel.hint3',
 };
 
 function segmented<V extends string | number>(
@@ -39,27 +40,27 @@ export function renderSetup({ config, onStart }: SetupOptions): void {
     app.replaceChildren();
     const suggested = draft.startChains === stats.nextStart;
     appendChildren(app, [h('div', { class: 'parallel' },
-      h('a', { class: 'back-link', href: '#/' }, '← Zurück'),
-      h('h1', { class: 'page-title' }, 'Paralleles Kettenrechnen'),
+      h('a', { class: 'back-link', href: '#/' }, t('common.backLink')),
+      h('h1', { class: 'page-title' }, t('parallel.title')),
       h('p', { class: 'muted' },
-        'Mehrere Ketten laufen gleichzeitig. Immer wenn eine Karte aufleuchtet, rechnest du die Operation im Kopf auf diese Kette. Zwischensummen werden nie angezeigt.'),
+        t('parallel.intro')),
       h('div', { class: 'stack' },
-        h('div', { class: 'label' }, 'Level'),
-        segmented<Level>('Level', LEVELS, draft.level, (v) => { draft = { ...draft, level: v }; draw(); }),
-        h('div', { class: 'small muted' }, LEVEL_HINT[draft.level]),
-        h('div', { class: 'label' }, 'Tempo (Abstand zwischen Rechenschritten)'),
-        segmented<number>('Tempo', TEMPOS, draft.intervalMs, (v) => { draft = { ...draft, intervalMs: v }; draw(); }),
-        h('div', { class: 'label' }, 'Dauer'),
-        segmented<number>('Dauer', DURATIONS, draft.durationMs, (v) => { draft = { ...draft, durationMs: v }; draw(); }),
-        h('div', { class: 'label' }, 'Start-Ketten'),
-        segmented<2 | 3 | 4>('Start-Ketten', CHAIN_COUNTS, draft.startChains, (v) => { draft = { ...draft, startChains: v }; draw(); }),
+        h('div', { class: 'label' }, t('common.level')),
+        segmented<Level>(t('common.level'), LEVELS.map((l) => [l, t('common.levelN', { n: l })] as const), draft.level, (v) => { draft = { ...draft, level: v }; draw(); }),
+        h('div', { class: 'small muted' }, t(LEVEL_HINT[draft.level])),
+        h('div', { class: 'label' }, t('parallel.tempoLabel')),
+        segmented<number>(t('parallel.tempo'), TEMPOS.map((v) => [v, t('common.sec', { n: v / 1000 })] as const), draft.intervalMs, (v) => { draft = { ...draft, intervalMs: v }; draw(); }),
+        h('div', { class: 'label' }, t('parallel.duration')),
+        segmented<number>(t('parallel.duration'), DURATIONS.map((v) => [v, t('common.sec', { n: v / 1000 })] as const), draft.durationMs, (v) => { draft = { ...draft, durationMs: v }; draw(); }),
+        h('div', { class: 'label' }, t('parallel.startChains')),
+        segmented<2 | 3 | 4>(t('parallel.startChains'), CHAIN_COUNTS, draft.startChains, (v) => { draft = { ...draft, startChains: v }; draw(); }),
         h('div', { class: 'small muted' },
-          suggested ? `Vorschlag: ${stats.nextStart} Ketten (passt sich deinem Können an)` : `Vorschlag wäre ${stats.nextStart} Ketten`)),
+          suggested ? t('parallel.suggested', { n: stats.nextStart }) : t('parallel.suggestedAlt', { n: stats.nextStart }))),
       h('p', { class: 'small muted' },
         stats.rounds === 0
-          ? 'Noch keine Runde gespielt.'
-          : `Bestwert: ${stats.bestChains} Ketten fehlerfrei · längste Serie ${stats.bestCorrectStreak} · ${stats.rounds} Runden`),
-      h('button', { type: 'button', class: 'btn primary', onclick: () => onStart(draft) }, 'Start'))]);
+          ? t('parallel.noRounds')
+          : t('parallel.bestStats', { best: stats.bestChains, streak: stats.bestCorrectStreak, rounds: stats.rounds })),
+      h('button', { type: 'button', class: 'btn primary', onclick: () => onStart(draft) }, t('common.start')))]);
   };
   draw();
 }

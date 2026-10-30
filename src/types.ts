@@ -160,6 +160,11 @@ export interface Settings {
   // v7
   /** Timer abgelaufen → aktuelle Eingabe automatisch einreichen */
   autoFail: boolean;
+  // v8
+  /** 'auto' = Browsersprache (de, sonst en) */
+  lang: 'auto' | 'de' | 'en';
+  /** zuletzt gesehene App-Version (für „Was ist neu?“) */
+  lastSeenVersion: string;
 }
 
 export interface ReviewItem { box: number; dueAt: number; lastTs: number }
@@ -309,3 +314,14 @@ export interface RemoteSyncProvider {
   push(changes: ChangeRecord[], docs: Record<string, unknown>): Promise<{ acceptedSeqs: number[] }>;
   pull(since: number | null): Promise<{ docs: Array<{ target: SyncCollection | SyncDocument; id: string; op: 'upsert' | 'delete'; doc: unknown }>; serverTime: number }>;
 }
+
+// ---------- Versionen & Release Notes (v8) ----------
+export type LangCode = 'de' | 'en';
+export interface ReleaseNote { de: string; en: string }
+export interface Release {
+  version: string;          // SemVer MAJOR.MINOR.PATCH
+  date: string;             // YYYY-MM-DD
+  title: ReleaseNote;
+  highlights: ReleaseNote[];
+}
+export interface BuildInfo { version: string; build: string; date: string }

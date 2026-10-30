@@ -6,9 +6,13 @@ import { createKeypad, useKeypad } from '../ui/keypad.ts';
 import { app, h, appendChildren } from '../ui/dom.ts';
 import { setCleanup, addCleanup, go } from '../router.ts';
 import { createFabBar, type FabBar } from '../ui/fab.ts';
+import { skeleton, deferRender } from '../ui/skeleton.ts';
+import { bindResultKeys } from '../ui/modal.ts';
+import { t } from '../i18n/index.ts';
 
-const TEMPOS: ReadonlyArray<readonly [number, string]> = [[800, '0,8 s'], [1200, '1,2 s'], [1800, '1,8 s']];
-const LEVELS: ReadonlyArray<readonly [Level, string]> = [[1, 'Level 1'], [2, 'Level 2'], [3, 'Level 3']];
+type TKey = 'chain.tempo1' | 'chain.tempo2' | 'chain.tempo3';
+const TEMPOS: ReadonlyArray<readonly [number, TKey]> = [[800, 'chain.tempo1'], [1200, 'chain.tempo2'], [1800, 'chain.tempo3']];
+const LEVELS: readonly Level[] = [1, 2, 3];
 
 function segmented<V extends string | number>(
   label: string, options: ReadonlyArray<readonly [V, string]>, current: V, onPick: (v: V) => void,
@@ -24,9 +28,9 @@ function segmented<V extends string | number>(
 }
 
 function parseNumber(raw: string): number | null {
-  const t = raw.trim().replace(/[−–]/g, '-').replace(/\s/g, '').replace(',', '.');
-  if (!/^-?\d+(\.\d+)?$/.test(t)) return null;
-  const n = Number(t);
+  const s = raw.trim().replace(/[−–]/g, '-').replace(/\s/g, '').replace(',', '.');
+  if (!/^-?\d+(\.\d+)?$/.test(s)) return null;
+  const n = Number(s);
   return Number.isFinite(n) ? n : null;
 }
 
@@ -55,16 +59,16 @@ export function renderChain(): void {
   function setup(): void {
     const best = getChainBest()[level];
     screen(
-      h('a', { class: 'back-link', href: '#/' }, '← Zurück'),
-      h('h1', { class: 'page-title' }, 'Kettenrechnen'),
-      h('p', { class: 'muted' }, 'Merke dir die Zahl und rechne jeden Schritt im Kopf mit. Am Ende nennst du das Ergebnis.'),
+      h('a', { class: 'back-link', href: '#/' }, t('common.backLink')),
+      h('h1', { class: 'page-title' }, t('chain.title')),
+      h('p', { class: 'muted' }, t('chain.intro')),
       h('div', { class: 'stack' },
-        h('div', { class: 'label' }, 'Level'),
-        segmented<Level>('Level', LEVELS, level, (v) => { level = v; setup(); }),
-        h('div', { class: 'label' }, 'Tempo pro Schritt'),
-        segmented<number>('Tempo', TEMPOS, tempo, (v) => { tempo = v; setup(); })),
-      h('p', { class: 'small muted' }, best ? `Bestwert Level ${level}: ${best} in Folge` : `Noch kein Bestwert für Level ${level}`),
-      h('button', { type: 'button', class: 'btn primary', onclick: () => start() }, 'Start'));
+        h('div', { class: 'label' }, t('common.level')),
+        segmented<Level>(t('common.level'), LEVELS.map((l) => [l, t('common.levelN', { n: l })] as const), level, (v) => { level = v; setup(); }),
+        h('div', { class: 'label' }, t('chain.tempoPerStep')),
+        segmented<number>(t('chain.tempo'), TEMPOS.map(([ms, k]) => [ms, t(k)] as const), tempo, (v) => { tempo = v; setup(); })),
+      h('p', { class: 'small muted' }, best ? t('chain.best', { level, n: best }) : t('chain.noBest', { level })),
+      h('button', { type: 'button', class: 'btn primary', onclick: () => start() }, t('common.start')));
   }
 
   function start(): void {
@@ -73,7 +77,7 @@ export function renderChain(): void {
     const total = labels.length;
     const stage = h('div', { class: 'chain-stage', 'aria-live': 'polite' });
     const count = h('div', { class: 'chain-count' });
-    screen(h('a', { class: 'back-link', href: '#/chain' }, '← Abbrechen'), stage, count);
+    screen(h('a', { class: 'back-link', href: '#/chain' }, t('common.cancelLink')), stage, count);
     let i = 0;
     const tick = (): void => {
       if (i >= total) { ask(task); return; }
@@ -87,7 +91,7 @@ export function renderChain(): void {
 
   function ask(task: ChainTask): void {
     const input: HTMLInputElement = h('input', {
-      type: 'text', inputmode: 'none', autocomplete: 'off', 'aria-label': 'Ergebnis', placeholder: '?',
+      type: 'text', inputmode: 'none', autocomplete: 'off', 'aria-label': t('chain.resultAria'), placeholder: '?',
     });
     const submit = (): void => {
       const given = parseNumber(input.value);
@@ -98,7 +102,7 @@ export function renderChain(): void {
     const kp = useKeypad(getSettings().keypad);
     screen(
       h('div', { class: 'chain-stage' },
-        h('div', { class: 'label' }, 'Ergebnis?'),
+        h('div', { class: 'label' }, t('chain.resultQ')),
         h('div', { class: 'answer' }, input)));
     if (kp) {
       input.readOnly = true;
@@ -109,8 +113,8 @@ export function renderChain(): void {
       input.inputMode = 'decimal';
       input.removeAttribute('readonly');
       app.querySelector('.chain')?.append(h('div', { class: 'btn-row' },
-        h('button', { type: 'button', class: 'btn primary', onclick: submit }, 'Prüfen'),
-        h('button', { type: 'button', class: 'btn', onclick: () => reveal(task, null) }, 'Weiß nicht')));
+        h('button', { type: 'button', class: 'btn primary', onclick: submit }, t('common.check')),
+        h('button', { type: 'button', class: 'btn', onclick: () => reveal(task, null) }, t('common.dontKnow'))));
       input.focus();
     }
   }
@@ -126,21 +130,24 @@ export function renderChain(): void {
       ...task.steps.map((s) => h('li', null, chainStepLabel(s))));
     screen(
       h('div', { class: 'chain-stage' },
-        h('div', { class: 'label' }, ok ? 'Richtig' : given === null ? 'Übersprungen' : 'Leider falsch'),
+        h('div', { class: 'label' }, ok ? t('common.correct') : given === null ? t('common.skipped') : t('chain.wrongFinal')),
         steps,
         h('div', { class: `chain-result ${ok ? 'good' : 'bad'}` }, `= ${fmt(task.result)}`),
-        given !== null && !ok ? h('div', { class: 'sub' }, `Deine Antwort: ${fmt(given)}`) : null,
+        given !== null && !ok ? h('div', { class: 'sub' }, t('chain.yourAnswer', { n: fmt(given) })) : null,
         h('div', { class: 'chain-count' },
-          `Serie ${streak} · Bestwert ${Math.max(prev, streak)}${newBest ? ' – neuer Rekord!' : ''}`)),
+          `${t('chain.streakLine', { streak, best: Math.max(prev, streak) })}${newBest ? t('chain.newRecordSuffix') : ''}`)),
       h('div', { class: 'btn-row' },
-        h('button', { type: 'button', class: 'btn', onclick: () => setup() }, 'Einstellungen')));
+        h('button', { type: 'button', class: 'btn', onclick: () => setup() }, t('chain.settings'))));
     const bar = createFabBar([
-      { label: 'Nochmal', primary: true, onClick: () => start() },
-      { label: 'Übersicht', onClick: () => go('#/') },
+      { label: t('common.again'), primary: true, onClick: () => start() },
+      { label: t('common.overview'), onClick: () => go('#/') },
     ]);
     fab = bar;
     addCleanup(bar.destroy);
+    addCleanup(bindResultKeys(() => start(), () => go('#/')));
   }
 
-  setup();
+  const sk = skeleton('text', 3);
+  app.append(sk);
+  deferRender(sk, () => { setup(); return document.createDocumentFragment(); });
 }

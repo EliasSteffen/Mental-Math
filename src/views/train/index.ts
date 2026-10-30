@@ -17,6 +17,7 @@ import { createTimer, type TaskTimer } from './timer.ts';
 import { createAnswer } from './answer.ts';
 import { createHelp, buildFeedback } from './feedback.ts';
 import { showResult } from './result.ts';
+import { t } from '../../i18n/index.ts';
 
 export interface TrainResult { task: Task; given: number | null; ev: Evaluation; timeMs: number }
 
@@ -66,10 +67,10 @@ export function renderTrain(modeIn: Mode, { n: nOverride = null, intro = false, 
   if (mode === 'daily') fixedTasks = dailyTasks(today);
   else if (mode === 'retry') {
     fixedTasks = loadRetryTasks();
-    if (!fixedTasks) { mode = 'all'; notice = 'Keine Fehler-Aufgaben gespeichert – gemischtes Training'; }
+    if (!fixedTasks) { mode = 'all'; notice = t('train.noRetry'); }
   } else if (mode === 'custom' && !custom) {
     mode = 'all';
-    notice = 'Kein eigener Bereich angegeben – gemischtes Training';
+    notice = t('train.noRange');
   }
   const fixedMode = mode === 'daily' || mode === 'retry' || mode === 'custom';
   const sessionLength = fixedTasks ? fixedTasks.length : mode === 'daily' ? 15 : nOverride || settings.sessionLength || 10;
@@ -82,7 +83,7 @@ export function renderTrain(modeIn: Mode, { n: nOverride = null, intro = false, 
     weakSubtypes = weaknesses(getAttempts(), undefined, { enabledCategories: settings.enabledCategories }).map((w) => w.subtype);
     if (weakSubtypes.length === 0) {
       genMode = 'all';
-      notice = 'Noch zu wenig Daten – gemischtes Training';
+      notice = t('train.noWeak');
     }
   }
 
@@ -91,7 +92,7 @@ export function renderTrain(modeIn: Mode, { n: nOverride = null, intro = false, 
     reviewSubtypes = dueReviews(getReviews(), Date.now()).map((r) => r.subtype);
     if (reviewSubtypes.length === 0) {
       genMode = 'all';
-      notice = 'Keine Wiederholungen fällig – gemischtes Training';
+      notice = t('train.noReview');
     }
   }
 
@@ -131,7 +132,7 @@ export function renderTrain(modeIn: Mode, { n: nOverride = null, intro = false, 
   function header(levelName: string, timerRow: HTMLElement | null): HTMLElement[] {
     ghostEl = null;
     if (best) {
-      ghostEl = h('span', { class: 'ghost-marker', 'aria-hidden': 'true', title: 'Persönlicher Rekord' }, h('span', { class: 'ghost-label' }, 'Rekord'));
+      ghostEl = h('span', { class: 'ghost-marker', 'aria-hidden': 'true', title: t('train.personalBest') }, h('span', { class: 'ghost-label' }, t('train.bestLabel')));
       const g = ghostEl;
       const tick = (): void => g.style.setProperty('--ghost', String(Math.max(0, Math.min(100, (ghostProgress(best, Date.now() - ctx.startedAt, sessionLength) ?? 0) * 100))));
       tick();
@@ -142,8 +143,8 @@ export function renderTrain(modeIn: Mode, { n: nOverride = null, intro = false, 
     return [
       h('div', { class: 'play-head' },
         h('div', { class: 'train-head' },
-          h('a', { class: 'back-link', href: '#/' }, `← ${modeName(mode)}`),
-          h('span', { class: 'muted' }, `${levelName ? `${levelName} · ` : ''}${ctx.points} Pkt`)),
+          h('a', { class: 'back-link', href: '#/' }, t('train.backMode', { mode: modeName(mode) })),
+          h('span', { class: 'muted' }, `${levelName ? `${levelName} · ` : ''}${t('common.pointsValue', { n: ctx.points })}`)),
         h('div', { class: 'bar-row' },
           h('div', { class: 'progress-wrap' },
             h('div', { class: 'progress', role: 'progressbar', 'aria-valuemin': '0', 'aria-valuemax': String(sessionLength), 'aria-valuenow': String(ctx.index) }, fill),
@@ -245,8 +246,8 @@ export function renderTrain(modeIn: Mode, { n: nOverride = null, intro = false, 
         e.preventDefault();
         finish(Number(e.key) - 1);
       } else if (e.key === 'Enter') {
-        const t = e.target;
-        if (t instanceof Element && (t.closest('button, a, summary, .ai-box'))) return;
+        const el = e.target;
+        if (el instanceof Element && (el.closest('button, a, summary, .ai-box'))) return;
         e.preventDefault();
         if (answered) next();
         else if (!isChoice) answer.check.click();
@@ -264,8 +265,8 @@ export function renderTrain(modeIn: Mode, { n: nOverride = null, intro = false, 
         // Typ nur zeigen, wenn er nicht schon in der Kopfzeile steht (gemischte Runden)
         SUBTYPES[mode] ? null : h('div', { class: 'task-type' }, sub ? sub.name : task.subtype),
         question,
-        taskEst ? h('div', { class: 'est-hint' }, 'Schätzen: ±5 % reicht') : null,
-        h('div', { class: 'hint' }, task.hint || (!isChoice && unitFactor(task.unit) > 1 ? `in ${task.unit} oder als volle Zahl` : '')),
+        taskEst ? h('div', { class: 'est-hint' }, t('train.estimateHint')) : null,
+        h('div', { class: 'hint' }, task.hint || (!isChoice && unitFactor(task.unit) > 1 ? t('train.unitHint', { unit: task.unit }) : '')),
         answer.answerRow,
         help.wrap,
         answer.choicesEl,
@@ -280,21 +281,21 @@ export function renderTrain(modeIn: Mode, { n: nOverride = null, intro = false, 
     if (!subId || !method) { showTask(); return; }
     const ex = generate(subId, Math.random, { level: levelFor(subId, getAttempts(), settings.difficulty) });
     const steps = safeSteps(ex);
-    const start = h('button', { type: 'button', class: 'btn primary', onclick: () => showTask() }, "Los geht's");
+    const start = h('button', { type: 'button', class: 'btn primary', onclick: () => showTask() }, t('common.letsGo'));
     setKeyHandler((e) => {
       if (e.key !== 'Enter') return;
-      const t = e.target;
-      if (t instanceof Element && t.closest('button, a, summary')) return;
+      const el = e.target;
+      if (el instanceof Element && el.closest('button, a, summary')) return;
       e.preventDefault();
       start.click();
     });
     root.replaceChildren(
-      h('div', { class: 'train-head' }, h('a', { class: 'back-link', href: '#/' }, `← ${modeName(mode)}`)),
+      h('div', { class: 'train-head' }, h('a', { class: 'back-link', href: '#/' }, t('train.backMode', { mode: modeName(mode) }))),
       h('div', { class: 'intro-card' },
         h('h1', { class: 'page-title' }, SUBTYPES[subId]?.name),
         methodBlock(method),
         steps.length
-          ? h('div', null, h('h3', { class: 'fb-heading' }, `Beispiel: ${ex.prompt}`), stepsList(steps))
+          ? h('div', null, h('h3', { class: 'fb-heading' }, t('train.example', { prompt: ex.prompt })), stepsList(steps))
           : null,
         start));
     start.focus();

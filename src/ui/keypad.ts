@@ -1,4 +1,5 @@
 import { h, appendChildren } from './dom.ts';
+import { t } from '../i18n/index.ts';
 
 export function useKeypad(setting: 'auto' | 'on' | 'off' | string): boolean {
   if (setting === 'on') return true;
@@ -57,12 +58,12 @@ export function createKeypad({ input, onSubmit, onSkip, haptics = false, layout 
     ? [[digit('1'), digit('2'), digit('3')], [digit('4'), digit('5'), digit('6')], [digit('7'), digit('8'), digit('9')]]
     : [[digit('7'), digit('8'), digit('9')], [digit('4'), digit('5'), digit('6')], [digit('1'), digit('2'), digit('3')]];
   appendChildren(grid, [
-    ...rows[0]!, edit('⌫', 'key-aux', actions.back, 'Löschen'),
-    ...rows[1]!, edit('±', 'key-aux', actions.sign, 'Vorzeichen wechseln'),
+    ...rows[0]!, edit('⌫', 'key-aux', actions.back, t('common.keyDelete')),
+    ...rows[1]!, edit('±', 'key-aux', actions.sign, t('common.keySign')),
     ...rows[2]!,
-    key('Prüfen ↵', 'key-submit', onSubmit, { aria: 'Prüfen' }),
-    edit(',', 'key-digit', actions.comma, 'Komma'), digit('0'),
-    edit('000', 'key-digit', actions.zeros, 'Drei Nullen'),
+    key(t('common.checkEnter'), 'key-submit', onSubmit, { aria: t('common.check') }),
+    edit(',', 'key-digit', actions.comma, t('common.keyComma')), digit('0'),
+    edit('000', 'key-digit', actions.zeros, t('common.keyZeros')),
   ]);
 
   const skip = h('button', {
@@ -70,8 +71,8 @@ export function createKeypad({ input, onSubmit, onSkip, haptics = false, layout 
     onpointerdown: (e: Event) => e.preventDefault(),
     onmousedown: (e: Event) => e.preventDefault(),
     onclick: onSkip,
-  }, 'Weiß nicht');
+  }, t('common.dontKnow'));
 
-  return h('div', { class: 'keypad', role: 'group', 'aria-label': 'Zahlentastatur' },
+  return h('div', { class: 'keypad', role: 'group', 'aria-label': t('common.keypad') },
     h('div', { class: 'keypad-top' }, skip), grid);
 }

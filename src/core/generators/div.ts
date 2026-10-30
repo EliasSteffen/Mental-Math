@@ -1,7 +1,8 @@
 import type { Level, Task } from '../../types.ts';
+import { t } from '../../i18n/index.ts';
 import { fmt, randInt, pick, round } from '../numbers.ts';
 import type { Rng } from '../numbers.ts';
-import { task, lv, decHint, placesHint, PCT_HINT, UNIT_VALUE, bigStr } from './helpers.ts';
+import { task, lv, decHint, placesHint, pctHint, UNIT_VALUE, bigStr } from './helpers.ts';
 import type { Gen } from './helpers.ts';
 
 export const divGen: Record<string, Gen> = {
@@ -22,7 +23,7 @@ export const divGen: Record<string, Gen> = {
       if (n % d === 0) continue;
       return task('div.round', { params: { n, d },
         prompt: `${fmt(n)} ÷ ${fmt(d)}`,
-        hint: 'auf ganze Zahl runden',
+        hint: t('core.hint.round_int'),
         expected: Math.round(n / d),
         abs: 1,
       });

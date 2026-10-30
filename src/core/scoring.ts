@@ -3,6 +3,7 @@ import type {
   Attempt, CategoryId, DifficultySetting, ErrorPatterns, EvaluateOptions, Evaluation, Level, SkillStats, SubtypeId, Task, Weakness,
 } from '../types.ts';
 import { SUBTYPES, CATEGORIES, activeCategories } from './catalog.ts';
+import { t } from '../i18n/index.ts';
 import { unitFactor } from './numbers.ts';
 
 const clamp = (x: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, x));
@@ -116,7 +117,6 @@ export function overall(attempts: Attempt[] | null | undefined): SkillStats {
   return skill(attempts, 100);
 }
 
-const LABELS = { nullen: 'Nullen-Fehler', ungenau: 'Ungenau', langsam: 'Zu langsam' } as const;
 
 export function weaknesses(
   attempts: Attempt[] | null | undefined,
@@ -146,7 +146,7 @@ export function weaknesses(
       targetMs: s.targetMs,
       n: sk.n,
       reason,
-      label: LABELS[reason],
+      label: t(`core.label.${reason}`),
       tip: s.tip,
     });
   }

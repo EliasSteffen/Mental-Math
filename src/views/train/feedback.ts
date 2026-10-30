@@ -4,6 +4,7 @@ import { aiExplainTask, isAiAvailable } from '../../features/ai-client.ts';
 import { aiControl } from '../../features/ai-view.ts';
 import { appendChildren, h } from '../../ui/dom.ts';
 import { fold, methodBlock, safeSteps, stepsList } from '../../ui/widgets.ts';
+import { t } from '../../i18n/index.ts';
 
 export interface Help {
   /** Container („Wie geht das?“ + Hilfebox); wird nach der Antwort entfernt */
@@ -29,7 +30,7 @@ export function createHelp(
         if (opening && !assisted) {
           assisted = true;
           box.replaceChildren(
-            h('p', { class: 'small muted' }, 'Hilfe genutzt – halbe Punkte'),
+            h('p', { class: 'small muted' }, t('train.helpUsed')),
             methodBlock(method));
         }
         box.hidden = !opening;
@@ -38,7 +39,7 @@ export function createHelp(
         document.body.classList.toggle('kp-scroll', opening);
         if (focusInput) focusInput();
       },
-    }, 'Wie geht das?')
+    }, t('train.howTo'))
     : null;
   const wrap = h('div', { class: 'help-wrap' }, btn, box);
   return { wrap, btn, isAssisted: () => assisted };
@@ -57,7 +58,9 @@ export interface FeedbackParams {
   timedOut?: boolean;
 }
 
-const LABELS: Record<string, string> = { nullen: 'Nullen-Fehler', knapp: 'Knapp daneben', falsch: 'Falsch', skip: 'Übersprungen' };
+const LABELS: Record<string, () => string> = {
+  nullen: () => t('train.errZeros'), knapp: () => t('train.errClose'), falsch: () => t('common.wrong'), skip: () => t('common.skipped'),
+};
 
 /** Baut die Aktionszeile nach der Antwort und liefert sie samt „Weiter“-Button (für Fokus). */
 export function buildFeedback({ task, ev, timeMs, given, assisted, method, isLast, onNext, timedOut = false }: FeedbackParams): { nodes: Node[]; nextBtn: HTMLButtonElement } {
@@ -68,34 +71,34 @@ export function buildFeedback({ task, ev, timeMs, given, assisted, method, isLas
     ? ` (= ${fmt(Number((task.expected * uF).toPrecision(12)))}${task.unit.includes('€') ? ' €' : ''})`
     : '';
   const answerText = choices ? String(choices[task.expected]) : `${fmt(task.expected)}${task.unit ? ' ' + task.unit : ''}${fullText}`;
-  const timeoutNote = timedOut ? h('div', { class: 'fb-tip' }, 'Zeit abgelaufen') : null;
-  const assistNote = assisted ? h('div', { class: 'fb-tip' }, 'Hilfe genutzt – halbe Punkte') : null;
+  const timeoutNote = timedOut ? h('div', { class: 'fb-tip' }, t('train.timeUp')) : null;
+  const assistNote = assisted ? h('div', { class: 'fb-tip' }, t('train.helpUsed')) : null;
   if (ev.correct) {
     appendChildren(fb, [
-      h('div', { class: 'fb-title' }, `✓ Richtig`),
-      h('div', { class: 'fb-detail' }, `${fmtSeconds(timeMs)} · +${ev.points} Pkt`),
+      h('div', { class: 'fb-title' }, `✓ ${t('common.correct')}`),
+      h('div', { class: 'fb-detail' }, `${fmtSeconds(timeMs)} · +${t('common.pointsValue', { n: ev.points })}`),
       timeoutNote,
       assistNote]);
   } else {
     appendChildren(fb, [
-      h('div', { class: 'fb-title' }, `✗ ${(ev.errorType && LABELS[ev.errorType]) || 'Falsch'}`),
-      h('div', { class: 'fb-detail' }, `Richtig: ${answerText}`),
-      h('div', { class: 'fb-detail' }, `${fmtSeconds(timeMs)} · ${ev.points > 0 ? '+' : ''}${ev.points} Pkt`),
+      h('div', { class: 'fb-title' }, `✗ ${(ev.errorType && LABELS[ev.errorType]?.()) || t('common.wrong')}`),
+      h('div', { class: 'fb-detail' }, t('train.rightAnswer', { answer: answerText })),
+      h('div', { class: 'fb-detail' }, `${fmtSeconds(timeMs)} · ${ev.points > 0 ? '+' : ''}${t('common.pointsValue', { n: ev.points })}`),
       timeoutNote,
       assistNote]);
   }
   const steps = safeSteps(task);
   const solution = steps.length
     ? (ev.correct
-      ? fold('Lösungsweg ansehen', stepsList(steps))
-      : h('section', { class: 'fb-section' }, h('h3', { class: 'fb-heading' }, 'Lösungsweg'), stepsList(steps)))
+      ? fold(t('train.viewSolution'), stepsList(steps))
+      : h('section', { class: 'fb-section' }, h('h3', { class: 'fb-heading' }, t('train.solution')), stepsList(steps)))
     : null;
   const methodFold = method
-    ? fold('So löst du diesen Typ', methodBlock(method, { pitfalls: true, link: `#/lernen/${task.subtype}` }))
+    ? fold(t('train.howToSolve'), methodBlock(method, { pitfalls: true, link: `#/lernen/${task.subtype}` }))
     : null;
-  const ai = isAiAvailable() ? aiControl('KI-Erklärung', () => aiExplainTask(task, given)) : null;
+  const ai = isAiAvailable() ? aiControl(t('train.aiExplain'), () => aiExplainTask(task, given)) : null;
   const nextBtn = h('button', { type: 'button', class: 'btn primary next-btn', onclick: onNext },
-    isLast ? 'Ergebnis ↵' : 'Weiter ↵');
+    isLast ? t('common.resultEnter') : t('common.nextEnter'));
   const nodes: Node[] = [fb, solution, methodFold, ai, nextBtn].filter((n): n is HTMLElement => n !== null);
   return { nodes, nextBtn };
 }

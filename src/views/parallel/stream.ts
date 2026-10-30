@@ -2,6 +2,8 @@ import type { ParallelChain, ParallelConfig, ParallelState } from '../../types.t
 import { createParallelState, tick } from '../../core/parallel.ts';
 import { getSettings } from '../../data/storage.ts';
 import { app, h, appendChildren } from '../../ui/dom.ts';
+import { setTitle } from '../../ui/title.ts';
+import { t } from '../../i18n/index.ts';
 
 const PULSE_MS = 900;
 const BADGE_MS = 3500;
@@ -38,7 +40,7 @@ export function renderStream(config: ParallelConfig, onDone: (state: ParallelSta
   const fill = h('div', { class: 'pl-time-fill' });
   const secs = h('span', { class: 'pl-secs' });
   const status = h('div', { class: 'pl-sr', 'aria-live': 'polite' });
-  const paused = h('div', { class: 'pl-paused', hidden: true }, 'Pausiert');
+  const paused = h('div', { class: 'pl-paused', hidden: true }, t('parallel.paused'));
 
   const later = (fn: () => void, ms: number): number => {
     const id = window.setTimeout(() => { timers.delete(id); fn(); }, ms);
@@ -54,9 +56,9 @@ export function renderStream(config: ParallelConfig, onDone: (state: ParallelSta
   const addCard = (chain: ParallelChain, isNew: boolean): void => {
     const main = h('div', { class: 'pl-main is-start' }, startValue(chain));
     const recent = h('div', { class: 'pl-recent', 'aria-hidden': 'true' });
-    const badge = isNew ? h('span', { class: 'pl-badge' }, 'Neu') : null;
-    const root = h('article', { class: 'pl-card', 'aria-label': `Kette ${chain.id}` },
-      h('div', { class: 'pl-card-head' }, h('span', { class: 'pl-id' }, `Kette ${chain.id}`), badge),
+    const badge = isNew ? h('span', { class: 'pl-badge' }, t('parallel.badgeNew')) : null;
+    const root = h('article', { class: 'pl-card', 'aria-label': t('parallel.chain', { id: chain.id }) },
+      h('div', { class: 'pl-card-head' }, h('span', { class: 'pl-id' }, t('parallel.chain', { id: chain.id })), badge),
       main, recent);
     grid.append(root);
     cards.set(chain.id, { root, main, recent, pulseTimer: null });
@@ -85,7 +87,7 @@ export function renderStream(config: ParallelConfig, onDone: (state: ParallelSta
     const ratio = Math.max(0, Math.min(1, state.remainingMs / config.durationMs));
     fill.style.setProperty('--pl-ratio', String(ratio));
     const s = Math.max(0, Math.ceil(state.remainingMs / 1000));
-    if (s !== lastSecond) { lastSecond = s; secs.textContent = `${s} s`; }
+    if (s !== lastSecond) { lastSecond = s; secs.textContent = t('common.sec', { n: s }); setTitle(t('common.secCompact', { n: s })); }
   };
 
   const finish = (delay: number): void => {
@@ -103,7 +105,7 @@ export function renderStream(config: ParallelConfig, onDone: (state: ParallelSta
       const ev = r.event;
       const chain = state.chains.find((c) => c.id === ev.chainId);
       if (chain) pulse(chain, ev.label);
-      status.textContent = `Kette ${ev.chainId}: ${ev.label}`;
+      status.textContent = t('parallel.chainStatus', { id: ev.chainId, label: ev.label });
       buzz();
     }
     updateTime();
@@ -126,8 +128,8 @@ export function renderStream(config: ParallelConfig, onDone: (state: ParallelSta
 
   app.replaceChildren();
   appendChildren(app, [h('div', { class: 'parallel' },
-    h('a', { class: 'back-link', href: '#/' }, '← Abbrechen'),
-    h('div', { class: 'pl-time', role: 'progressbar', 'aria-label': 'Restzeit' }, h('div', { class: 'pl-time-track' }, fill), secs),
+    h('a', { class: 'back-link', href: '#/' }, t('common.cancelLink')),
+    h('div', { class: 'pl-time', role: 'progressbar', 'aria-label': t('parallel.timeLeft') }, h('div', { class: 'pl-time-track' }, fill), secs),
     grid, paused, status)]);
   for (const chain of state.chains) addCard(chain, false);
   updateTime();

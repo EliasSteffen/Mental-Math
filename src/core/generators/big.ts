@@ -1,7 +1,9 @@
 import type { Level, Task } from '../../types.ts';
+import { t } from '../../i18n/index.ts';
+import { lw } from '../l10n.ts';
 import { fmt, randInt, pick, round } from '../numbers.ts';
 import type { Rng } from '../numbers.ts';
-import { task, lv, decHint, placesHint, PCT_HINT, UNIT_VALUE, bigStr } from './helpers.ts';
+import { task, lv, decHint, placesHint, pctHint, UNIT_VALUE, bigStr } from './helpers.ts';
 import type { Gen } from './helpers.ts';
 
 export const bigGen: Record<string, Gen> = {
@@ -19,8 +21,8 @@ export const bigGen: Record<string, Gen> = {
       if (round(e, 3) !== round(e, 4) && Math.abs(e - round(e, 2)) > 1e-9) continue;
       if (L === 3 && Math.abs(e - round(e, 2)) > 1e-9) continue;
       return task('big.mult', { params: { m, u: uName, b, ua },
-        prompt: `${fmt(m)} ${uName} × ${fmt(b)}`,
-        unit: ua,
+        prompt: `${fmt(m)} ${lw(uName)} × ${fmt(b)}`,
+        unit: lw(ua),
         expected: e,
         abs: 0.005,
       });
@@ -43,7 +45,7 @@ export const bigGen: Record<string, Gen> = {
       const ua = A >= 1e6 ? 'Mio.' : 'Tsd.';
       return task('big.div', { params: { D, d, ua },
         prompt: `${bigStr(D)} ÷ ${fmt(d)}`,
-        unit: ua,
+        unit: lw(ua),
         expected: A / (UNIT_VALUE[ua] ?? 1),
         abs: 0.005,
       });
@@ -52,23 +54,23 @@ export const bigGen: Record<string, Gen> = {
   'big.percapita': (rng: Rng, L: Level): Task => {
     const T = L === 1 ? randInt(1, 12, rng) : L === 3 ? 0.1 * randInt(5, 300, rng) : 0.5 * randInt(1, 60, rng);
     const [label, base] = pick(lv(L, [
-      ['84 Mio. Einwohner', 84],
-      ['450 Mio. EU-Bürger', 450],
+      ['p.pop.de', 84],
+      ['p.pop.eu', 450],
     ], [
-      ['84 Mio. Einwohner', 84],
-      ['41 Mio. Haushalte', 41],
-      ['46 Mio. Erwerbstätige', 46],
-      ['450 Mio. EU-Bürger', 450],
+      ['p.pop.de', 84],
+      ['p.pop.hh', 41],
+      ['p.pop.work', 46],
+      ['p.pop.eu', 450],
     ], [
-      ['84 Mio. Einwohner', 84],
-      ['41 Mio. Haushalte', 41],
-      ['46 Mio. Erwerbstätige', 46],
-      ['450 Mio. EU-Bürger', 450],
+      ['p.pop.de', 84],
+      ['p.pop.hh', 41],
+      ['p.pop.work', 46],
+      ['p.pop.eu', 450],
     ]), rng);
     return task('big.percapita', { params: { T: round(T, 4), base },
-      prompt: `${fmt(round(T, 4))} Mrd. € verteilt auf ${label} – wie viel € pro Kopf?`,
+      prompt: t('core.p.percapita', { t: fmt(round(T, 4)), label: t(`core.${label}`) }),
       unit: '€',
-      hint: PCT_HINT,
+      hint: pctHint(),
       expected: (T * 1000) / base,
       rel: 0.03,
     });

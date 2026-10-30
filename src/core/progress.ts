@@ -2,6 +2,7 @@
 import type {
   Activity, ApmPoint, Attempt, CategoryId, DailyPoint, HeatCell, Mode, PersonalBest, Recommendation, Reviews, Session, StreakInfo, XpInfo,
 } from '../types.ts';
+import { t } from '../i18n/index.ts';
 import { SUBTYPES, activeCategories } from './catalog.ts';
 import { weaknesses } from './scoring.ts';
 import { dueReviews } from './review.ts';
@@ -115,8 +116,8 @@ export function recommendation(
   if (due.length) {
     return {
       kind: 'review', mode: 'review', subtype: null,
-      title: 'Fehler-Wiederholung',
-      reason: `${due.length} ${due.length === 1 ? 'Wiederholung' : 'Wiederholungen'} fällig`,
+      title: t('core.rec.review.title'),
+      reason: t(due.length === 1 ? 'core.rec.review.one' : 'core.rec.review.many', { n: due.length }),
     };
   }
   const weak = weaknesses(attempts, 1, { enabledCategories })[0];
@@ -124,15 +125,15 @@ export function recommendation(
     return {
       kind: 'weak', mode: weak.subtype, subtype: weak.subtype,
       title: weak.name,
-      reason: `${Math.round(weak.accuracy * 100)} % richtig in den letzten Versuchen`,
+      reason: t('core.rec.weak.reason', { pct: Math.round(weak.accuracy * 100) }),
     };
   }
   const seen = new Set((attempts || []).map((a) => a.subtype));
   for (const c of cats) {
     const s = Object.values(SUBTYPES).find((x) => x.category === c.id && !seen.has(x.id));
-    if (s) return { kind: 'new', mode: s.id, subtype: s.id, title: s.name, reason: 'Noch nie geübt' };
+    if (s) return { kind: 'new', mode: s.id, subtype: s.id, title: s.name, reason: t('core.rec.new.reason') };
   }
-  return { kind: 'mixed', mode: 'all', subtype: null, title: 'Gemischtes Training', reason: 'Alles im grünen Bereich – bleib im Rhythmus' };
+  return { kind: 'mixed', mode: 'all', subtype: null, title: t('core.rec.mixed.title'), reason: t('core.rec.mixed.reason') };
 }
 
 /** Beste Session eines Modus: niedrigste Ø-Zeit je Aufgabe bei ≥ 5 Aufgaben und ≥ 80 % richtig */

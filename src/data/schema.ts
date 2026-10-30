@@ -7,6 +7,8 @@ export const DEFAULT_SETTINGS: Settings = {
   enabledCategories: null,
   autoSubmit: false, numpadLayout: 'calculator', estimateMode: false, ghost: true,
   autoFail: false,
+  lang: 'auto',
+  lastSeenVersion: '',
 };
 
 export const DEFAULT_PARALLEL_STATS: ParallelStats = { nextStart: 2, bestChains: 0, bestCorrectStreak: 0, rounds: 0 };

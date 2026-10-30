@@ -1,7 +1,7 @@
 import type { Level, Task } from '../../types.ts';
 import { fmt, randInt, pick, round } from '../numbers.ts';
 import type { Rng } from '../numbers.ts';
-import { task, lv, decHint, placesHint, PCT_HINT, UNIT_VALUE, bigStr } from './helpers.ts';
+import { task, lv, decHint, placesHint, pctHint, UNIT_VALUE, bigStr } from './helpers.ts';
 import type { Gen } from './helpers.ts';
 
 export const multGen: Record<string, Gen> = {

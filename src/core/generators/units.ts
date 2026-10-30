@@ -3,10 +3,22 @@ import { fmt, randInt, pick, round } from '../numbers.ts';
 import type { Rng } from '../numbers.ts';
 import { parseU, uMul, uDiv, uInv, uMap, uStr } from '../units.ts';
 import type { UnitList } from '../units.ts';
-import { task, choiceTask, shuffle, lv, isInt, placesHint } from './helpers.ts';
+import { t } from '../../i18n/index.ts';
+import { lw } from '../l10n.ts';
+import type { ChoiceTask } from '../../types.ts';
+import { task, choiceTask as baseChoiceTask, shuffle, lv, isInt, placesHint } from './helpers.ts';
 import type { Gen } from './helpers.ts';
 
 const TIME_SWAP: Record<string, string[]> = { Jahr: ['Monat', 'Tag'], Monat: ['Jahr', 'Tag'], Tag: ['Jahr', 'h'], h: ['Tag', 'Jahr'] };
+
+// Auswahl-Aufgabe mit lokalisierter Anzeige (Optionen, Prompt); intern bleiben die deutschen Einheitennamen
+const choiceTask: typeof baseChoiceTask = (id, rng, o) => {
+  const c: ChoiceTask = baseChoiceTask(id, rng, o);
+  c.prompt = lw(c.prompt);
+  c.choices = c.choices.map(lw);
+  c.choices.forEach((x, i) => { c.params['c' + i] = x; });
+  return c;
+};
 
 // Plausible Fehlantworten für eine Einheit: Kehrwert, Einzelfaktoren, falsche Zeitbasis
 function unitDistractors(list: UnitList, rng: Rng, extra: string[] = []): string[] {
@@ -55,46 +67,46 @@ interface Conv { x: number; y: number; prompt: string; unit: string; expected: n
 const CONV: Record<number, (rng: Rng, L: Level) => Conv> = {
   1: (rng: Rng, L: Level): Conv => {
     const x = 5 * randInt(lv(L, 2, 2, 5), lv(L, 40, 100, 300), rng) * (L === 1 ? 2 : 1);
-    return { x, y: 0, prompt: `${fmt(x)} Tsd. €/Monat = ? Mio. €/Jahr`, unit: 'Mio. €/Jahr', expected: (x * 12) / 1000, abs: 0.005 };
+    return { x, y: 0, prompt: t('core.conv.1', { x: fmt(x) }), unit: lw('Mio. €/Jahr'), expected: (x * 12) / 1000, abs: 0.005 };
   },
   2: (rng: Rng, L: Level): Conv => {
     const x = 18 * pick(lv(L, [2, 3, 4, 5, 6], [2, 3, 4, 5, 6, 7, 8], [1, 3, 5, 7, 9, 10]), rng);
-    return { x, y: 0, prompt: `${fmt(x)} km/h = ? m/s`, unit: 'm/s', expected: x / 3.6 };
+    return { x, y: 0, prompt: t('core.conv.2', { x: fmt(x) }), unit: 'm/s', expected: x / 3.6 };
   },
   3: (rng: Rng, L: Level): Conv => {
     const x = L === 3 ? pick([2, 4, 6, 8, 12, 14], rng) : 5 * randInt(1, 8, rng);
     const e = round(x * 3.6, 4);
-    return { x, y: 0, prompt: `${fmt(x)} m/s = ? km/h`, unit: 'km/h', expected: e, abs: isInt(e) ? 0 : 0.05 };
+    return { x, y: 0, prompt: t('core.conv.3', { x: fmt(x) }), unit: 'km/h', expected: e, abs: isInt(e) ? 0 : 0.05 };
   },
   4: (rng: Rng, L: Level): Conv => {
     const x = pick(lv(L, [6, 8], [6, 7, 8, 9], [7.5, 8, 8.5, 9.5]), rng);
     const y = pick(lv(L, [200, 220, 250], [200, 210, 220, 225, 230, 240, 250], [210, 220, 230, 240]), rng);
-    return { x, y, prompt: `${fmt(x)} h/Tag × ${fmt(y)} Tage = ? h/Jahr`, unit: 'h/Jahr', expected: x * y };
+    return { x, y, prompt: t('core.conv.4', { x: fmt(x), y: fmt(y) }), unit: lw('h/Jahr'), expected: x * y };
   },
   5: (rng: Rng, L: Level): Conv => {
     const x = pick(lv(L, [0.5, 1, 2, 3, 5], [0.25, 0.5, 1.5, 2, 2.5, 4, 5], [0.35, 0.75, 1.2, 1.75, 2.25, 3.5]), rng);
-    return { x, y: 0, prompt: `${fmt(x)} €/Min. = ? €/h`, unit: '€/h', expected: x * 60 };
+    return { x, y: 0, prompt: t('core.conv.5', { x: fmt(x) }), unit: '€/h', expected: x * 60 };
   },
   6: (rng: Rng, L: Level): Conv => {
     const y = 5 * randInt(lv(L, 2, 2, 4), lv(L, 40, 100, 250), rng) * (L === 1 ? 2 : 1);
     const x = round((y * 12) / 1000, 4);
-    return { x, y, prompt: `${fmt(x)} Mio. €/Jahr = ? Tsd. €/Monat`, unit: 'Tsd. €/Monat', expected: y };
+    return { x, y, prompt: t('core.conv.6', { x: fmt(x) }), unit: lw('Tsd. €/Monat'), expected: y };
   },
   7: (rng: Rng, L: Level): Conv => {
     const x = 100 * pick(lv(L, [2, 4, 5, 10], [2, 4, 5, 8, 10, 12, 20, 25], [12, 15, 24, 36, 48, 75]), rng);
     const y = pick(lv(L, [250], [200, 220, 250, 300], [210, 240, 250, 280, 300]), rng);
-    return { x, y, prompt: `${fmt(x)} Stück/Tag × ${fmt(y)} Tage = ? Tsd. Stück/Jahr`, unit: 'Tsd. Stück/Jahr', expected: (x * y) / 1000 };
+    return { x, y, prompt: t('core.conv.7', { x: fmt(x), y: fmt(y) }), unit: lw('Tsd. Stück/Jahr'), expected: (x * y) / 1000 };
   },
   8: (rng: Rng, L: Level): Conv => {
     for (;;) {
       const x = pick([6, 12, 15, 20, 30, 45, 90], rng), y = pick([200, 210, 220, 225, 240, 250], rng);
       if ((x * y) % 60 !== 0) continue;
-      return { x, y, prompt: `${fmt(x)} Min./Tag × ${fmt(y)} Tage = ? h/Jahr`, unit: 'h/Jahr', expected: (x * y) / 60 };
+      return { x, y, prompt: t('core.conv.8', { x: fmt(x), y: fmt(y) }), unit: lw('h/Jahr'), expected: (x * y) / 60 };
     }
   },
   9: (rng: Rng): Conv => {
     const y = pick([200, 250], rng), x = pick(y === 250 ? [0.5, 1, 1.5, 2, 2.5, 3, 5] : [0.5, 1, 2, 3, 5], rng);
-    return { x, y, prompt: `${fmt(x)} Mio. Stück/Jahr bei ${fmt(y)} Tagen = ? Stück/Tag`, unit: 'Stück/Tag', expected: (x * 1e6) / y };
+    return { x, y, prompt: t('core.conv.9', { x: fmt(x), y: fmt(y) }), unit: lw('Stück/Tag'), expected: (x * 1e6) / y };
   },
 };
 const CONV_FAMS: Record<Level, number[]> = { 1: [1, 2, 4, 5], 2: [1, 2, 3, 4, 5, 6, 7, 8], 3: [3, 6, 7, 8, 9, 1, 5] };
@@ -113,7 +125,7 @@ export const unitsGen: Record<string, Gen> = {
       return choiceTask('units.dimless', rng, {
         prompt, correct: uStr(ans), distractors: unitDistractors(ans, rng, [uStr(comb)]),
         params: { ua: u1, ub: u2, o1: op, o2: mode, k: 3 },
-        hint: 'Welche Einheit hat das Fragezeichen?',
+        hint: t('core.hint.unit_q'),
       });
     }
     const keys = Object.keys(QUANT);
@@ -125,7 +137,7 @@ export const unitsGen: Record<string, Gen> = {
       prompt: `${nm} [${u}] ${mode} ? = dimensionslos`,
       correct: uStr(ans), distractors: unitDistractors(ans, rng, [uStr(parseU(u))]),
       params: { ua: u, ub: '', o1: '', o2: mode, k: 1 },
-      hint: 'Welche Einheit hat das Fragezeichen?',
+      hint: t('core.hint.unit_q'),
     });
   },
   'units.result': (rng: Rng, L: Level): Task => {
@@ -148,7 +160,7 @@ export const unitsGen: Record<string, Gen> = {
       prompt, correct,
       distractors: [...shuffle(alt.filter((x) => x !== correct), rng), ...unitDistractors(res, rng)],
       params: { ua: ex[0] ?? '', o1: ex[1] ?? '', ub: ex[2] ?? '', o2: ex[3] || '', uc: ex[4] || '', k: (ex.length + 1) / 2 },
-      hint: 'Einheiten kürzen wie Brüche',
+      hint: t('core.hint.cancel'),
     });
   },
   'units.convert': (rng: Rng, L: Level): Task => {

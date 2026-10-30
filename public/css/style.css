@@ -705,3 +705,16 @@ body.has-keypad .answer input { padding-top:10px; padding-bottom:10px; }
 .spark-tall { height:64px; }
 .spark-tall .spark { height:100%; }
 @media (max-width: 359px) { .quick-grid { grid-template-columns:1fr; } }
+
+/* ---------- Settings: Tabs & Daten ---------- */
+.settings-tabs { position:sticky; top:0; z-index:5; display:flex; gap:4px; overflow-x:auto; scrollbar-width:none; padding:6px 0; margin:0 0 12px; background:var(--bg); max-width:100%; }
+.settings-tabs::-webkit-scrollbar { display:none; }
+.settings-tab { flex:1 0 auto; display:inline-flex; align-items:center; justify-content:center; gap:6px; min-height:42px; padding:0 14px; border:1px solid var(--border); border-radius:var(--radius-md); background:var(--surface-2); color:var(--muted); font-weight:700; font-size:0.9375rem; white-space:nowrap; cursor:pointer; transition:background-color 150ms, color 150ms; }
+.settings-tab:hover { color:var(--text); }
+.settings-tab.active { background:var(--accent-soft); color:var(--accent); border-color:var(--accent); }
+.settings-panel { display:flex; flex-direction:column; gap:14px; min-width:0; }
+.id-chip { font-family:ui-monospace, Menlo, monospace; font-size:0.8125rem; padding:4px 8px; border-radius:8px; background:var(--surface-2); color:var(--muted); max-width:100%; overflow:hidden; text-overflow:ellipsis; }
+.setting-row > code.id-chip { margin-left:auto; }
+@media (max-width: 359px) {
+  .settings-tab { padding:0 10px; font-size:0.8125rem; gap:4px; }
+}

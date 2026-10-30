@@ -1,5 +1,6 @@
 // Daily Challenge: für alle Nutzer am selben Tag dieselben 15 Aufgaben (seeded RNG)
 import type { DailyResult, Level, Task } from '../types.ts';
+import { t } from '../i18n/index.ts';
 import { fmt, pick } from './numbers.ts';
 import type { Rng } from './numbers.ts';
 import { SUBTYPES, activeCategories } from './catalog.ts';
@@ -55,6 +56,6 @@ const mmss = (ms: number): string => {
 /** „Mental Math Daily 30.10.2026: 13/15 · 1.240 Pkt · 2:31 min\n<url>“ */
 export function dailyShareText(r: DailyResult, dateKey: string, url: string): string {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateKey);
-  const date = m ? `${m[3]}.${m[2]}.${m[1]}` : dateKey;
-  return `Mental Math Daily ${date}: ${r.correct}/${r.n} · ${fmt(r.points)} Pkt · ${mmss(r.timeMs)} min\n${url}`;
+  const date = m ? t('core.daily.date', { d: m[3] ?? '', m: m[2] ?? '', y: m[1] ?? '' }) : dateKey;
+  return t('core.daily.share', { date, correct: r.correct, n: r.n, points: fmt(r.points), time: mmss(r.timeMs), url });
 }

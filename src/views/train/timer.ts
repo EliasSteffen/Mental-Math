@@ -1,6 +1,8 @@
 import type { Task } from '../../types.ts';
 import { fmtSeconds } from '../../core/numbers.ts';
 import { h } from '../../ui/dom.ts';
+import { setTitle } from '../../ui/title.ts';
+import { t } from '../../i18n/index.ts';
 
 export interface TaskTimer {
   /** Text „x,x s / Ziel“ (Zeile unter dem Balken) */
@@ -21,9 +23,12 @@ export function createTimer(task: Task, t0: number): TaskTimer {
   const fill = h('span', { class: 'timerbar-fill' });
   const bar = h('div', { class: 'timerbar', 'aria-hidden': 'true' }, fill);
   let timerId: ReturnType<typeof setInterval> | null = null;
+  let lastSec = -1;
 
   const update = (): void => {
     const el = performance.now() - t0;
+    const sec = Math.floor(el / 1000);
+    if (sec !== lastSec) { lastSec = sec; setTitle(t('common.secCompact', { n: sec })); }
     label.textContent = `${fmtSeconds(el)} / ${fmtSeconds(task.targetMs)}`;
     fill.style.setProperty('--w', String(Math.min(100, (el / task.targetMs) * 100)));
     // Druck sichtbar machen: über Zielzeit orange, über doppelter Zielzeit rot

@@ -1,7 +1,8 @@
 import type { Level, Task } from '../../types.ts';
+import { t } from '../../i18n/index.ts';
 import { fmt, randInt, pick, round } from '../numbers.ts';
 import type { Rng } from '../numbers.ts';
-import { task, lv, decHint, placesHint, PCT_HINT, UNIT_VALUE, bigStr } from './helpers.ts';
+import { task, lv, decHint, placesHint, pctHint, UNIT_VALUE, bigStr } from './helpers.ts';
 import type { Gen } from './helpers.ts';
 
 export const fracGen: Record<string, Gen> = {
@@ -16,7 +17,7 @@ export const fracGen: Record<string, Gen> = {
     ]), rng);
     const e = round((n / d) * 100, 4);
     return task('frac.topct', { params: { n, d },
-      prompt: `${n}/${d} in Prozent`,
+      prompt: t('core.p.frac_pct', { n, d }),
       unit: '%',
       hint: decHint(e),
       expected: e,
@@ -26,6 +27,6 @@ export const fracGen: Record<string, Gen> = {
   'frac.of': (rng: Rng, L: Level): Task => {
     const d = pick(lv(L, [2, 3, 4, 5, 10], [3, 4, 5, 6, 8, 12, 25], [6, 7, 8, 9, 12, 15, 25]), rng), n = randInt(1, d - 1, rng);
     const y = d * randInt(lv(L, 2, 3, 8), lv(L, 20, 60, 99), rng) * (L === 3 ? pick([1, 10], rng) : L === 1 ? 1 : pick([1, 10], rng));
-    return task('frac.of', { params: { n, d, y }, prompt: `${n}/${d} von ${fmt(y)}`, expected: (n * y) / d });
+    return task('frac.of', { params: { n, d, y }, prompt: t('core.p.frac_of', { n, d, y: fmt(y) }), expected: (n * y) / d });
   },
 };

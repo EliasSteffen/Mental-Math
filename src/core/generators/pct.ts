@@ -1,14 +1,15 @@
 import type { Level, Task } from '../../types.ts';
+import { t } from '../../i18n/index.ts';
 import { fmt, randInt, pick, round } from '../numbers.ts';
 import type { Rng } from '../numbers.ts';
-import { task, lv, decHint, placesHint, PCT_HINT, UNIT_VALUE, bigStr } from './helpers.ts';
+import { task, lv, decHint, placesHint, pctHint, UNIT_VALUE, bigStr } from './helpers.ts';
 import type { Gen } from './helpers.ts';
 
 export const pctGen: Record<string, Gen> = {
   'pct.of': (rng: Rng, L: Level): Task => {
     const p = pick(lv(L, [5, 10, 20, 25, 50], [3, 5, 8, 10, 12, 15, 17, 20, 25, 30, 35, 40, 45, 60, 75], [7, 13, 16, 18, 22, 27, 33, 36, 48, 65, 85]), rng);
     const y = L === 1 ? randInt(2, 50, rng) * 10 : L === 3 ? randInt(12, 199, rng) * 10 : randInt(4, 96, rng) * pick([10, 100], rng);
-    return task('pct.of', { params: { p, y }, prompt: `${fmt(p)} % von ${fmt(y)}`, expected: (p * y) / 100, abs: 0.01 });
+    return task('pct.of', { params: { p, y }, prompt: t('core.p.pct_of', { p: fmt(p), y: fmt(y) }), expected: (p * y) / 100, abs: 0.01 });
   },
   'pct.change': (rng: Rng, L: Level): Task => {
     for (;;) {
@@ -18,7 +19,7 @@ export const pctGen: Record<string, Gen> = {
       const neu = round(alt * (1 + (up ? r : -r) / 100), 4);
       if (Math.abs(neu * 10 - Math.round(neu * 10)) > 1e-6 || neu <= 0) continue;
       return task('pct.change', { params: { alt, neu },
-        prompt: `Umsatz ${up ? 'steigt' : 'sinkt'} von ${fmt(alt)} auf ${fmt(neu)} Mio. €. Um wie viel Prozent?`,
+        prompt: t(up ? 'core.p.change.up' : 'core.p.change.down', { a: fmt(alt), b: fmt(neu) }),
         unit: '%',
         expected: r,
       });
@@ -32,7 +33,7 @@ export const pctGen: Record<string, Gen> = {
       : pick(lv(L, [10, 20, 50], [10, 20, 25, 50], [15, 30, 35, 40, 45, 60]), rng);
     const nach = round(O * (1 + (discount ? -r : r) / 100), 4);
     return task('pct.reverse', { params: { r, nach, discount: discount ? 1 : 0 },
-      prompt: `Nach ${fmt(r)} % ${discount ? 'Rabatt' : 'Preiserhöhung'} kostet ein Produkt ${fmt(nach)} €. Ursprünglicher Preis?`,
+      prompt: t(discount ? 'core.p.reverse.discount' : 'core.p.reverse.raise', { r: fmt(r), p: fmt(nach) }),
       unit: '€',
       expected: O,
     });
@@ -42,7 +43,7 @@ export const pctGen: Record<string, Gen> = {
     const d = L === 1 ? pick([1, 2, 5], rng) : randInt(1, L === 3 ? 6 : 5, rng), m2 = m1 + d;
     const e = round((d / m1) * 100, 4);
     return task('pct.points', { params: { m1, m2 },
-      prompt: `Die Marge steigt von ${fmt(m1)} % auf ${fmt(m2)} %. Um wie viel Prozent (nicht Prozentpunkte)?`,
+      prompt: t('core.p.points', { a: fmt(m1), b: fmt(m2) }),
       unit: '%',
       hint: decHint(e),
       expected: e,
@@ -52,11 +53,11 @@ export const pctGen: Record<string, Gen> = {
   'pct.chain': (rng: Rng, L: Level): Task => {
     const R = lv(L, [10, 20, 50, -10, -20, -50], [10, 20, 25, 50, -10, -20, -25, -50], [5, 15, 30, 40, -5, -15, -30, -40, 20, -20]);
     const r1 = pick(R, rng), r2 = pick(R, rng);
-    const word = (r: number, pron: string) => `${r > 0 ? 'steigt' : 'sinkt'}${pron} um ${fmt(Math.abs(r))} %`;
+    const word = (r: number, second: boolean) => t(`core.p.chain.${r > 0 ? 'up' : 'down'}${second ? '2' : ''}`, { p: fmt(Math.abs(r)) });
     return task('pct.chain', { params: { r1, r2 },
-      prompt: `Der Preis ${word(r1, '')}, danach ${word(r2, ' er')}. Gesamtveränderung in %?`,
+      prompt: t('core.p.chain', { first: word(r1, false), second: word(r2, true) }),
       unit: '%',
-      hint: 'mit Vorzeichen, z. B. −4',
+      hint: t('core.hint.signed'),
       expected: ((1 + r1 / 100) * (1 + r2 / 100) - 1) * 100,
       abs: 0.05,
     });

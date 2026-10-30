@@ -3,6 +3,8 @@ import type { ChoiceTask, Level, NumberTask, Params, Task } from '../../types.ts
 import { fmt, round } from '../numbers.ts';
 import type { Rng } from '../numbers.ts';
 import { SUBTYPES } from '../catalog.ts';
+import { t } from '../../i18n/index.ts';
+import { lw } from '../l10n.ts';
 
 /** Generator eines Subtyps: (rng, normalisiertes Level) → Aufgabe */
 export type Gen = (rng: Rng, L: Level) => Task;
@@ -68,21 +70,21 @@ export function choiceTask(id: string, rng: Rng, { prompt, correct, distractors,
 }
 
 export const isInt = (x: number): boolean => Math.abs(x - Math.round(x)) < 1e-9;
-export const decHint = (x: number): string => (isInt(x) ? '' : 'auf 1 Nachkommastelle');
+export const decHint = (x: number): string => (isInt(x) ? '' : t('core.hint.places.one'));
 
 // Hinweis mit der tatsächlichen Stellenzahl (z. B. 0,78 → „auf 2 Nachkommastellen“)
 export function placesHint(x: number): string {
   const s = String(round(x, 4));
   const d = s.includes('.') ? (s.split('.')[1] ?? '').length : 0;
-  return d === 0 ? '' : `auf ${d} Nachkommastelle${d > 1 ? 'n' : ''}`;
+  return d === 0 ? '' : d === 1 ? t('core.hint.places.one') : t('core.hint.places.many', { n: d });
 }
-export const PCT_HINT = '±3 % ok';
+export const pctHint = (): string => t('core.hint.tol3');
 
 export const UNIT_VALUE: Record<string, number> = { 'Tsd.': 1e3, 'Mio.': 1e6, 'Mrd.': 1e9 };
 
 // Große Zahl als Mantisse + Einheit (ab 1 Mio.), sonst ausgeschrieben
 export function bigStr(v: number): string {
-  if (v >= 1e9) return fmt(v / 1e9) + ' Mrd.';
-  if (v >= 1e6) return fmt(v / 1e6) + ' Mio.';
+  if (v >= 1e9) return fmt(v / 1e9) + ' ' + lw('Mrd.');
+  if (v >= 1e6) return fmt(v / 1e6) + ' ' + lw('Mio.');
   return fmt(v);
 }

@@ -1,0 +1,22 @@
+// Namespace 'lernen' (Deutsch) – Schlüssel ohne Präfix, Zugriff über t('lernen.key')
+export const lernen = {
+  title: 'Lernen',
+  intro: 'So rechnest du jeden Aufgabentyp im Kopf – mit Beispiel zum Selbstversuch.',
+  solution: 'Lösung: {answer}',
+  showSolution: 'Lösung zeigen',
+  hideSolution: 'Lösung verbergen',
+  newExample: 'Neues Beispiel',
+  answerIn: 'Antwort in {unit}',
+  isNew: 'neu',
+  goal: 'Ziel {time}',
+  approach: 'Vorgehen',
+  trick: 'Trick',
+  pitfalls: 'Typische Fehler',
+  example: 'Beispiel',
+  practice: 'Üben',
+  aiExplain: 'KI: anders erklären',
+  aiLabel: 'KI · kann sich irren',
+  aiBusy: 'KI erklärt …',
+  aiUnavailable: 'KI gerade nicht erreichbar.',
+  openInLearn: 'Im Lernbereich öffnen',
+} as const;

@@ -1,5 +1,6 @@
 // Rechentricks: nur Aufgaben, bei denen der jeweilige Trick wirklich greift
 import type { Level, Task } from '../../types.ts';
+import { t } from '../../i18n/index.ts';
 import { fmt, randInt, pick } from '../numbers.ts';
 import type { Rng } from '../numbers.ts';
 import { task, lv } from './helpers.ts';
@@ -52,7 +53,7 @@ export const tricksGen: Record<string, Gen> = {
     do {
       p = randInt(Math.ceil(lo / step), Math.floor(hi / step), rng) * step;
     } while ([10, 20, 25, 50, 75, 100].includes(p));
-    return task('tricks.pctswap', { params: { p, y }, prompt: `${p} % von ${y}`, expected: (p * y) / 100 });
+    return task('tricks.pctswap', { params: { p, y }, prompt: t('core.p.pct_of', { p, y }), expected: (p * y) / 100 });
   },
 
   // a − b mit b auf 7/8/9 endend

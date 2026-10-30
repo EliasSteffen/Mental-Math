@@ -3,6 +3,7 @@ import { parseAnswer } from '../../core/numbers.ts';
 import { icon } from '../../ui/charts.ts';
 import { h } from '../../ui/dom.ts';
 import { useKeypad, createKeypad } from '../../ui/keypad.ts';
+import { t } from '../../i18n/index.ts';
 
 export interface AnswerControls {
   isChoice: boolean;
@@ -44,11 +45,11 @@ export function createAnswer(task: Task, { keypadSetting, haptics, numpadLayout 
 
   const input = h('input', {
     type: 'text', inputmode: kp ? 'none' : 'decimal', autocomplete: 'off', enterkeyhint: 'done',
-    'aria-label': 'Antwort', spellcheck: 'false', autocapitalize: 'off',
+    'aria-label': t('common.answer'), spellcheck: 'false', autocapitalize: 'off',
   });
 
   const signBtn = h('button', {
-    type: 'button', class: 'sign-toggle', 'aria-label': 'Vorzeichen wechseln',
+    type: 'button', class: 'sign-toggle', 'aria-label': t('common.keySign'),
     onmousedown: (e: Event) => e.preventDefault(),
     onpointerdown: (e: Event) => e.preventDefault(),
     onclick: () => {
@@ -75,15 +76,15 @@ export function createAnswer(task: Task, { keypadSetting, haptics, numpadLayout 
       const v = parseAnswer(input.value);
       if (input.value.trim() === '') { input.focus(); return; }
       if (v === null) {
-        inputError.textContent = 'Bitte nur die Zahl eingeben, z. B. 2,4 – ohne „min“, „Jahre“ o. Ä.';
+        inputError.textContent = t('train.inputError');
         input.focus();
         input.select();
         return;
       }
       onFinish(v);
     },
-  }, 'Prüfen ↵');
-  const skip = h('button', { type: 'button', class: 'btn', onclick: () => onFinish(null) }, 'Weiß nicht');
+  }, t('common.checkEnter'));
+  const skip = h('button', { type: 'button', class: 'btn', onclick: () => onFinish(null) }, t('common.dontKnow'));
 
   const actionNodes: Node[] = [];
   if (isChoice) actionNodes.push(h('div', { class: 'btn-row' }, skip));
@@ -91,7 +92,7 @@ export function createAnswer(task: Task, { keypadSetting, haptics, numpadLayout 
   else actionNodes.push(inputError, h('div', { class: 'btn-row' }, check, skip));
 
   const choicesEl = choices
-    ? h('div', { class: 'choices', role: 'group', 'aria-label': 'Antwortmöglichkeiten' },
+    ? h('div', { class: 'choices', role: 'group', 'aria-label': t('train.choices') },
       choices.map((c, i) => {
         const b = h('button', { type: 'button', class: 'choice', onclick: () => onFinish(i) },
           h('span', { class: 'choice-text' }, c));

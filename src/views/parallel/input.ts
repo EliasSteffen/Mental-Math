@@ -4,11 +4,12 @@ import { fmt } from '../../core/numbers.ts';
 import { getSettings } from '../../data/storage.ts';
 import { createKeypad, useKeypad } from '../../ui/keypad.ts';
 import { app, h, appendChildren } from '../../ui/dom.ts';
+import { t } from '../../i18n/index.ts';
 
 function parseNumber(raw: string): number | null {
-  const t = raw.trim().replace(/[−–]/g, '-').replace(/\s/g, '').replace(',', '.');
-  if (!/^-?\d+(\.\d+)?$/.test(t)) return null;
-  const n = Number(t);
+  const s = raw.trim().replace(/[−–]/g, '-').replace(/\s/g, '').replace(',', '.');
+  if (!/^-?\d+(\.\d+)?$/.test(s)) return null;
+  const n = Number(s);
   return Number.isFinite(n) ? n : null;
 }
 
@@ -21,7 +22,7 @@ export function renderInput(initial: ParallelState, onDone: (state: ParallelStat
   const grid = h('div', { class: 'pl-grid' });
   const prompt = h('div', { class: 'label pl-prompt' });
   const input: HTMLInputElement = h('input', {
-    type: 'text', inputmode: 'none', autocomplete: 'off', 'aria-label': 'Ergebnis der Kette', placeholder: '?',
+    type: 'text', inputmode: 'none', autocomplete: 'off', 'aria-label': t('parallel.chainResultAria'), placeholder: '?',
   });
 
   const update = (): void => {
@@ -37,11 +38,11 @@ export function renderInput(initial: ParallelState, onDone: (state: ParallelStat
       const text = i === idx ? '?' : i > idx ? '·' : a === null || a === undefined ? '–' : fmt(a);
       const cls = i === idx ? 'pl-card is-active' : i < idx ? 'pl-card is-answered' : 'pl-card';
       return h('article', { class: cls, 'aria-current': i === idx ? 'step' : null },
-        h('div', { class: 'pl-card-head' }, h('span', { class: 'pl-id' }, `Kette ${c.id}`)),
+        h('div', { class: 'pl-card-head' }, h('span', { class: 'pl-id' }, t('parallel.chain', { id: c.id }))),
         h('div', { class: 'pl-main is-answer' }, text));
     }));
     const current = state.chains[idx];
-    prompt.textContent = current ? `Kette ${current.id} = ?` : '';
+    prompt.textContent = current ? t('parallel.chainPrompt', { id: current.id }) : '';
     input.value = '';
   };
 
@@ -67,12 +68,12 @@ export function renderInput(initial: ParallelState, onDone: (state: ParallelStat
   const actions = kp
     ? null
     : h('div', { class: 'btn-row' },
-      h('button', { type: 'button', class: 'btn primary', onclick: submit }, 'Weiter ↵'),
-      h('button', { type: 'button', class: 'btn', onclick: skip }, 'Weiß nicht'));
+      h('button', { type: 'button', class: 'btn primary', onclick: submit }, t('common.nextEnter')),
+      h('button', { type: 'button', class: 'btn', onclick: skip }, t('common.dontKnow')));
 
   app.replaceChildren();
   appendChildren(app, [h('div', { class: 'parallel' },
-    h('h1', { class: 'page-title' }, 'Was ist das Ergebnis?'),
+    h('h1', { class: 'page-title' }, t('parallel.question')),
     progress, grid,
     h('div', { class: 'pl-answer' }, prompt, h('div', { class: 'answer' }, input)),
     actions)]);

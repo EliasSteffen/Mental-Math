@@ -1,5 +1,6 @@
 import type { Method, Task } from '../types.ts';
 import { solutionSteps } from '../core/solutions/index.ts';
+import { t } from '../i18n/index.ts';
 import { h } from './dom.ts';
 
 export type ScoreLevel = 'muted' | 'good' | 'warn' | 'bad';
@@ -13,7 +14,7 @@ export function level(score: number | null | undefined): ScoreLevel {
 
 export function badge(score: number | null | undefined): HTMLSpanElement {
   const lv = level(score);
-  return h('span', { class: `badge ${lv}` }, lv === 'muted' ? 'neu' : String(score));
+  return h('span', { class: `badge ${lv}` }, lv === 'muted' ? t('analyse.badgeNew') : String(score));
 }
 
 export function tile(value: string, label: string, lv?: string): HTMLDivElement {
@@ -56,10 +57,10 @@ export function methodBlock(
   return h('div', { class: 'method' },
     h('p', { class: 'method-idea' }, m.idea),
     m.steps && m.steps.length ? stepsList(m.steps) : null,
-    m.trick ? h('div', { class: 'callout' }, h('span', { class: 'callout-label' }, 'Trick'), m.trick) : null,
+    m.trick ? h('div', { class: 'callout' }, h('span', { class: 'callout-label' }, t('lernen.trick')), m.trick) : null,
     pitfalls && m.pitfalls && m.pitfalls.length
-      ? h('div', null, h('h4', { class: 'method-heading' }, 'Typische Fehler'),
+      ? h('div', null, h('h4', { class: 'method-heading' }, t('lernen.pitfalls')),
         h('ul', { class: 'bullets' }, m.pitfalls.map((p) => h('li', null, p))))
       : null,
-    link ? h('a', { class: 'linkbtn', href: link, target: '_blank', rel: 'noopener' }, 'Im Lernbereich öffnen') : null);
+    link ? h('a', { class: 'linkbtn', href: link, target: '_blank', rel: 'noopener' }, t('lernen.openInLearn')) : null);
 }

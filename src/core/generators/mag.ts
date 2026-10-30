@@ -2,6 +2,8 @@ import type { Level, Task } from '../../types.ts';
 import { fmt, randInt, pick, round } from '../numbers.ts';
 import type { Rng } from '../numbers.ts';
 import { p10 } from '../units.ts';
+import { t } from '../../i18n/index.ts';
+import { lw } from '../l10n.ts';
 import { task, lv } from './helpers.ts';
 import type { Gen } from './helpers.ts';
 
@@ -14,7 +16,7 @@ type Style = 'sci' | 'word' | 'plain';
 function dispNum(a: number, p: number, style: Style): string {
   if (style === 'word') {
     const e = [9, 6, 3].find((x) => x <= p && p - x <= 2);
-    if (e) return `${fmt(round(a * 10 ** (p - e), 6), 6)} ${WORD[e] ?? ''}`;
+    if (e) return `${fmt(round(a * 10 ** (p - e), 6), 6)} ${lw(WORD[e] ?? '')}`;
   } else if (style === 'plain' && p >= -5 && p <= 6) {
     return fmt(round(a * 10 ** p, 8), 8);
   }
@@ -36,7 +38,6 @@ const FACTS: Fact[] = [
   ['Einwohner China', '1,4 Mrd.', 1.4, 9, 3], ['Einwohner Indien', '1,4 Mrd.', 1.4, 9, 3],
   ['Sekunden pro Monat', '2,6 Mio.', 2.6, 6, 3],
 ];
-const EXP_HINT = 'a × 10ⁿ mit 1 ≤ a < 10';
 
 // Zwei Faktoren a × 10^p für Produkt/Quotient
 function twoFactors(rng: Rng, L: Level, kind: 'product' | 'ratio') {
@@ -77,7 +78,7 @@ export const magGen: Record<string, Gen> = {
       k = pick(lv(L, [0], [0, 1, 2], [-2, -1, 3, 2]), rng);
       n = k + e;
       u = WORD[e] ?? '';
-      disp = `${fmt(round(a * 10 ** k, 6), 6)} ${u}`;
+      disp = `${fmt(round(a * 10 ** k, 6), 6)} ${lw(u)}`;
     } else {
       n = L === 1 ? randInt(3, 5, rng) : L === 2 ? randInt(-4, 6, rng) : randInt(-6, -2, rng);
       if (L === 2 && n >= 0 && n < 3) n = n - 4;
@@ -85,17 +86,17 @@ export const magGen: Record<string, Gen> = {
       disp = fmt(round(a * 10 ** n, 9), 9);
     }
     return task('mag.exponent', { params: { a, k, e, n, u, disp },
-      prompt: `${disp} = a × 10ⁿ – wie lautet n?`,
-      hint: EXP_HINT,
+      prompt: t('core.p.exp_n', { x: disp }),
+      hint: t('core.hint.exp'),
       expected: n,
     });
   },
   'mag.facts': (rng: Rng, L: Level): Task => {
-    const pool = FACTS.filter((f) => (L === 1 ? f[4] === 1 : L === 2 ? f[4] <= 2 : f[4] >= 2));
-    const [label, v, a, n] = pick(pool, rng);
+    const pool = FACTS.map((f, i) => ({ f, i })).filter(({ f }) => (L === 1 ? f[4] === 1 : L === 2 ? f[4] <= 2 : f[4] >= 2));
+    const { f: [label, v, a, n], i: idx } = pick(pool, rng);
     return task('mag.facts', { params: { fact: label, v, a, n },
-      prompt: `Größenordnung: ${label} – Wert = a × 10ⁿ, n = ?`,
-      hint: EXP_HINT,
+      prompt: t('core.p.facts', { label: t(`core.fact.${idx}`) }),
+      hint: t('core.hint.exp'),
       expected: n,
     });
   },
@@ -103,8 +104,8 @@ export const magGen: Record<string, Gen> = {
     const f = twoFactors(rng, L, 'product');
     const carry = round(f.a1 * f.a2, 6) >= 10 ? 1 : 0;
     return task('mag.product', { params: { a1: f.a1, p1: f.p1, a2: f.a2, p2: f.p2, d1: f.d1, d2: f.d2 },
-      prompt: `${f.d1} × ${f.d2} = a × 10ⁿ – wie lautet n?`,
-      hint: EXP_HINT,
+      prompt: t('core.p.exp_n', { x: `${f.d1} × ${f.d2}` }),
+      hint: t('core.hint.exp'),
       expected: f.p1 + f.p2 + carry,
     });
   },
@@ -112,8 +113,8 @@ export const magGen: Record<string, Gen> = {
     const f = twoFactors(rng, L, 'ratio');
     const borrow = f.a1 < f.a2 ? 1 : 0;
     return task('mag.ratio', { params: { a1: f.a1, p1: f.p1, a2: f.a2, p2: f.p2, d1: f.d1, d2: f.d2 },
-      prompt: `${f.d1} ÷ ${f.d2} = a × 10ⁿ – wie lautet n?`,
-      hint: EXP_HINT,
+      prompt: t('core.p.exp_n', { x: `${f.d1} ÷ ${f.d2}` }),
+      hint: t('core.hint.exp'),
       expected: f.p1 - f.p2 - borrow,
     });
   },

@@ -1,4 +1,5 @@
 // Formatieren, Parsen, Zufall
+import { getLang, locale } from '../i18n/index.ts';
 
 /** Zufallsquelle: liefert Werte in [0, 1) */
 export type Rng = () => number;
@@ -11,13 +12,13 @@ export function round(n: number, decimals = 0): number {
 export function fmt(n: number, maxDecimals = 2): string {
   if (!Number.isFinite(n)) return '–';
   const r = round(n, maxDecimals);
-  const s = new Intl.NumberFormat('de-DE', {
+  const s = new Intl.NumberFormat(locale(), {
     maximumFractionDigits: maxDecimals,
     minimumFractionDigits: 0,
     useGrouping: true,
   }).format(Math.abs(r));
   // de-DE gruppiert 4-stellige Zahlen nicht immer; manuell sicherstellen
-  const out = fixGrouping(s);
+  const out = getLang() === 'de' ? fixGrouping(s) : s;
   return r < 0 ? '−' + out : out;
 }
 
@@ -37,7 +38,9 @@ export function unitFactor(unit: unknown): number {
   if (u.startsWith('Tsd.')) return 1e3;
   if (u.startsWith('Mio.')) return 1e6;
   if (u.startsWith('Mrd.')) return 1e9;
-  return 1;
+  // englische Anzeige-Einheiten: K / M / B (nur als eigenes Wort, nicht „km“ o. ä.)
+  const en = /^(K|M|B)(?=$|[\s€/])/.exec(u)?.[1];
+  return en === 'K' ? 1e3 : en === 'M' ? 1e6 : en === 'B' ? 1e9 : 1;
 }
 
 const SUFFIXES: Record<string, number> = {
@@ -46,14 +49,19 @@ const SUFFIXES: Record<string, number> = {
   mrd: 1e9, bn: 1e9, milliarde: 1e9, milliarden: 1e9,
 };
 const SUFFIX_RE = /^(.*?)\s*(k|tsd|tausend|mio|millionen|million|mrd|bn|milliarden|milliarde)\.?\s*€?\s*$/i;
+const SUFFIXES_EN: Record<string, number> = {
+  k: 1e3, thousand: 1e3, m: 1e6, mm: 1e6, mio: 1e6, million: 1e6, millions: 1e6, b: 1e9, bn: 1e9, billion: 1e9, billions: 1e9,
+};
+const SUFFIX_RE_EN = /^(.*?)\s*(thousand|millions|million|billions|billion|mio|bn|mm|k|m|b)\.?\s*€?\s*$/i;
 
 export function parseAnswer(str: unknown): number | null {
   if (typeof str !== 'string') return null;
-  const m = SUFFIX_RE.exec(str.trim());
+  const en = getLang() !== 'de';
+  const m = (en ? SUFFIX_RE_EN : SUFFIX_RE).exec(str.trim());
   if (m && (m[1] ?? '').trim() !== '') {
     const base = parseAnswerPlain(m[1] ?? '');
     if (base === null) return null;
-    return Number((base * (SUFFIXES[(m[2] ?? '').toLowerCase()] ?? 1)).toPrecision(12));
+    return Number((base * ((en ? SUFFIXES_EN : SUFFIXES)[(m[2] ?? '').toLowerCase()] ?? 1)).toPrecision(12));
   }
   return parseAnswerPlain(str);
 }
@@ -61,7 +69,9 @@ export function parseAnswer(str: unknown): number | null {
 function parseAnswerPlain(str: string): number | null {
   let s = str.trim().replace(/[\s €%]/g, '').replace(/−/g, '-');
   if (s === '') return null;
-  if (s.includes(',')) {
+  if (getLang() !== 'de') {
+    s = s.replace(/,/g, ''); // Englisch: ',' = Tausender, '.' = Dezimal
+  } else if (s.includes(',')) {
     s = s.replace(/\./g, '').replace(',', '.');
   } else if (/^-?\d{1,3}(\.\d{3})+$/.test(s)) {
     s = s.replace(/\./g, '');

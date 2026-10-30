@@ -1,5 +1,6 @@
 // charts.ts – UI-Bausteine (nur DOM-API, kein innerHTML, keine style-Attribute)
 import type { HeatCell } from '../types.ts';
+import { t } from '../i18n/index.ts';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
@@ -80,7 +81,7 @@ export function sparkline(
   { area = true, max = null, gaps = false }: { area?: boolean; max?: number | null; gaps?: boolean } = {},
 ): SVGElement {
   const W = 120, H = 40, PAD = 3;
-  const root = svgEl('svg', { class: 'spark', viewBox: `0 0 ${W} ${H}`, preserveAspectRatio: 'none', role: 'img', 'aria-label': 'Verlauf' });
+  const root = svgEl('svg', { class: 'spark', viewBox: `0 0 ${W} ${H}`, preserveAspectRatio: 'none', role: 'img', 'aria-label': t('analyse.trend') });
   const vals = Array.isArray(values) ? values : [];
   const isNum = (v: number | null | undefined): v is number => typeof v === 'number' && Number.isFinite(v);
   const nums = vals.filter(isNum);
@@ -132,12 +133,12 @@ export function heatmapGrid(cells: readonly HeatCell[] | null | undefined): HTML
   const root = document.createElement('div');
   root.className = 'heatmap';
   root.setAttribute('role', 'img');
-  root.setAttribute('aria-label', 'Aktivität der letzten Wochen');
+  root.setAttribute('aria-label', t('analyse.heatmapAria'));
   for (const c of cells ?? []) {
     const cell = document.createElement('span');
     cell.className = 'hm-cell';
     cell.dataset['level'] = String(Math.max(0, Math.min(4, c.level | 0)));
-    if (c.date) cell.title = `${c.date}${c.ms ? ` · ${Math.round(c.ms / 60000)} min` : ''}`;
+    if (c.date) cell.title = `${c.date}${c.ms ? ` · ${t('analyse.minutes', { n: Math.round(c.ms / 60000) })}` : ''}`;
     root.append(cell);
   }
   return root;
@@ -177,12 +178,4 @@ export function confetti(): HTMLDivElement {
   return root;
 }
 
-export function toast(text: string): HTMLDivElement {
-  const el = document.createElement('div');
-  el.className = 'toast';
-  el.setAttribute('role', 'status');
-  el.textContent = String(text);
-  document.body.append(el);
-  setTimeout(() => el.remove(), 3200);
-  return el;
-}
+export { toast } from './toast.ts';

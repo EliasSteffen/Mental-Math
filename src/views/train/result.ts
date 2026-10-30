@@ -8,8 +8,11 @@ import { createFabBar } from '../../ui/fab.ts';
 import { dailyShareText } from '../../core/daily.ts';
 import { toast } from '../../ui/charts.ts';
 import { h } from '../../ui/dom.ts';
+import { setTitle } from '../../ui/title.ts';
+import { bindResultKeys } from '../../ui/modal.ts';
 import { fold, level, safeSteps, stepsList, tile } from '../../ui/widgets.ts';
 import type { TrainCtx } from './index.ts';
+import { t } from '../../i18n/index.ts';
 
 export function showResult(ctx: TrainCtx): void {
   ctx.stop();
@@ -36,10 +39,10 @@ export function showResult(ctx: TrainCtx): void {
         if (typeof navigator.share === 'function') {
           navigator.share({ text }).catch(() => { /* abgebrochen */ });
         } else if (navigator.clipboard) {
-          navigator.clipboard.writeText(text).then(() => { toast('Kopiert'); }, () => { toast('Kopieren nicht möglich'); });
+          navigator.clipboard.writeText(text).then(() => { toast(t('train.copied')); }, () => { toast(t('train.copyFail')); });
         }
       },
-    }, 'Teilen');
+    }, t('train.share'));
   }
 
   // Smart Retry: falsch, übersprungen oder deutlich zu langsam
@@ -48,10 +51,10 @@ export function showResult(ctx: TrainCtx): void {
     ? h('button', {
       type: 'button', class: 'btn',
       onclick: () => {
-        try { sessionStorage.setItem('mm.retry', JSON.stringify(weak)); } catch { toast('Nicht möglich'); return; }
+        try { sessionStorage.setItem('mm.retry', JSON.stringify(weak)); } catch { toast(t('train.notPossible')); return; }
         location.hash = '#/train/retry';
       },
-    }, 'Fehler & langsame wiederholen')
+    }, t('train.retryWeak'))
     : null;
 
   const list = h('ul', { class: 'list' });
@@ -66,29 +69,31 @@ export function showResult(ctx: TrainCtx): void {
       : `${r.given === null ? '–' : fmt(r.given)} → ${fmt(r.task.expected)}${unit}`;
     const steps = safeSteps(r.task);
     list.append(h('li', null,
-      h('span', { class: `mark ${ok ? 'good' : 'bad'}`, 'aria-label': ok ? 'richtig' : 'falsch' }, ok ? '✓' : '✗'),
+      h('span', { class: `mark ${ok ? 'good' : 'bad'}`, 'aria-label': ok ? t('train.markCorrect') : t('train.markWrong') }, ok ? '✓' : '✗'),
       h('span', { class: 'item-main' }, r.task.prompt),
       h('span', { class: 'item-meta' }, `${fmtSeconds(r.timeMs)} · ${r.ev.points > 0 ? '+' : ''}${r.ev.points}`),
       h('span', { class: 'item-sub' }, mid),
-      steps.length ? h('div', { class: 'item-steps' }, fold('Lösungsweg', stepsList(steps), { open: !ok })) : null));
+      steps.length ? h('div', { class: 'item-steps' }, fold(t('train.solution'), stepsList(steps), { open: !ok })) : null));
   }
 
   root.replaceChildren(
-    h('h1', { class: 'page-title' }, `Ergebnis · ${modeName(mode)}`),
+    h('h1', { class: 'page-title' }, t('train.resultTitle', { mode: modeName(mode) })),
     h('div', { class: 'stats' },
-      tile(String(ctx.points), 'Punkte'),
-      tile(`${correct}/${n}`, 'richtig'),
-      tile(fmtSeconds(avg), 'Ø Zeit'),
-      tile(sk === null || sk === undefined ? '–' : String(sk), 'Skill', level(sk))),
+      tile(String(ctx.points), t('common.points')),
+      tile(`${correct}/${n}`, t('train.statCorrect')),
+      tile(fmtSeconds(avg), t('train.avgTime')),
+      tile(sk === null || sk === undefined ? '–' : String(sk), t('train.skill'), level(sk))),
     list,
     h('div', { class: 'btn-row' },
       retryBtn,
       dailyBtn,
-      h('a', { class: 'btn', href: '#/analyse' }, 'Analyse')));
+      h('a', { class: 'btn', href: '#/analyse' }, t('train.analysis'))));
   const fab = createFabBar([
-    { label: 'Nochmal', primary: true, onClick: () => go(ctx.restart) },
-    { label: 'Übersicht', onClick: () => go('#/') },
+    { label: t('common.again'), primary: true, onClick: () => go(ctx.restart) },
+    { label: t('common.overview'), onClick: () => go('#/') },
   ]);
   addCleanup(fab.destroy);
+  addCleanup(bindResultKeys(() => go(ctx.restart), () => go('#/')));
+  setTitle(t('common.roundDone'));
   fab.el.querySelector<HTMLElement>('.fab-btn.primary')?.focus();
 }

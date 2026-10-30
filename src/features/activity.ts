@@ -1,6 +1,7 @@
 // Activity tracker: counts active time in 5 s ticks.
 import { addActivityMs, getActivity, getSettings, setSettings } from '../data/storage.ts';
 import { dayKey } from '../core/progress.ts';
+import { t } from '../i18n/index.ts';
 import { confetti, toast } from '../ui/charts.ts';
 
 const TICK = 5000;
@@ -20,7 +21,7 @@ export function startActivityTracker(): void {
     if (before < goal && before + TICK >= goal && s.celebrated !== dayKey(now)) {
       setSettings({ celebrated: dayKey(now) });
       confetti();
-      toast('Tagesziel geschafft 🔥');
+      toast(t('analyse.goalReached'));
     }
   }, TICK);
 }

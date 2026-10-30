@@ -3,6 +3,7 @@ import { DEFAULT_PARALLEL_CONFIG } from '../../core/parallel.ts';
 import { getParallelStats } from '../../data/storage.ts';
 import { app } from '../../ui/dom.ts';
 import { setCleanup } from '../../router.ts';
+import { skeleton, deferRender } from '../../ui/skeleton.ts';
 import { renderSetup } from './setup.ts';
 import { renderStream } from './stream.ts';
 import { renderInput } from './input.ts';
@@ -46,5 +47,7 @@ export function renderParallel(): void {
     });
   }
 
-  showSetup();
+  const sk = skeleton('cards', 3);
+  app.append(sk);
+  deferRender(sk, () => { showSetup(); return document.createDocumentFragment(); });
 }

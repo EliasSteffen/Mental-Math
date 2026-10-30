@@ -6,3 +6,5 @@ node_modules/
 .dev.vars
 # Build-Output (aus src/ via tsc, public/ kopiert, precache) – nicht versioniert
 dist/
+# Erzeugt von scripts/build-info.ts
+src/generated/
