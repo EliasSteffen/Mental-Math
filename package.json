@@ -1,0 +1,10 @@
+{
+  "name": "mental-math",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test tests/*.test.js",
+    "dev": "python3 -m http.server 8080 -d public",
+    "dev:ai": "npx wrangler pages dev public --port 8788"
+  }
+}
