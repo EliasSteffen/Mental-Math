@@ -360,14 +360,19 @@ svg.spark[viewBox^="0 0 6"], svg.spark[viewBox^="0 0 7"] { background:var(--surf
 }
 .sign-toggle:hover { background:var(--accent-soft); }
 .sign-toggle:active { transform:scale(.92); }
-.timer {
-  align-self:center; margin:4px auto 0; padding:4px 14px; border-radius:999px;
-  background:var(--surface-2); color:var(--text); font-weight:700; font-size:1.125rem;
-  font-variant-numeric:tabular-nums; text-align:center; width:max-content;
-  transition:color 200ms, background-color 200ms;
+/* Kopf im Training: dünne Balken mit Beschriftung rechts */
+.play-head { display:flex; flex-direction:column; gap:6px; }
+.play-head .train-head .back-link { min-height:36px; padding:4px 0; }
+.bar-row { display:flex; align-items:center; gap:10px; }
+.bar-row > .progress, .bar-row > .timerbar { flex:1; height:5px; }
+.bar-label, .timer {
+  min-width:6.5em; text-align:right; font-size:0.8125rem; font-weight:600;
+  color:var(--muted); font-variant-numeric:tabular-nums; white-space:nowrap;
+  transition:color 200ms;
 }
-.timer.is-warn { color:var(--warn); background:color-mix(in srgb, var(--warn) 15%, transparent); }
-.timer.is-over { color:var(--bad); background:color-mix(in srgb, var(--bad) 15%, transparent); animation:timer-pulse 1s ease-in-out infinite; }
+.timer { color:var(--text); }
+.timer.is-warn { color:var(--warn); }
+.timer.is-over { color:var(--bad); animation:timer-pulse 1s ease-in-out infinite; }
 .timerbar.is-warn .timerbar-fill { background:var(--warn); }
 .timerbar.is-over .timerbar-fill { background:var(--bad); }
 @keyframes timer-pulse { 50% { transform:scale(1.06); } }
@@ -587,8 +592,29 @@ html[data-theme="pastel"] .keypad { box-shadow:0 14px 40px rgba(24,24,27,.14); }
 /* Solange das Tastenfeld offen ist, passt alles auf einen Bildschirm – kein Scrollen */
 body.has-keypad { position:fixed; inset:0; overflow:hidden; overscroll-behavior:none; }
 body.has-keypad.kp-scroll { position:static; overflow:visible; }
+/* Fokus-Modus im Training: keine Topbar */
+body.in-play .topbar { display:none; }
+body.in-play main.container { padding-top:calc(10px + env(safe-area-inset-top, 0px)); }
+/* Kompaktes Layout mit Tastenfeld: Aufgabe + Eingabe passen über die Tastatur.
+   Reicht der Platz trotzdem nicht, scrollt nur der Aufgabenbereich. */
+body.has-keypad main.container {
+  --kp-space:330px;
+  height:100dvh; overflow-y:auto; overscroll-behavior:contain; gap:10px;
+  padding-bottom:calc(var(--kp-space) + env(safe-area-inset-bottom, 0px));
+}
+body.has-keypad .task { padding:6px 0 0; gap:8px; }
+body.has-keypad .question { font-size:clamp(1.75rem, 9vw, 2.5rem); }
+body.has-keypad .question.long { font-size:clamp(1.125rem, 4.6vw, 1.375rem); line-height:1.35; }
+body.has-keypad .hint:empty { display:none; }
+body.has-keypad .answer input { padding-top:10px; padding-bottom:10px; }
+@media (max-height: 760px) {
+  body.has-keypad main.container { --kp-space:290px; }
+  .keypad { padding:8px; border-radius:24px; }
+  .keypad .key { height:44px; border-radius:15px; font-size:1.375rem; }
+  .keypad .key-submit { height:auto; font-size:1rem; }
+  .keypad-top { padding-bottom:6px; }
+}
 .keypad .keypad-help[aria-expanded="true"] { background:var(--accent-soft); color:var(--accent-text, var(--accent)); }
-body.has-keypad main.container { padding-bottom:calc(330px + env(safe-area-inset-bottom, 0px)); }
 @media (prefers-reduced-motion: reduce) { .keypad { animation:none; } }
 @media (prefers-reduced-motion: reduce) {
   .keypad .key { transition:none; }

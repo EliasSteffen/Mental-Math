@@ -56,13 +56,18 @@ export function renderTrain(mode, { n: nOverride = null, intro = false } = {}) {
   const root = h('div', { class: 'train play' });
   app.append(root);
 
-  function header() {
+  // Kopf: Zurück + Level/Punkte, darunter Fortschritts- und Zeitbalken mit Beschriftung rechts
+  function header(levelName = '', timerRow = null) {
     return [
-      h('div', { class: 'train-head' },
-        h('a', { class: 'back-link', href: '#/' }, `← ${modeName(mode)}`),
-        h('span', { class: 'muted' }, `${index + 1} / ${sessionLength} · ${points} Pkt`)),
-      h('div', { class: 'progress', role: 'progressbar', 'aria-valuemin': '0', 'aria-valuemax': String(sessionLength), 'aria-valuenow': String(index) },
-        (() => { const s = h('span'); s.style.setProperty('--w', String((index / sessionLength) * 100)); return s; })()),
+      h('div', { class: 'play-head' },
+        h('div', { class: 'train-head' },
+          h('a', { class: 'back-link', href: '#/' }, `← ${modeName(mode)}`),
+          h('span', { class: 'muted' }, `${levelName ? `${levelName} · ` : ''}${points} Pkt`)),
+        h('div', { class: 'bar-row' },
+          h('div', { class: 'progress', role: 'progressbar', 'aria-valuemin': '0', 'aria-valuemax': String(sessionLength), 'aria-valuenow': String(index) },
+            (() => { const s = h('span'); s.style.setProperty('--w', String((index / sessionLength) * 100)); return s; })()),
+          h('span', { class: 'bar-label' }, `${index + 1}/${sessionLength}`)),
+        timerRow),
     ];
   }
 
@@ -247,13 +252,11 @@ export function renderTrain(mode, { n: nOverride = null, intro = false } = {}) {
 
     root.replaceChildren();
     appendChildren(root, [
-      ...header(),
-      timerbar,
+      ...header(LEVEL_NAMES[task.level] || LEVEL_NAMES[2], timed ? h('div', { class: 'bar-row' }, timerbar, timer) : null),
       notice ? h('p', { class: 'notice' }, notice) : null,
       h('div', { class: 'task' },
-        h('div', { class: 'task-type' }, sub ? sub.name : task.subtype,
-          h('span', { class: 'chip' }, LEVEL_NAMES[task.level] || LEVEL_NAMES[2])),
-        timer,
+        // Typ nur zeigen, wenn er nicht schon in der Kopfzeile steht (gemischte Runden)
+        SUBTYPES[mode] ? null : h('div', { class: 'task-type' }, sub ? sub.name : task.subtype),
         question,
         h('div', { class: 'hint' }, task.hint || (unitFactor(task.unit) > 1 ? `in ${task.unit} oder als volle Zahl` : '')),
         h('div', { class: 'answer' }, kp ? null : signBtn, input, task.unit ? h('span', { class: 'unit' }, task.unit) : null),
