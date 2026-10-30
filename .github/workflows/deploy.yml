@@ -1,4 +1,4 @@
-# Testet die Logik und deployt public/ bei jedem Push auf main auf Cloudflare Pages.
+# Typprüfung, Tests und Build (TypeScript → public/js), danach Deploy auf Cloudflare Pages.
 # Einmalige Einrichtung (Secrets, Pages-Projekt, Domain): siehe README.md → Deployment.
 name: Deploy
 
@@ -23,6 +23,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: lts/*
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
       - run: npm test
 
   deploy:
@@ -33,6 +36,12 @@ jobs:
       url: https://mental-math.elias-steffen.de
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: npm
+      - run: npm ci
+      - run: npm run build
       - uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}

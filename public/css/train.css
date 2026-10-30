@@ -1,0 +1,25 @@
+/* Train v5: Ghost-Marker, Schätz-Hinweis, Fortschrittsbalken-Wrapper */
+.progress-wrap { position:relative; flex:1; min-width:0; padding-bottom:0; }
+.progress-wrap > .progress { width:100%; }
+.ghost-marker {
+  position:absolute; top:-3px; left:calc(var(--ghost, 0) * 1%);
+  width:2px; height:11px; margin-left:-1px; border-radius:1px;
+  background:var(--warn, var(--accent-text)); opacity:.85; pointer-events:none;
+  transition:left 200ms linear;
+}
+.ghost-label {
+  position:absolute; top:12px; left:50%; transform:translateX(-50%);
+  font-size:0.625rem; line-height:1; font-weight:700; letter-spacing:.02em;
+  color:var(--muted); white-space:nowrap;
+}
+.play-head .bar-row { align-items:flex-start; }
+.est-hint {
+  display:inline-block; margin:0 auto 6px; padding:3px 10px; border-radius:999px;
+  font-size:0.8125rem; font-weight:600; color:var(--accent-text);
+  background:color-mix(in srgb, var(--accent) 14%, var(--surface));
+}
+.choice { justify-content:center; text-align:center; }
+@media (max-width:360px) {
+  .ghost-label { font-size:0.5625rem; }
+  .est-hint { font-size:0.75rem; }
+}

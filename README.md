@@ -1,6 +1,6 @@
 # Kopfrechner
 
-Minimalistischer Kopfrechen-Trainer für Case Interviews (Consulting). Er ist rein statisch, braucht keinen Build-Schritt und keine Dependencies und speichert alle Daten nur lokal im Browser.
+Minimalistischer Kopfrechen-Trainer für Case Interviews (Consulting). Er ist in TypeScript geschrieben (Build per `tsc`, keine Laufzeit-Dependencies) und speichert alle Daten nur lokal im Browser.
 
 - **8 Kategorien** + „Alle Kategorien“: Multiplikation, Division, Große Zahlen, Prozente, Brüche, Wachstum, Business (Payback, Break-even, TCO, FTE, SLA …), Überschlag
 - **Score pro Aufgabe** aus Ergebnis, Zeit im Verhältnis zur Zielzeit und Schwierigkeit
@@ -23,16 +23,26 @@ Details: [docs/SPEC.md](docs/SPEC.md)
 ## Lokal starten
 
 ```bash
-npm run dev        # → http://localhost:8080 (ohne KI)
+npm install        # TypeScript + @types/node (nur Dev-Dependencies)
 ```
 
 ```bash
-npm run dev:ai     # → http://localhost:8788 (mit KI-Function; liest GOOGLE_API_KEY aus .env)
+npm run dev        # Build + http://localhost:8080 (ohne KI)
 ```
 
 ```bash
-npm test           # Logik-Tests (node:test, keine Dependencies)
+npm run dev:ai     # Build + http://localhost:8788 (mit KI-Function; liest GOOGLE_API_KEY aus .env)
 ```
+
+```bash
+npm run build      # tsc (src → public/js, sw.ts → public/sw.js) + scripts/precache.mjs
+npm run typecheck  # tsc über src, server, functions, tests
+npm test           # Tests (node --test, TypeScript direkt per Type-Stripping)
+```
+
+`public/js/`, `public/sw.js` und `public/precache.json` sind **Build-Output** (gitignored). Der Service Worker liest Version und Precache-Liste zur Laufzeit aus `precache.json`.
+
+> Einmalige Migration für den Repo-Owner vor dem ersten TS-Commit: `git rm -r --cached public/js public/sw.js`
 
 ## Deployment (GitHub Actions → Cloudflare Pages)
 
@@ -83,7 +93,7 @@ npx wrangler pages deploy public --project-name=mental-math
 
 ## KI-Erklärungen (optional)
 
-Der Button „KI-Erklärung“ (nach einer Antwort) und „KI: anders erklären“ (im Lernbereich) rufen die Cloudflare Pages Function `functions/api/explain.js` auf. Die Logik dazu steckt in `server/explain.js`. Die Function fragt Google Gemini an, Standardmodell ist `gemini-flash-lite-latest`. **Der API-Key liegt nur als Cloudflare-Secret auf dem Server und erreicht nie den Browser.** Ist kein Key gesetzt, blendet die App die KI-Buttons automatisch aus.
+Der Button „KI-Erklärung“ (nach einer Antwort) und „KI: anders erklären“ (im Lernbereich) rufen die Cloudflare Pages Function `functions/api/explain.ts` auf. Die Logik dazu steckt in `server/explain.ts`. Die Function fragt Google Gemini an, Standardmodell ist `gemini-flash-lite-latest`. **Der API-Key liegt nur als Cloudflare-Secret auf dem Server und erreicht nie den Browser.** Ist kein Key gesetzt, blendet die App die KI-Buttons automatisch aus.
 
 **Einrichten (einmalig):**
 
@@ -108,20 +118,23 @@ Fortschritt und Statistiken liegen nur im `localStorage` deines Browsers (Schlü
 ## Struktur
 
 ```
-public/          ← wird ausgeliefert
-  index.html
-  css/style.css
-  js/numbers.js     Formatieren & Parsen (de-DE)
-  js/generators.js  Kategorien, Aufgabentypen, Generatoren
-  js/solutions.js   Lösungsweg mit den Zahlen der Aufgabe
-  js/methods.js     Lernmethoden pro Aufgabentyp
-  js/scoring.js     Bewertung, Punkte, Skill, Schwächen
-  js/storage.js     localStorage
-  js/ai.js          Client für /api/explain
-  js/app.js         Router & Views
-functions/api/explain.js  ← Cloudflare Pages Function (KI-Endpoint)
-server/explain.js         ← Validierung, Prompt, Gemini-Aufruf, Rate-Limit
-tests/           ← node --test
-docs/SPEC.md     ← Spezifikation & Design
-.github/workflows/deploy.yml  ← CI/CD: Tests + Deploy auf Cloudflare Pages
+src/
+  types.ts          zentrale Typen
+  core/             DOM-frei: numbers, rng, units, catalog, generators/, solutions/,
+                    methods, scoring, review, progress, modes, daily, chain
+  data/storage.ts   localStorage (Schema + Migration)
+  ui/               dom, charts, icons, keypad, fx, theme, toast
+  features/         ai-client, activity, pwa
+  views/            home, lernen, analyse, settings, daily, chain, train/
+  router.ts  app.ts
+  sw.ts             Service Worker (→ public/sw.js)
+public/             ← wird ausgeliefert
+  index.html  css/  icons/  manifest.webmanifest  _headers
+  js/ sw.js precache.json   ← Build-Output
+scripts/precache.mjs        erzeugt public/precache.json
+functions/api/explain.ts    ← Cloudflare Pages Function (KI-Endpoint)
+server/explain.ts           ← Validierung, Prompt, Gemini-Aufruf, Rate-Limit
+tests/                      ← node --test (*.test.ts)
+docs/                       ← SPEC, ARCHITECTURE, PLAN-v5
+.github/workflows/deploy.yml  ← CI/CD: Tests + Build + Deploy auf Cloudflare Pages
 ```
