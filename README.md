@@ -35,14 +35,15 @@ npm run dev:ai     # Build + http://localhost:8788 (mit KI-Function; liest GOOGL
 ```
 
 ```bash
-npm run build      # tsc (src → public/js, sw.ts → public/sw.js) + scripts/precache.mjs
-npm run typecheck  # tsc über src, server, functions, tests
+npm run build      # clean (dist/ leeren) → tsc (src → dist/js, sw.ts → dist/sw.js) → copy-static (public/ → dist/) → precache (dist/precache.json)
+npm run clean      # löscht dist/
+npm run typecheck  # tsc über src, server, functions, tests, scripts
 npm test           # Tests (node --test, TypeScript direkt per Type-Stripping)
 ```
 
-`public/js/`, `public/sw.js` und `public/precache.json` sind **Build-Output** (gitignored). Der Service Worker liest Version und Precache-Liste zur Laufzeit aus `precache.json`.
+`dist/` ist die **Build-Ausgabe** (gitignored) und wird komplett neu erzeugt. Quellen für statische Dateien liegen in `public/`, Build-Skripte in `scripts/`. Der Service Worker liest Version und Precache-Liste zur Laufzeit aus `dist/precache.json`.
 
-> Einmalige Migration für den Repo-Owner vor dem ersten TS-Commit: `git rm -r --cached public/js public/sw.js`
+> Einmalige Migration für bestehende Klone: `git rm -r --cached public/js public/sw.js public/precache.json`
 
 ## Deployment (GitHub Actions → Cloudflare Pages)
 
@@ -50,7 +51,7 @@ npm test           # Tests (node --test, TypeScript direkt per Type-Stripping)
 - **Cloudflare-Pages-Projekt:** `mental-math` (→ `mental-math.pages.dev`)
 - **Domain:** `mental-math.elias-steffen.de`
 
-Jeder Push auf `main` startet [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml). Der Workflow führt erst die Tests aus und deployt dann `public/` auf Cloudflare Pages. Schlagen die Tests fehl, wird nichts deployt. Manuell anstoßen lässt er sich über **Actions → Deploy → Run workflow**.
+Jeder Push auf `main` startet [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml). Der Workflow führt erst die Tests aus und deployt dann `dist/` (Build-Ausgabe aus `public/` + `src/`) auf Cloudflare Pages. Schlagen die Tests fehl, wird nichts deployt. Manuell anstoßen lässt er sich über **Actions → Deploy → Run workflow**.
 
 ### Einmalige Einrichtung
 
@@ -86,10 +87,11 @@ Jeder Push auf `main` startet [`.github/workflows/deploy.yml`](.github/workflows
 **Manuell deployen (ohne GitHub):**
 
 ```bash
-npx wrangler pages deploy public --project-name=mental-math
+npm run build
+npx wrangler pages deploy dist --project-name=mental-math
 ```
 
-`public/_headers` setzt Security-Header (u. a. eine strikte Content-Security-Policy). Die App lädt nichts von externen Quellen.
+`public/_headers` (landet über `dist/_headers` im Deployment) setzt Security-Header (u. a. eine strikte Content-Security-Policy). Die App lädt nichts von externen Quellen.
 
 ## KI-Erklärungen (optional)
 
@@ -127,12 +129,12 @@ src/
   features/         ai-client, activity, pwa
   views/            home, lernen, analyse, settings, daily, chain, train/
   router.ts  app.ts
-  sw.ts             Service Worker (→ public/sw.js)
-public/             ← wird ausgeliefert
-  index.html  css/  icons/  manifest.webmanifest  _headers
-  js/ sw.js precache.json   ← Build-Output
-scripts/precache.mjs        erzeugt public/precache.json
-functions/api/explain.ts    ← Cloudflare Pages Function (KI-Endpoint)
+  sw.ts             Service Worker (→ dist/sw.js)
+public/             ← statische Quellen (index.html, css/, icons/, manifest, favicon, _headers)
+dist/               ← Build-Ausgabe, nicht versioniert, wird ausgeliefert
+  js/ sw.js precache.json + kopierte public/-Dateien
+scripts/            Build-Skripte (laufen mit node): clean.ts, copy-static.ts, precache.ts (→ dist/precache.json)
+functions/api/explain.ts    ← Cloudflare Pages Function (KI-Endpoint, bleibt im Repo-Root)
 server/explain.ts           ← Validierung, Prompt, Gemini-Aufruf, Rate-Limit
 tests/                      ← node --test (*.test.ts)
 docs/                       ← SPEC, ARCHITECTURE, PLAN-v5

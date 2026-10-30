@@ -3,7 +3,8 @@ import { SUBTYPES } from '../../core/catalog.ts';
 import { categoryStats, subtypeStats, overall } from '../../core/scoring.ts';
 import { modeName } from '../../core/modes.ts';
 import { addSession, getAttempts, setDailyResult } from '../../data/storage.ts';
-import { go } from '../../router.ts';
+import { go, addCleanup } from '../../router.ts';
+import { createFabBar } from '../../ui/fab.ts';
 import { dailyShareText } from '../../core/daily.ts';
 import { toast } from '../../ui/charts.ts';
 import { h } from '../../ui/dom.ts';
@@ -81,11 +82,13 @@ export function showResult(ctx: TrainCtx): void {
       tile(sk === null || sk === undefined ? '–' : String(sk), 'Skill', level(sk))),
     list,
     h('div', { class: 'btn-row' },
-      h('button', { type: 'button', class: 'btn primary', onclick: () => go(ctx.restart) }, 'Nochmal'),
       retryBtn,
       dailyBtn,
-      h('a', { class: 'btn', href: '#/analyse' }, 'Analyse'),
-      h('a', { class: 'btn', href: '#/' }, 'Übersicht')));
-  const first = root.querySelector<HTMLElement>('.btn.primary');
-  if (first) first.focus();
+      h('a', { class: 'btn', href: '#/analyse' }, 'Analyse')));
+  const fab = createFabBar([
+    { label: 'Nochmal', primary: true, onClick: () => go(ctx.restart) },
+    { label: 'Übersicht', onClick: () => go('#/') },
+  ]);
+  addCleanup(fab.destroy);
+  fab.el.querySelector<HTMLElement>('.fab-btn.primary')?.focus();
 }

@@ -3,6 +3,8 @@ import { scoreParallel, updateParallelStats } from '../../core/parallel.ts';
 import { fmt } from '../../core/numbers.ts';
 import { getParallelStats, setParallelStats } from '../../data/storage.ts';
 import { app, h, appendChildren } from '../../ui/dom.ts';
+import { createFabBar } from '../../ui/fab.ts';
+import { addCleanup, go } from '../../router.ts';
 
 export interface ParallelSession {
   /** aufeinanderfolgende fehlerfreie Runden in diesem Besuch */
@@ -52,8 +54,10 @@ export function renderResult(
       newBest ? h('div', { class: 'sub' }, `Neuer Rekord: ${stats.bestChains} Ketten fehlerfrei`) : null,
       session.streak > 1 ? h('div', { class: 'sub' }, `${session.streak} fehlerfreie Runden in Folge`) : null),
     list,
-    h('p', { class: 'muted' }, `Nächste Runde: ${stats.nextStart} Ketten`),
-    h('div', { class: 'btn-row' },
-      h('button', { type: 'button', class: 'btn primary', onclick: () => onAgain(stats.nextStart) }, 'Nochmal'),
-      h('a', { class: 'btn', href: '#/' }, 'Übersicht')))]);
+    h('p', { class: 'muted' }, `Nächste Runde: ${stats.nextStart} Ketten`))]);
+  const fab = createFabBar([
+    { label: 'Nochmal', primary: true, onClick: () => { fab.destroy(); onAgain(stats.nextStart); } },
+    { label: 'Übersicht', onClick: () => go('#/') },
+  ]);
+  addCleanup(fab.destroy);
 }

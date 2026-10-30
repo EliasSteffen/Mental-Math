@@ -3,11 +3,12 @@ import assert from 'node:assert/strict';
 import {
   getSettings, setSettings, getReviews, setReviews, getActivity, addActivityMs, resetAll, load, save,
   getDailyResults, setDailyResult, getChainBest, setChainBest, addAttempt, addSession, getAttempts, getSessions,
-  invalidateCache, exportJSON, DEFAULT_SETTINGS,
+  invalidateCache, exportJSON, DEFAULT_SETTINGS, getParallelStats, getProfile,
 } from '../src/data/storage.ts';
 import type { Attempt, DailyResult, Session, State } from '../src/types.ts';
 
 const KEY = 'kopfrechner.v1';
+const V3 = 'mm:v3:';
 
 interface FakeStorage extends Storage { reads: number; writes: number; raw: Map<string, string> }
 
@@ -48,7 +49,7 @@ test('Defaults, alte Daten werden ergänzt (In-Memory)', () => {
   resetAll();
   assert.deepEqual(getSettings(), {
     sessionLength: 10, dailyGoalMin: 15, theme: 'system', difficulty: 'auto', timer: true, sound: false, haptics: true, celebrated: '', keypad: 'auto', enabledCategories: null,
-    autoSubmit: false, numpadLayout: 'calculator', estimateMode: false, ghost: true,
+    autoSubmit: false, numpadLayout: 'calculator', estimateMode: false, ghost: true, autoFail: false,
   });
   assert.deepEqual(getReviews(), {});
   assert.deepEqual(getActivity(), {});
@@ -126,13 +127,14 @@ test('Migration v1 → v2: Daten bleiben, neue Felder und Defaults kommen dazu',
     assert.equal(s.sessions.length, 1);
     assert.deepEqual(s.reviews, v1.reviews);
     assert.deepEqual(s.activity, v1.activity);
-    // Schlüssel bleibt, nach dem ersten Schreiben liegt v2 im Speicher
+    // Nach der Migration liegt v3 im Speicher, der alte Stand bleibt als Backup
     setSettings({ ghost: false });
-    const stored = JSON.parse(fs.raw.get(KEY) ?? '{}') as State;
-    assert.equal(stored.version, 2);
-    assert.equal(stored.settings.ghost, false);
-    assert.equal(stored.attempts.length, 1);
-    assert.deepEqual([...fs.raw.keys()], [KEY]);
+    const stored = JSON.parse(fs.raw.get(V3 + 'doc:settings') ?? '{}') as Record<string, unknown>;
+    assert.equal(stored.ghost, false);
+    assert.equal(stored.sessionLength, 20);
+    assert.equal((JSON.parse(fs.raw.get(V3 + 'col:results') ?? '[]') as unknown[]).length, 1);
+    assert.ok(!fs.raw.has(KEY));
+    assert.equal(fs.raw.get(KEY + '.bak'), JSON.stringify(v1));
   });
 });
 
@@ -159,43 +161,46 @@ test('Falsch typisierte Felder werden durch Defaults ersetzt', () => {
 });
 
 // ---------- Cache ----------
-test('Cache: Getter parsen localStorage nur einmal', () => {
+test('Cache: Getter lesen den Speicher nur einmal', () => {
   const fs = fakeStorage({ [KEY]: JSON.stringify({ version: 2, attempts: [att()] }) });
   withStorage(fs, () => {
-    for (let i = 0; i < 10; i++) {
-      getAttempts();
-      getSettings();
-      getReviews();
-      getActivity();
-      getDailyResults();
-    }
-    assert.equal(fs.reads, 1);
-    assert.equal(fs.writes, 0);
+    const all = (): void => { getAttempts(); getSessions(); getSettings(); getReviews(); getActivity(); getDailyResults(); getChainBest(); getParallelStats(); };
+    all();
+    const reads = fs.reads;
+    for (let i = 0; i < 10; i++) all();
+    assert.equal(fs.reads, reads, 'wiederholte Getter treffen den Cache');
+    assert.equal(getAttempts().length, 1);
   });
 });
 
-test('Cache: Write-Through bei jeder Mutation, ohne erneutes Lesen', () => {
+test('Cache: Write-Through bei Mutationen, ohne erneutes Lesen', () => {
   const fs = fakeStorage();
   withStorage(fs, () => {
     getSettings();
+    getAttempts();
+    getSessions();
+    getReviews();
+    getActivity();
+    getDailyResults();
+    getChainBest();
+    getProfile(); // liest auch die Geräte-ID
     const reads = fs.reads;
+    const writes = fs.writes;
     setSettings({ theme: 'pastel' });
-    assert.equal(fs.writes, 1);
+    assert.ok(fs.writes > writes);
     addAttempt(att({ ts: 7 }));
-    assert.equal(fs.writes, 2);
     addSession({ id: 'x', ts: 1, mode: 'all', n: 1, correct: 1, points: 1, avgTimeMs: 1 } satisfies Session);
     setReviews({ a: { box: 0, dueAt: 1, lastTs: 0 } });
     addActivityMs(100, new Date(2026, 0, 1, 12).getTime());
     setDailyResult('2026-01-01', { n: 15, correct: 12, points: 1000, timeMs: 90000, ts: 5 });
     setChainBest(2, 6);
-    assert.equal(fs.writes, 7);
     assert.equal(fs.reads, reads, 'Mutationen lesen nicht erneut');
-    const stored = JSON.parse(fs.raw.get(KEY) ?? '{}') as State;
-    assert.equal(stored.settings.theme, 'pastel');
-    assert.equal(stored.attempts[0]?.ts, 7);
-    assert.equal(stored.sessions.length, 1);
-    assert.deepEqual(stored.chainBest, { 2: 6 });
-    assert.equal(stored.dailyResults['2026-01-01']?.correct, 12);
+    const doc = (n: string): Record<string, unknown> => JSON.parse(fs.raw.get(V3 + n) ?? '{}') as Record<string, unknown>;
+    assert.equal(doc('doc:settings').theme, 'pastel');
+    assert.equal((JSON.parse(fs.raw.get(V3 + 'col:results') ?? '[]') as Attempt[])[0]?.ts, 7);
+    assert.equal((JSON.parse(fs.raw.get(V3 + 'col:sessions') ?? '[]') as unknown[]).length, 1);
+    assert.deepEqual(doc('doc:chainBest'), { 2: 6 });
+    assert.equal((doc('doc:dailyResults')['2026-01-01'] as DailyResult).correct, 12);
     assert.equal(getAttempts().length, 1);
     assert.equal(getSessions().length, 1);
   });
@@ -205,11 +210,10 @@ test('Cache: invalidateCache liest geänderte Daten neu ein', () => {
   const fs = fakeStorage();
   withStorage(fs, () => {
     assert.equal(getSettings().sessionLength, 10);
-    fs.raw.set(KEY, JSON.stringify({ version: 2, settings: { sessionLength: 30 } }));
+    fs.raw.set(V3 + 'doc:settings', JSON.stringify({ sessionLength: 30, updatedAt: 1 }));
     assert.equal(getSettings().sessionLength, 10, 'ohne Invalidierung bleibt der Cache');
     invalidateCache();
     assert.equal(getSettings().sessionLength, 30);
-    assert.equal(fs.reads, 2);
   });
 });
 
@@ -226,7 +230,7 @@ test('Cache: storage-Event aus anderem Tab invalidiert (nur Schlüssel oder clea
     (globalThis as { localStorage?: Storage }).localStorage = fs;
     try {
       assert.equal(mod.getSettings().sessionLength, 10);
-      fs.raw.set(KEY, JSON.stringify({ version: 2, settings: { sessionLength: 25 } }));
+      fs.raw.set(V3 + 'doc:settings', JSON.stringify({ sessionLength: 25 }));
       const fire = (key: string | null): void => {
         const e = new Event('storage') as Event & { key: string | null };
         e.key = key;
@@ -234,9 +238,9 @@ test('Cache: storage-Event aus anderem Tab invalidiert (nur Schlüssel oder clea
       };
       fire('anderer.key');
       assert.equal(mod.getSettings().sessionLength, 10, 'fremder Schlüssel ignorieren');
-      fire(KEY);
+      fire(V3 + 'doc:settings');
       assert.equal(mod.getSettings().sessionLength, 25);
-      fs.raw.set(KEY, JSON.stringify({ version: 2, settings: { sessionLength: 40 } }));
+      fs.raw.set(V3 + 'doc:settings', JSON.stringify({ sessionLength: 40 }));
       fire(null);
       assert.equal(mod.getSettings().sessionLength, 40);
     } finally {
@@ -273,9 +277,9 @@ test('resetAll leert Speicher und Cache', () => {
   const fs = fakeStorage();
   withStorage(fs, () => {
     setSettings({ sessionLength: 99 });
-    assert.ok(fs.raw.has(KEY));
+    assert.ok(fs.raw.has(V3 + 'doc:settings'));
     resetAll();
-    assert.ok(!fs.raw.has(KEY));
+    assert.ok(!fs.raw.has(V3 + 'doc:settings'));
     assert.equal(getSettings().sessionLength, 10);
   });
 });

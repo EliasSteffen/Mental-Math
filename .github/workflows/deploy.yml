@@ -1,4 +1,4 @@
-# Typprüfung, Tests und Build (TypeScript → public/js), danach Deploy auf Cloudflare Pages.
+# Typprüfung, Tests und Build (TypeScript → dist/js, statische Dateien → dist/), danach Deploy auf Cloudflare Pages.
 # Einmalige Einrichtung (Secrets, Pages-Projekt, Domain): siehe README.md → Deployment.
 name: Deploy
 
@@ -46,5 +46,5 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy public --project-name=mental-math --branch=main
+          command: pages deploy dist --project-name=mental-math --branch=main
           gitHubToken: ${{ secrets.GITHUB_TOKEN }}

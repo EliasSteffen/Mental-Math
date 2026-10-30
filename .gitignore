@@ -4,7 +4,5 @@ node_modules/
 .env
 .env.*
 .dev.vars
-# Build-Output (aus src/ via tsc)
-public/js/
-public/sw.js
-public/precache.json
+# Build-Output (aus src/ via tsc, public/ kopiert, precache) – nicht versioniert
+dist/

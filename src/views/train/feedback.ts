@@ -53,12 +53,14 @@ export interface FeedbackParams {
   method: Method | null;
   isLast: boolean;
   onNext: () => void;
+  /** Zeit abgelaufen (Auto-Fail) */
+  timedOut?: boolean;
 }
 
 const LABELS: Record<string, string> = { nullen: 'Nullen-Fehler', knapp: 'Knapp daneben', falsch: 'Falsch', skip: 'Übersprungen' };
 
 /** Baut die Aktionszeile nach der Antwort und liefert sie samt „Weiter“-Button (für Fokus). */
-export function buildFeedback({ task, ev, timeMs, given, assisted, method, isLast, onNext }: FeedbackParams): { nodes: Node[]; nextBtn: HTMLButtonElement } {
+export function buildFeedback({ task, ev, timeMs, given, assisted, method, isLast, onNext, timedOut = false }: FeedbackParams): { nodes: Node[]; nextBtn: HTMLButtonElement } {
   const choices = task.kind === 'choice' && Array.isArray(task.choices) ? task.choices : null;
   const fb = h('div', { class: `feedback ${ev.correct ? 'good anim-pop' : 'bad anim-shake'}` });
   const uF = unitFactor(task.unit);
@@ -66,17 +68,20 @@ export function buildFeedback({ task, ev, timeMs, given, assisted, method, isLas
     ? ` (= ${fmt(Number((task.expected * uF).toPrecision(12)))}${task.unit.includes('€') ? ' €' : ''})`
     : '';
   const answerText = choices ? String(choices[task.expected]) : `${fmt(task.expected)}${task.unit ? ' ' + task.unit : ''}${fullText}`;
+  const timeoutNote = timedOut ? h('div', { class: 'fb-tip' }, 'Zeit abgelaufen') : null;
   const assistNote = assisted ? h('div', { class: 'fb-tip' }, 'Hilfe genutzt – halbe Punkte') : null;
   if (ev.correct) {
     appendChildren(fb, [
       h('div', { class: 'fb-title' }, `✓ Richtig`),
       h('div', { class: 'fb-detail' }, `${fmtSeconds(timeMs)} · +${ev.points} Pkt`),
+      timeoutNote,
       assistNote]);
   } else {
     appendChildren(fb, [
       h('div', { class: 'fb-title' }, `✗ ${(ev.errorType && LABELS[ev.errorType]) || 'Falsch'}`),
       h('div', { class: 'fb-detail' }, `Richtig: ${answerText}`),
       h('div', { class: 'fb-detail' }, `${fmtSeconds(timeMs)} · ${ev.points > 0 ? '+' : ''}${ev.points} Pkt`),
+      timeoutNote,
       assistNote]);
   }
   const steps = safeSteps(task);

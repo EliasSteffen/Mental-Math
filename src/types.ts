@@ -157,6 +157,9 @@ export interface Settings {
   numpadLayout: 'calculator' | 'phone';
   estimateMode: boolean;
   ghost: boolean;
+  // v7
+  /** Timer abgelaufen → aktuelle Eingabe automatisch einreichen */
+  autoFail: boolean;
 }
 
 export interface ReviewItem { box: number; dueAt: number; lastTs: number }
@@ -246,3 +249,63 @@ export interface ParallelStats { nextStart: 2 | 3 | 4; bestChains: number; bestC
 export type AiResult = { ok: true; text: string } | { ok: false; error: string; message: string };
 export type AiInline = { text: string; bold: boolean; italic: boolean };
 export type AiBlock = { type: 'p'; parts: AiInline[] } | { type: 'ol' | 'ul'; items: AiInline[][] };
+
+// ---------- Persistenz v3 (lokal, vorbereitet für Cloud-Sync) ----------
+/** Metadaten, die jedes synchronisierbare Objekt trägt (Konfliktauflösung: höchstes updatedAt / rev gewinnt). */
+export interface SyncMeta {
+  id: string;            // UUID (crypto.randomUUID), global eindeutig
+  createdAt: number;     // Epoch-ms
+  updatedAt: number;     // Epoch-ms, bei jeder Änderung gesetzt
+  deletedAt: number | null; // Soft-Delete (Tombstone) statt physischem Löschen
+  deviceId: string;      // Gerät, das zuletzt geändert hat
+  rev: number;           // lokaler Revisionszähler, +1 je Änderung
+}
+
+export interface UserProfile extends SyncMeta {
+  displayName: string | null;
+  /** gesetzt, sobald ein Cloud-Account verknüpft ist */
+  cloudUserId: string | null;
+  schemaVersion: 3;
+}
+
+export interface AppSettings extends Settings { updatedAt: number }
+
+/** Ein Versuch (Aufgabe) – synchronisierbar */
+export interface GameResult extends Attempt, SyncMeta {}
+
+/** Eine Runde – synchronisierbar */
+export interface SessionStats extends Session, SyncMeta {}
+
+export type SyncCollection = 'results' | 'sessions';
+export type SyncDocument = 'profile' | 'settings' | 'reviews' | 'activity' | 'dailyResults' | 'chainBest' | 'parallel';
+
+export interface ChangeRecord {
+  seq: number;                                // lokal fortlaufend
+  target: SyncCollection | SyncDocument;
+  id: string;                                 // Objekt-ID bzw. Dokumentname
+  op: 'upsert' | 'delete';
+  at: number;                                 // Epoch-ms
+}
+
+export interface SyncState {
+  lastPulledAt: number | null;
+  lastPushedSeq: number;
+  nextSeq: number;
+  pending: ChangeRecord[];                    // max. 2.000, älteste werden zusammengefasst
+}
+
+/** Low-Level-Schlüssel/Wert-Speicher (heute localStorage, später z. B. IndexedDB) */
+export interface StorageAdapter {
+  readonly name: string;
+  get(key: string): string | null;
+  set(key: string, value: string): void;
+  remove(key: string): void;
+  keys(prefix: string): string[];
+}
+
+/** Gegenstück für die spätere Cloud (Firebase, Supabase, eigene API). Heute: NoopSyncProvider. */
+export interface RemoteSyncProvider {
+  readonly name: string;
+  push(changes: ChangeRecord[], docs: Record<string, unknown>): Promise<{ acceptedSeqs: number[] }>;
+  pull(since: number | null): Promise<{ docs: Array<{ target: SyncCollection | SyncDocument; id: string; op: 'upsert' | 'delete'; doc: unknown }>; serverTime: number }>;
+}

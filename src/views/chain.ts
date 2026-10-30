@@ -4,7 +4,8 @@ import { fmt } from '../core/numbers.ts';
 import { getChainBest, setChainBest, getSettings } from '../data/storage.ts';
 import { createKeypad, useKeypad } from '../ui/keypad.ts';
 import { app, h, appendChildren } from '../ui/dom.ts';
-import { setCleanup } from '../router.ts';
+import { setCleanup, addCleanup, go } from '../router.ts';
+import { createFabBar, type FabBar } from '../ui/fab.ts';
 
 const TEMPOS: ReadonlyArray<readonly [number, string]> = [[800, '0,8 s'], [1200, '1,2 s'], [1800, '1,8 s']];
 const LEVELS: ReadonlyArray<readonly [Level, string]> = [[1, 'Level 1'], [2, 'Level 2'], [3, 'Level 3']];
@@ -35,8 +36,10 @@ export function renderChain(): void {
   let streak = 0;
   let timer: number | null = null;
   let keypadEl: HTMLElement | null = null;
+  let fab: FabBar | null = null;
 
   const stop = (): void => {
+    if (fab) { fab.destroy(); fab = null; }
     if (timer !== null) { clearTimeout(timer); timer = null; }
     if (keypadEl) { keypadEl.remove(); keypadEl = null; }
     document.body.classList.remove('has-keypad');
@@ -130,8 +133,13 @@ export function renderChain(): void {
         h('div', { class: 'chain-count' },
           `Serie ${streak} · Bestwert ${Math.max(prev, streak)}${newBest ? ' – neuer Rekord!' : ''}`)),
       h('div', { class: 'btn-row' },
-        h('button', { type: 'button', class: 'btn primary', onclick: () => start() }, 'Nächste Kette'),
         h('button', { type: 'button', class: 'btn', onclick: () => setup() }, 'Einstellungen')));
+    const bar = createFabBar([
+      { label: 'Nochmal', primary: true, onClick: () => start() },
+      { label: 'Übersicht', onClick: () => go('#/') },
+    ]);
+    fab = bar;
+    addCleanup(bar.destroy);
   }
 
   setup();

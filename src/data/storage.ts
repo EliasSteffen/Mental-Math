@@ -1,192 +1,216 @@
-// localStorage mit In-Memory-Fallback, Schema v2 und In-Memory-Cache
-import type { Activity, Attempt, DailyResult, Level, ParallelStats, Reviews, Session, Settings, State } from '../types.ts';
+// Öffentliche Storage-API (unverändert) über dem v3-Repository (`mm:v3:*`, SyncMeta, Änderungsprotokoll).
+// Alles synchron (localStorage). Ein späterer async/IndexedDB-Adapter läuft hinter demselben Repository.
+import type {
+  Activity, Attempt, DailyResult, GameResult, Level, ParallelStats, Reviews, Session, SessionStats, Settings, State, SyncState, UserProfile,
+} from '../types.ts';
+import { createLegacyStore, getDefaultAdapter, V3_PREFIX } from './adapters.ts';
+import { LEGACY_BACKUP_KEY, LEGACY_KEY, migrateV1 } from './migrate.ts';
+import { createMeta, touch } from './meta.ts';
+import { Repository } from './repository.ts';
+import { DEFAULT_PARALLEL_STATS, DEFAULT_SETTINGS, isObj, normalize, normalizeParallel } from './schema.ts';
 
-const KEY = 'kopfrechner.v1'; // Schlüssel bleibt, damit keine Nutzerdaten verloren gehen
+export { DEFAULT_PARALLEL_STATS, DEFAULT_SETTINGS, normalize };
+
 const MAX_ATTEMPTS = 5000;
 const MAX_SESSIONS = 500;
 const MAX_ACTIVITY_DAYS = 400;
+const KEEP_ON_RESET = ['deviceId', 'doc:profile'];
 
-export const DEFAULT_SETTINGS: Settings = {
-  sessionLength: 10, dailyGoalMin: 15, theme: 'system', difficulty: 'auto',
-  timer: true, sound: false, haptics: true, celebrated: '', keypad: 'auto',
-  enabledCategories: null,
-  autoSubmit: false, numpadLayout: 'calculator', estimateMode: false, ghost: true,
-};
+const adapter = getDefaultAdapter();
+const repo = new Repository(adapter);
+const legacy = createLegacyStore();
+let ready = false;
 
-export const DEFAULT_PARALLEL_STATS: ParallelStats = { nextStart: 2, bestChains: 0, bestCorrectStreak: 0, rounds: 0 };
-
-const defaults = (): State => ({
-  version: 2, attempts: [], sessions: [], settings: { ...DEFAULT_SETTINGS }, reviews: {}, activity: {},
-  dailyResults: {}, chainBest: {},
-  parallel: { ...DEFAULT_PARALLEL_STATS },
-});
-
-const isObj = (x: unknown): x is Record<string, unknown> => x !== null && typeof x === 'object' && !Array.isArray(x);
-
-function store(): Storage | null {
-  try {
-    return globalThis.localStorage || null;
-  } catch {
-    return null;
+/** Repository; führt beim ersten Zugriff (und nach Invalidierung) die Migration von `kopfrechner.v1` aus. */
+function r(): Repository {
+  if (!ready) {
+    ready = true;
+    try {
+      migrateV1(repo, legacy);
+    } catch {
+      /* Migration darf die App nie blockieren */
+    }
   }
+  return repo;
 }
 
-/** Beliebige (auch alte v1-)Daten → gültiger State v2. Fehlende Felder werden mit Defaults ergänzt. */
-export function normalize(s: unknown): State {
-  const d = defaults();
-  if (!isObj(s)) return d;
-  return {
-    version: 2,
-    attempts: Array.isArray(s.attempts) ? (s.attempts as Attempt[]) : d.attempts,
-    sessions: Array.isArray(s.sessions) ? (s.sessions as Session[]) : d.sessions,
-    settings: { ...d.settings, ...(isObj(s.settings) ? (s.settings as Partial<Settings>) : {}) },
-    reviews: isObj(s.reviews) ? (s.reviews as Reviews) : d.reviews,
-    activity: isObj(s.activity) ? (s.activity as Activity) : d.activity,
-    dailyResults: isObj(s.dailyResults) ? (s.dailyResults as Record<string, DailyResult>) : d.dailyResults,
-    chainBest: isObj(s.chainBest) ? (s.chainBest as Partial<Record<Level, number>>) : d.chainBest,
-    parallel: normalizeParallel(s.parallel),
-  };
+// ---------- abgeleitete Sichten (pro Revision gecacht, stabile Objektidentität zwischen Schreibzugriffen) ----------
+const views = new Map<string, { rev: number; v: unknown }>();
+function view<T>(key: string, build: () => T): T {
+  const rp = r();
+  const hit = views.get(key);
+  if (hit && hit.rev === rp.revision) return hit.v as T;
+  const v = build();
+  views.set(key, { rev: rp.revision, v });
+  return v;
 }
-
-function normalizeParallel(p: unknown): ParallelStats {
-  const d = { ...DEFAULT_PARALLEL_STATS };
-  if (!isObj(p)) return d;
-  const num = (v: unknown, fb: number): number => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? Math.floor(v) : fb);
-  const ns = p.nextStart === 3 || p.nextStart === 4 ? p.nextStart : 2;
-  return { nextStart: ns, bestChains: num(p.bestChains, 0), bestCorrectStreak: num(p.bestCorrectStreak, 0), rounds: num(p.rounds, 0) };
-}
-
-// ---------- Cache ----------
-let mem: State | null = null; // In-Memory-Fallback (wenn localStorage fehlt/voll ist)
-let cache: State | null = null; // geparster Stand von localStorage (Write-Through)
 
 if (typeof globalThis.addEventListener === 'function') {
   // Änderungen aus anderen Tabs: Cache verwerfen
   globalThis.addEventListener('storage', (e: Event) => {
     const key = (e as StorageEvent).key;
-    if (key === null || key === undefined || key === KEY) cache = null;
+    if (key === null || key === undefined || key.startsWith(V3_PREFIX) || key === LEGACY_KEY) invalidateCache();
   });
 }
 
 /** Cache verwerfen (z. B. für Tests oder nach externen Änderungen) */
 export function invalidateCache(): void {
-  cache = null;
+  repo.invalidate();
+  views.clear();
+  ready = false;
 }
 
+// ---------- Profil & Sync ----------
+export function getProfile(): UserProfile {
+  const rp = r();
+  const p = rp.getDoc<UserProfile>('profile');
+  if (p && typeof p.id === 'string' && p.schemaVersion === 3) return p;
+  const created: UserProfile = { ...createMeta(Date.now(), rp.deviceId), displayName: null, cloudUserId: null, schemaVersion: 3 };
+  rp.putDoc('profile', created);
+  return created;
+}
+
+export function updateProfile(patch: Partial<Pick<UserProfile, 'displayName' | 'cloudUserId'>>): UserProfile {
+  const next: UserProfile = { ...touch(getProfile(), Date.now(), r().deviceId), ...patch };
+  r().putDoc('profile', next);
+  return next;
+}
+
+export const getSyncState = (): SyncState => r().getSyncState();
+
+// ---------- State-Sicht (Kompatibilität) ----------
+/** Gesamter Stand als State v2 (abgeleitet; Schreiben über die Setter bzw. `save`). */
 export function load(): State {
-  if (cache) return cache;
-  try {
-    const ls = store();
-    const raw = ls && ls.getItem(KEY);
-    if (raw) {
-      cache = normalize(JSON.parse(raw) as unknown);
-      return cache;
-    }
-  } catch {
-    /* Fallback unten */
-  }
-  cache = normalize(mem);
-  return cache;
+  return {
+    version: 2,
+    attempts: getAttempts(), sessions: getSessions(), settings: getSettings(), reviews: getReviews(), activity: getActivity(),
+    dailyResults: getDailyResults(), chainBest: getChainBest(), parallel: getParallelStats(),
+  };
 }
 
+/** Kompletten State v2 übernehmen (ersetzt alles; Einträge ohne SyncMeta bekommen eine). */
 export function save(state: State): void {
-  const next = normalize(state);
-  mem = next;
-  cache = next;
-  try {
-    const ls = store();
-    if (ls) ls.setItem(KEY, JSON.stringify(next));
-  } catch {
-    /* In-Memory-Fallback */
-  }
+  const s = normalize(state);
+  const rp = r();
+  const dev = rp.deviceId;
+  const now = Date.now();
+  const withMeta = <T extends { ts: number }>(x: T, id?: string): T & ReturnType<typeof createMeta> => {
+    const m = x as Partial<ReturnType<typeof createMeta>>;
+    if (typeof m.id === 'string' && typeof m.rev === 'number' && typeof m.createdAt === 'number') return x as T & ReturnType<typeof createMeta>;
+    return { ...x, ...createMeta(now, dev, id) };
+  };
+  setSettings(s.settings);
+  setReviews(s.reviews);
+  rp.putDoc('activity', s.activity);
+  rp.putDoc('dailyResults', s.dailyResults);
+  rp.putDoc('chainBest', s.chainBest);
+  setParallelStats(s.parallel);
+  rp.replaceCollection('results', s.attempts.map((a) => withMeta(a)));
+  rp.replaceCollection('sessions', s.sessions.map((x) => withMeta(x, x.id)));
 }
 
-export const getAttempts = (): Attempt[] => load().attempts;
-export const getSessions = (): Session[] => load().sessions;
-export const getSettings = (): Settings => load().settings;
-
-export function setSettings(partial: Partial<Settings>): Settings {
-  const s = load();
-  s.settings = { ...s.settings, ...partial };
-  save(s);
-  return s.settings;
-}
-
-export const getReviews = (): Reviews => load().reviews;
-
-export function setReviews(reviews: Reviews): Reviews {
-  const s = load();
-  s.reviews = isObj(reviews) ? reviews : {};
-  save(s);
-  return s.reviews;
-}
-
-export const getActivity = (): Activity => load().activity;
-
-export function addActivityMs(ms: number, ts: number = Date.now()): number {
-  const s = load();
-  const d = new Date(ts);
-  const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-  s.activity[key] = (Number(s.activity[key]) || 0) + (Number(ms) || 0);
-  const keys = Object.keys(s.activity).sort();
-  if (keys.length > MAX_ACTIVITY_DAYS) for (const k of keys.slice(0, keys.length - MAX_ACTIVITY_DAYS)) delete s.activity[k];
-  save(s);
-  return s.activity[key] ?? 0;
-}
+// ---------- Ergebnisse & Runden ----------
+export const getAttempts = (): GameResult[] => r().list<GameResult>('results');
+export const getSessions = (): SessionStats[] => r().list<SessionStats>('sessions');
 
 export function addAttempt(attempt: Attempt): void {
-  const s = load();
-  s.attempts.push(attempt);
-  if (s.attempts.length > MAX_ATTEMPTS) s.attempts = s.attempts.slice(-MAX_ATTEMPTS);
-  save(s);
+  const rp = r();
+  rp.upsert<GameResult>('results', { ...attempt, ...createMeta(Date.now(), rp.deviceId) });
+  rp.trim('results', MAX_ATTEMPTS);
 }
 
 export function addSession(session: Session): void {
-  const s = load();
-  s.sessions.push(session);
-  if (s.sessions.length > MAX_SESSIONS) s.sessions = s.sessions.slice(-MAX_SESSIONS);
-  save(s);
+  const rp = r();
+  rp.upsert<SessionStats>('sessions', { ...session, ...createMeta(Date.now(), rp.deviceId, session.id) });
+  rp.trim('sessions', MAX_SESSIONS);
+}
+
+// ---------- Settings ----------
+export const getSettings = (): Settings => view('settings', () => {
+  const { updatedAt: _u, ...rest } = (r().getDoc<Record<string, unknown>>('settings') ?? {}) as Record<string, unknown>;
+  void _u;
+  return { ...DEFAULT_SETTINGS, ...(rest as Partial<Settings>) };
+});
+
+export function setSettings(partial: Partial<Settings>): Settings {
+  const next = { ...getSettings(), ...partial };
+  r().putDoc('settings', { ...next, updatedAt: Date.now() });
+  return getSettings();
+}
+
+// ---------- Dokumente ----------
+export const getReviews = (): Reviews => view('reviews', () => {
+  const d = r().getDoc<unknown>('reviews');
+  return isObj(d) ? (d as Reviews) : {};
+});
+
+export function setReviews(reviews: Reviews): Reviews {
+  const doc = isObj(reviews) ? reviews : {};
+  r().putDoc('reviews', doc);
+  return doc;
+}
+
+export const getActivity = (): Activity => view('activity', () => {
+  const d = r().getDoc<unknown>('activity');
+  return isObj(d) ? (d as Activity) : {};
+});
+
+export function addActivityMs(ms: number, ts: number = Date.now()): number {
+  const act: Activity = { ...getActivity() };
+  const d = new Date(ts);
+  const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  act[key] = (Number(act[key]) || 0) + (Number(ms) || 0);
+  const keys = Object.keys(act).sort();
+  if (keys.length > MAX_ACTIVITY_DAYS) for (const k of keys.slice(0, keys.length - MAX_ACTIVITY_DAYS)) delete act[k];
+  r().putDoc('activity', act);
+  return act[key] ?? 0;
 }
 
 // ---------- v2: Daily & Kettenrechnen ----------
-export const getDailyResults = (): Record<string, DailyResult> => load().dailyResults;
+export const getDailyResults = (): Record<string, DailyResult> => view('dailyResults', () => {
+  const d = r().getDoc<unknown>('dailyResults');
+  return isObj(d) ? (d as Record<string, DailyResult>) : {};
+});
 
 export function setDailyResult(dateKey: string, result: DailyResult): Record<string, DailyResult> {
-  const s = load();
-  s.dailyResults[dateKey] = result;
-  save(s);
-  return s.dailyResults;
+  const next = { ...getDailyResults(), [dateKey]: result };
+  r().putDoc('dailyResults', next);
+  return next;
 }
 
-export const getChainBest = (): Partial<Record<Level, number>> => load().chainBest;
+export const getChainBest = (): Partial<Record<Level, number>> => view('chainBest', () => {
+  const d = r().getDoc<unknown>('chainBest');
+  return isObj(d) ? (d as Partial<Record<Level, number>>) : {};
+});
 
 export function setChainBest(level: Level, value: number): Partial<Record<Level, number>> {
-  const s = load();
-  s.chainBest[level] = value;
-  save(s);
-  return s.chainBest;
+  const next = { ...getChainBest(), [level]: value };
+  r().putDoc('chainBest', next);
+  return next;
 }
 
-export const getParallelStats = (): ParallelStats => load().parallel;
+export const getParallelStats = (): ParallelStats => view('parallel', () => normalizeParallel(r().getDoc<unknown>('parallel')));
 
 export function setParallelStats(stats: ParallelStats): ParallelStats {
-  const s = load();
-  s.parallel = normalizeParallel(stats);
-  save(s);
-  return s.parallel;
+  const next = normalizeParallel(stats);
+  r().putDoc('parallel', next);
+  return next;
 }
 
+// ---------- Reset & Export ----------
+/** Löscht alle Daten inkl. Backup und Sync-Protokoll; Profil und deviceId bleiben. */
 export function resetAll(): void {
-  mem = null;
-  cache = null;
-  try {
-    const ls = store();
-    if (ls) ls.removeItem(KEY);
-  } catch {
-    /* ignorieren */
-  }
+  repo.clear(KEEP_ON_RESET);
+  legacy.remove(LEGACY_KEY);
+  legacy.remove(LEGACY_BACKUP_KEY);
+  views.clear();
+  ready = false;
 }
 
+/** Export v3: alle Daten inkl. Profil und SyncMeta der Ergebnisse/Runden (ohne Tombstones). */
 export function exportJSON(): string {
-  return JSON.stringify(load(), null, 2);
+  const s = load();
+  return JSON.stringify({
+    ...s, version: 3, exportedAt: Date.now(), deviceId: r().deviceId, profile: getProfile(),
+  }, null, 2);
 }

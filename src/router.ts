@@ -13,9 +13,16 @@ import { renderSettings } from './views/settings.ts';
 
 /* ---------- Cleanup-Hook (aktuelle View räumt Timer/Listener auf) ---------- */
 
-let cleanup: (() => void) | null = null;
-export function setCleanup(fn: (() => void) | null): void { cleanup = fn; }
-export function runCleanup(): void { if (cleanup) { const fn = cleanup; cleanup = null; fn(); } }
+let cleanups: Array<() => void> = [];
+/** Ersetzt alle registrierten Aufräum-Funktionen durch fn (oder leert sie). */
+export function setCleanup(fn: (() => void) | null): void { cleanups = fn ? [fn] : []; }
+/** Registriert zusätzlich eine Aufräum-Funktion für die aktuelle View. */
+export function addCleanup(fn: () => void): void { cleanups.push(fn); }
+export function runCleanup(): void {
+  const fns = cleanups;
+  cleanups = [];
+  for (const fn of fns) fn();
+}
 
 /* ---------- Navigation ---------- */
 

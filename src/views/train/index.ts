@@ -1,5 +1,5 @@
 import type { Attempt, CustomRange, Evaluation, Level, Mode, Task } from '../../types.ts';
-import { unitFactor } from '../../core/numbers.ts';
+import { unitFactor, parseAnswer } from '../../core/numbers.ts';
 import { SUBTYPES, LEVEL_NAMES } from '../../core/catalog.ts';
 import { generate, generateForMode } from '../../core/generators/index.ts';
 import { evaluate, weaknesses, levelFor } from '../../core/scoring.ts';
@@ -99,9 +99,11 @@ export function renderTrain(modeIn: Mode, { n: nOverride = null, intro = false, 
   let onKey: ((e: KeyboardEvent) => void) | null = null;
   let ghostTimer: ReturnType<typeof setInterval> | null = null;
   let ghostEl: HTMLElement | null = null;
+  let autoFailTimer: ReturnType<typeof setInterval> | null = null;
 
   const stop = (): void => {
     if (timer) { timer.stop(); timer = null; }
+    if (autoFailTimer !== null) { clearInterval(autoFailTimer); autoFailTimer = null; }
     if (ghostTimer !== null) { clearInterval(ghostTimer); ghostTimer = null; }
     if (onKey) { document.removeEventListener('keydown', onKey); onKey = null; }
     document.body.classList.remove('has-keypad', 'kp-scroll');
@@ -193,7 +195,16 @@ export function renderTrain(modeIn: Mode, { n: nOverride = null, intro = false, 
     timer = localTimer;
     if (localTimer) localTimer.start();
 
-    function finish(given: number | null): void {
+    // Auto-Fail: bei Ablauf der Zielzeit die aktuelle Eingabe abgeben (finish ist idempotent)
+    if (settings.autoFail === true && timed) {
+      autoFailTimer = setInterval(() => {
+        if (answered) return;
+        if (performance.now() - t0 < task.targetMs) return;
+        finish(isChoice ? null : parseAnswer(input.value), true);
+      }, 100);
+    }
+
+    function finish(given: number | null, timedOut = false): void {
       if (answered) return;
       answered = true;
       const timeMs = Math.round(performance.now() - t0);
@@ -223,7 +234,7 @@ export function renderTrain(modeIn: Mode, { n: nOverride = null, intro = false, 
       question.classList.add(ev.correct ? 'anim-pop' : 'anim-shake');
       const fb = buildFeedback({
         task, ev, timeMs, given, assisted, method,
-        isLast: ctx.index + 1 >= sessionLength, onNext: next,
+        isLast: ctx.index + 1 >= sessionLength, onNext: next, timedOut,
       });
       actions.replaceChildren(...fb.nodes);
       fb.nextBtn.focus();

@@ -24,10 +24,19 @@ function segmented<V extends string | number>(
 
 type BooleanSettingKey = { [K in keyof Settings]: Settings[K] extends boolean ? K : never }[keyof Settings];
 
-function toggle(label: string, key: BooleanSettingKey, settings: Settings): HTMLLabelElement {
+function toggle(label: string, key: BooleanSettingKey, settings: Settings, after?: () => void): HTMLLabelElement {
   const input: HTMLInputElement = h('input', {
     type: 'checkbox', 'aria-label': label, checked: settings[key] ? true : null,
-    onchange: () => setSettings({ [key]: input.checked }),
+    onchange: () => { setSettings({ [key]: input.checked }); if (after) after(); },
+  });
+  return h('label', { class: 'switch' }, input, h('span', { class: 'switch-track' }));
+}
+
+function autoFailToggle(s: Settings): HTMLLabelElement {
+  const input: HTMLInputElement = h('input', {
+    type: 'checkbox', 'aria-label': 'Auto-Fail', checked: s.autoFail && s.timer ? true : null,
+    disabled: s.timer ? null : true,
+    onchange: () => setSettings({ autoFail: input.checked }),
   });
   return h('label', { class: 'switch' }, input, h('span', { class: 'switch-track' }));
 }
@@ -124,7 +133,9 @@ export function renderSettings(): void {
       row('Bildschirm-Tastatur', segmented<'auto' | 'on' | 'off'>('Bildschirm-Tastatur',
         [['auto', 'Automatisch'], ['on', 'An'], ['off', 'Aus']], s.keypad || 'auto', (v) => setSettings({ keypad: v })),
       'Eigene Zahlentastatur mit „Prüfen“-Taste'),
-      row('Timer', toggle('Timer', 'timer', s), 'Aus: ohne Zeitdruck, Tempo zählt nicht'),
+      row('Timer', toggle('Timer', 'timer', s, rerender), 'Aus: ohne Zeitdruck, Tempo zählt nicht'),
+      row('Auto-Fail', autoFailToggle(s),
+        s.timer ? 'Läuft die Zielzeit ab, wird deine aktuelle Eingabe automatisch abgegeben' : 'Nur mit Timer'),
       row('Auto-Submit', toggle('Auto-Submit', 'autoSubmit', s), 'Prüft automatisch, sobald die Zahl stimmt'),
       row('Numpad-Layout', segmented<'calculator' | 'phone'>('Numpad-Layout',
         [['calculator', 'Rechner'], ['phone', 'Telefon']], s.numpadLayout, (v) => setSettings({ numpadLayout: v }))),
