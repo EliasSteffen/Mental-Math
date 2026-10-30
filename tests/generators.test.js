@@ -72,3 +72,51 @@ for (const id of Object.keys(SUBTYPES)) {
     }
   });
 }
+
+import { LEVEL_NAMES, LEVEL_WEIGHT } from '../public/js/generators.js';
+import { solutionSteps } from '../public/js/solutions.js';
+import { fmt } from '../public/js/numbers.js';
+
+test('Level-Konstanten', () => {
+  assert.deepEqual(LEVEL_NAMES, { 1: 'Leicht', 2: 'Mittel', 3: 'Schwer' });
+  assert.deepEqual(LEVEL_WEIGHT, { 1: 0.75, 2: 1, 3: 1.5 });
+});
+
+for (const id of Object.keys(SUBTYPES)) {
+  test(`Level 1..3: ${id}`, () => {
+    const s = SUBTYPES[id];
+    for (const level of [1, 2, 3]) {
+      for (let i = 0; i < 200; i++) {
+        const t = generate(id, Math.random, { level });
+        assert.equal(t.level, level);
+        assert.ok(Math.abs(t.weight - s.weight * LEVEL_WEIGHT[level]) < 1e-9);
+        assert.equal(t.targetMs, Math.round(s.targetMs * (level === 3 ? 1.3 : 1)));
+        const steps = solutionSteps(t);
+        const ctx = `L${level} ${t.prompt} → ${JSON.stringify(steps)}`;
+        assert.ok(steps.length >= 3 && steps.length <= 6, ctx);
+        assert.ok(steps[steps.length - 1].includes(fmt(t.expected)), ctx);
+        assert.equal(evaluate(t, t.expected, 1000).correct, true, ctx);
+        assert.doesNotMatch(t.prompt, /NaN|undefined|Infinity/);
+      }
+    }
+  });
+}
+
+test('Standard-Level ist 2', () => {
+  assert.equal(generate('pct.of').level, 2);
+  assert.equal(generate('pct.of', Math.random, { level: 9 }).level, 2);
+});
+
+test('generateForMode: levelFor und review', () => {
+  assert.equal(generateForMode('pct.of', {}).level, 2);
+  assert.equal(generateForMode('pct.of', { levelFor: () => 3 }).level, 3);
+  const seen = [];
+  const t = generateForMode('all', { levelFor: (id) => (seen.push(id), 1) });
+  assert.deepEqual(seen, [t.subtype]);
+  for (let i = 0; i < 50; i++) {
+    const r = generateForMode('review', { reviewSubtypes: [{ subtype: 'biz.roi' }, 'pct.of'] });
+    assert.ok(['biz.roi', 'pct.of'].includes(r.subtype));
+    assert.equal(r.mode, 'review');
+    assert.ok(SUBTYPES[generateForMode('review', {}).subtype]);
+  }
+});

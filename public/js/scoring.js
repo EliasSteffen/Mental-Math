@@ -9,8 +9,8 @@ export function timeFactor(timeMs, targetMs) {
   return clamp(1 - (0.6 * (timeMs - targetMs)) / (2 * targetMs), 0.4, 1);
 }
 
-export function evaluate(task, given, timeMs, { assisted = false } = {}) {
-  const tf = timeFactor(timeMs, task.targetMs);
+export function evaluate(task, given, timeMs, { assisted = false, untimed = false } = {}) {
+  const tf = untimed ? 1 : timeFactor(timeMs, task.targetMs);
   if (given === null || given === undefined || Number.isNaN(given)) {
     return { correct: false, errorType: 'skip', points: 0, timeFactor: tf };
   }
@@ -56,15 +56,26 @@ export function skill(attempts, window = 25) {
   if (n === 0) return { n: 0, accuracy: 0, speed: 0, score: null, avgTimeMs: 0, avgTargetMs: 0 };
   const right = list.filter((a) => a.correct);
   const accuracy = list.reduce((sum, a) => sum + (a.correct ? (a.assisted ? 0.5 : 1) : 0), 0) / n;
-  const speed = right.length ? mean(right.map((a) => Math.min(1, a.targetMs / a.timeMs))) : 0;
+  const timedRight = right.filter((a) => !a.untimed);
+  const timed = list.filter((a) => !a.untimed);
+  const speed = timedRight.length ? mean(timedRight.map((a) => Math.min(1, a.targetMs / a.timeMs))) : 0;
   return {
     n,
     accuracy,
     speed,
     score: n < 3 ? null : Math.round(100 * (0.7 * accuracy + 0.3 * speed)),
-    avgTimeMs: mean(list.map((a) => a.timeMs)),
-    avgTargetMs: mean(list.map((a) => a.targetMs)),
+    avgTimeMs: mean(timed.map((a) => a.timeMs)),
+    avgTargetMs: mean(timed.map((a) => a.targetMs)),
   };
+}
+
+// Schwierigkeit für einen Subtyp: setting 'auto' | 1 | 2 | 3
+export function levelFor(subtypeId, attempts, setting = 'auto') {
+  const n = Number(setting);
+  if (n === 1 || n === 2 || n === 3) return n;
+  const sk = skill((attempts || []).filter((a) => a.subtype === subtypeId));
+  if (sk.score === null || sk.score < 60) return 1;
+  return sk.score >= 85 ? 3 : 2;
 }
 
 function groupBy(attempts, key) {

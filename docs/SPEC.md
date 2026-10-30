@@ -325,3 +325,112 @@ parseAiText(text) → Block[]    // Block = { type: 'p', parts } | { type: 'ol'|
   - **Beispiel:** frische Aufgabe groß, Button „Lösung zeigen“ (zum Selbstversuch erst verborgen) und „Neues Beispiel“
   - Buttons „Üben“ (primär) und „KI: anders erklären“ (wenn verfügbar, Ergebnis in `.ai-box`)
 - Neue CSS-Komponenten: `.method`, `.steps` (ol, tabular-nums), `.callout`, `.ai-box`, `details/summary` mit Chevron, `.learn-card`, `.btn.small`, `.linkbtn`. Gleiche Tokens, minimalistisch.
+
+---
+
+# v3 – Gamification, Lernsteuerung & Redesign
+
+## Ziele
+1. **iPhone-Minus-Bug:** `inputmode="decimal"` hat auf iOS keine Minus-Taste → ±-Button im Eingabefeld.
+2. **Verlauf pro Kategorie** (Analyse).
+3. **Fehler-Wiederholung über Tage** (Spaced Repetition, Leitner-Boxen pro Aufgabentyp).
+4. **Klare Empfehlung** auf der Startseite („Heute: …“).
+5. **PWA** (installierbar, offline außer KI).
+6. **Tagesziel (Minuten, einstellbar) & Serie**, Heatmap, Level/XP.
+7. **Schwierigkeitsstufen** 1–3 pro Aufgabentyp, „Automatisch“ als Standard.
+8. **Redesign** nach Gemini-Empfehlung: Dark-first „Cyber Neon“, Bento-Kacheln, schwebende Tab-Leiste, Ringe, Heatmap, Sparklines mit Verlauf, Mikroanimationen, Themes, Einstellungsseite (Zahnrad oben rechts).
+
+## Logik-APIs (neu/erweitert)
+
+```js
+// generators.js
+generate(subtypeId, rng = Math.random, { level = 2 } = {})        // level 1 leicht · 2 mittel (= bisher) · 3 schwer
+generateForMode(mode, { weakSubtypes = [], levelFor } = {}, rng)   // levelFor(subtypeId) → 1|2|3 (optional, default 2)
+Task.level: 1|2|3     // Punkte-weight × LEVEL_WEIGHT[level] = { 1: 0.75, 2: 1, 3: 1.5 }; targetMs × { 1: 1, 2: 1, 3: 1.3 }
+export const LEVEL_NAMES = { 1: 'Leicht', 2: 'Mittel', 3: 'Schwer' }
+// Jeder Subtyp bekommt eigene, sinnvolle Bereiche pro Level (L1 = glattere/kleinere Zahlen, L3 = mehr Stellen/krummere Werte).
+
+// scoring.js
+evaluate(task, given, timeMs, { assisted = false, untimed = false } = {})   // untimed → timeFactor 1
+skill(...)  // untimed-Versuche fließen NICHT in speed ein (accuracy schon)
+levelFor(subtypeId, attempts, setting)  // setting 'auto'|1|2|3; auto: Skill des Subtyps null oder <60 → 1, 60–84 → 2, ≥85 → 3
+
+// review.js (neu) – Leitner pro Subtyp; Intervalle Box 0..4 = [1, 2, 4, 7, 14] Tage; Box > 4 → gemeistert (entfernt)
+recordResult(reviews, { subtype, correct, ts, isReview }) → reviews   // reine Funktion, neues Objekt
+   // !isReview: falsch → Item anlegen/zurücksetzen (box 0, due = ts + 1 Tag); richtig → nichts
+   // isReview: richtig → box+1, due = ts + Intervall; falsch → box 0, due = ts + 1 Tag
+dueReviews(reviews, now) → [{ subtype, box, dueAt }]  (fällig, nach dueAt sortiert)
+nextDue(reviews) → ts | null
+// reviews = { [subtype]: { box, dueAt, lastTs } }
+
+// progress.js (neu) – Datum immer lokal 'YYYY-MM-DD'
+dayKey(ts) → 'YYYY-MM-DD'
+streakInfo(activity, goalMs, now) → { current, best, todayMs, goalMs, todayDone }
+   // Serie = aufeinanderfolgende Tage mit activity ≥ goalMs, endend heute (falls erreicht) oder gestern
+heatmap(activity, goalMs, now, weeks = 16) → [{ date, ms, level: 0..4 }]  // ältester zuerst, beginnt an einem Montag
+dailySeries(attempts, { category = null, days = 14, now }) → [{ date, n, accuracy|null, speed|null }]
+xpInfo(attempts) → { xp, level, into, needed }   // xp = Σ points; Level n braucht 500·n XP (kumulativ)
+recommendation(attempts, reviews, now) → { kind: 'review'|'weak'|'new'|'mixed', mode, subtype|null, title, reason }
+   // Priorität: fällige Wiederholungen (mode 'review') > schwächster Subtyp (weaknesses) > noch nie geübter Subtyp (CATEGORIES-Reihenfolge) > 'all'
+
+// generators.generateForMode: zusätzlich mode 'review' → zufällig aus dueReviews (leer → 'all'); Aufrufer übergibt { reviewSubtypes }.
+
+// storage.js (erweitert, gleicher Key kopfrechner.v1, fehlende Felder mit Defaults ergänzen)
+settings: { sessionLength: 10, dailyGoalMin: 15, theme: 'system', difficulty: 'auto', timer: true, sound: false, haptics: true, celebrated: '' }
+getReviews() · setReviews(reviews) · getActivity() · addActivityMs(ms, ts = Date.now())   // activity = { 'YYYY-MM-DD': ms }, max. 400 Tage
+// Attempt zusätzlich: level, untimed, isReview
+```
+
+## Aktivitätszeit
+Alle 5 s: Seite sichtbar **und** letzte Eingabe (pointerdown/keydown/input) < 60 s her → `addActivityMs(5000)`. Zählt auf allen Seiten (auch Lernen). Tagesziel erreicht → einmal pro Tag Konfetti + Toast „Tagesziel geschafft 🔥“ (`settings.celebrated = dayKey`).
+
+## Routen
+`#/` Training-Hub · `#/train/<mode>?n=5&intro=1` (n = Rundenlänge-Override, intro = erst Methode zeigen, dann „Los“) · `#/lernen[/<id>]` · `#/analyse` · `#/settings`. Modi: Kategorie-ID, Subtyp-ID, `all`, `weak`, `review`.
+
+## Design-System
+**Themes** über `<html data-theme="neon|oled|pastel">`; Einstellung `system` → `neon` bei dunklem, `pastel` bei hellem System.
+
+| Token | neon (Standard) | oled | pastel |
+|---|---|---|---|
+| --bg | #121214 | #000000 | #F8F9FA |
+| --surface | #1A1A1E | #161616 | #FFFFFF |
+| --surface-2 | #222228 | #1F1F1F | #F1F3F5 |
+| --border | #2A2A30 | #262626 | #E5E7EB |
+| --text | #F4F4F5 | #FAFAFA | #18181B |
+| --muted | #A1A1AA | #A3A3A3 | #6B7280 |
+| --accent | #7C3AED | #06B6D4 | #4F46E5 |
+| --accent-text (Links/Text) | #A78BFA | #22D3EE | #4338CA |
+| --on-accent | #FFFFFF | #001014 | #FFFFFF |
+| --streak | #F97316 | #F59E0B | #FF6B6B |
+| --good | #10B981 | #22C55E | #059669 |
+| --bad | #F43F5E | #EF4444 | #DC2626 |
+| --warn | #F59E0B | #EAB308 | #D97706 |
+
+Dazu `-soft`-Varianten (≈ 15 % Deckkraft der Farbe über `color-mix`), `--glow-accent`, `--glow-streak` (box-shadow-Werte; im Pastel-Theme weiche Schatten statt Glow), Radien 20/14/10 px. Schrift: `system-ui` (SF Pro auf iOS), Zahlen `tabular-nums`, große Aufgabe 2.5–3.5rem, Gewicht 700.
+
+**Layout:** Topbar (Wortmarke links, Zahnrad `#/settings` rechts). **Schwebende Tab-Leiste** unten (Glas: halbtransparente Fläche + `backdrop-filter: blur`), 3 Tabs mit Icon + Label: Lernen · **Training** (Mitte) · Analyse; aktiver Tab als Akzent-Pill. `main` bekommt unten genug Abstand (inkl. `env(safe-area-inset-bottom)`). Max-Breite 720 px.
+
+**CSS-Klassenvertrag** (Design-Agent stylt, UI-Agents benutzen exakt diese Namen; alle bisherigen Klassen aus app.js bleiben gestylt):
+- Shell: `.topbar`, `.brand`, `.icon-btn`, `nav.tabbar` > `a.tab` (`.tab.active`) > `.tab-icon` + `.tab-label`
+- Bento: `.bento` (2 Spalten) · `.tile` · `.span-2` · `.tile-streak` (`.is-hot` → Glow) · `.tile-score` · `.tile-hero` (Akzent-Verlauf, großer CTA) · `.tile-goal` · `.big-num` · `.label` · `.sub`
+- `.level-badge` · `.progress` > `.progress-bar` (Breite über `--w` 0–100)
+- `.cat-grid` > `a.cat-card` (Ring + `.cat-name` + `.cat-meta`) · `.chip` (`.chip.active`)
+- Ringe: `svg.ring` (`.sm` 40px, `.md` 64px, `.lg` 120px) mit `circle.ring-track` + `circle.ring-value` + `text.ring-text`
+- `.heatmap` (7 Zeilen, Spalten = Wochen, `grid-auto-flow: column`) > `.hm-cell[data-level="0..4"]`
+- `.spark` mit `path.area` (Verlauf über `<linearGradient>` mit `stop.stop-a`/`stop.stop-b`) + `polyline.line`
+- `.cat-history` (Karte pro Kategorie mit Sparkline, aufklappbar)
+- Training: `.play` · `.timerbar` > `.timerbar-fill` (`--w`) · `.sign-toggle` (±-Button im `.answer`) · Feedback-Animation `.anim-pop` (richtig) / `.anim-shake` (falsch) · `.intro-card`
+- Einstellungen: `.settings-section` · `.setting-row` (Label links, Steuerung rechts) · `.segmented` > `button` (`.active`) · `.theme-swatches` > `button.swatch[data-theme-value]` > `.swatch-dot` · `label.switch` > `input[type=checkbox]` + `.switch-track` · `select.select`
+- `.toast` · `.confetti` > `.confetti-piece` (reines CSS, `prefers-reduced-motion` → keine Animation)
+
+**JS-Bausteine** (`js/charts.js`, vom Design-Agent): `icon(name, { size })` (inline SVG, Namen: book, play, chart, gear, flame, star, target, repeat, check, x, chevron, sparkles, plus-minus, trophy, clock) · `ring(value0to1, { size: 'sm'|'md'|'lg', text, cls })` · `sparkline(values, { area: true, max })` (null-Werte = Lücke) · `heatmapGrid(cells)` · `progressBar(value0to100)` · `confetti()` (fügt `.confetti` in `body` ein, entfernt sich nach 3 s) · `toast(text)`. Nur DOM-API, keine Inline-`style`-Attribute (CSSOM `style.setProperty` ok).
+
+## Seiten
+- **Training-Hub `#/`:** Bento: `.tile-streak` (Flamme, aktuelle Serie, „Rekord n“) · `.tile-score` (Level-Badge, XP-Fortschritt) · `.tile-goal span-2` (Ring Tagesziel „12 / 30 min“) · `.tile-hero span-2` = Empfehlung („Heute: Rückwärts-Prozent“ + Grund + Button „Methode & 5 Aufgaben“ → `#/train/<subtype>?n=5&intro=1`; bei Wiederholungen „3 Wiederholungen fällig“ → `#/train/review`) · Schnellstart „Alle Kategorien“ · `.cat-grid` (Ring = Kategorie-Skill).
+- **Training:** `.timerbar` oben (bei `timer: false` ausgeblendet, `untimed`), Aufgabe groß, Eingabe mit `.sign-toggle` (setzt/entfernt führendes „−“, Fokus bleibt im Feld), Level-Chip („Leicht/Mittel/Schwer“). Richtig → `.anim-pop` + optional Haptik `navigator.vibrate(15)`/Sound; falsch → `.anim-shake`. `intro=1` → zuerst `.intro-card` mit Methode + Beispiel-Lösungsweg, Button „Los geht's“. Ergebnisse wie bisher; jeder Versuch geht durch `recordResult`.
+- **Analyse:** Kopf-Bento (Skill-Ring, Serie, heute Minuten, Genauigkeit) · Heatmap (16 Wochen) · Wiederholungen („n fällig · nächste am …“) · Schwächen · **Kategorien**: `.cat-history` je Kategorie mit Sparkline Genauigkeit (14 Tage) + Ø Zeit, aufklappbar mit Subtypen (Skill, Level) · Fehlermuster · letzte Fehler. (Export/Reset wandern in Einstellungen.)
+- **Lernen:** wie bisher, im neuen Look (Karten mit Icon, Fortschritts-Ring pro Subtyp).
+- **Einstellungen `#/settings`:** Darstellung (Theme-Swatches System/Neon/OLED/Pastel) · Training (Tagesziel 5/10/15/20/30/45/60 min, Schwierigkeit Automatisch/Leicht/Mittel/Schwer, Rundenlänge 5/10/20/30, Timer an/aus) · Feedback (Haptik, Sound) · Daten (Export, Zurücksetzen) · Über (Version, GitHub-Link).
+
+## PWA
+`public/manifest.webmanifest` (name „Mental Math“, short_name „Mental Math“, start_url „/“, display „standalone“, theme/background #121214, Icons 192/512 PNG + maskable), `public/sw.js` (Precache der statischen Dateien, Stale-While-Revalidate, `/api/` nie cachen, Versions-Konstante), `public/js/pwa.js` → `registerSW()`. `index.html`: manifest-Link, `theme-color`, `apple-touch-icon` (180 PNG), `apple-mobile-web-app-capable`. `_headers`: `/sw.js` mit `Cache-Control: no-cache`, `/manifest.webmanifest` mit `Content-Type: application/manifest+json`.

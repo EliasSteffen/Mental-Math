@@ -13,6 +13,12 @@ Details: [docs/SPEC.md](docs/SPEC.md)
 - **Lösungsweg mit den Zahlen der Aufgabe** nach jeder Antwort, dazu „Wie geht das?“ als Hilfe vor dem Antworten (halbe Punkte)
 - **Lernbereich** (`#/lernen`): Methode, Vorgehen, Trick und typische Fehler für alle 30 Aufgabentypen, mit Beispiel zum Mitrechnen
 - **Optionale KI-Erklärungen** (Google Gemini, nur auf Knopfdruck) – siehe unten
+- **Tagesziel & Serie** (Minuten pro Tag, einstellbar), Aktivitäts-Heatmap, Level/XP
+- **Schwierigkeitsstufen** Leicht/Mittel/Schwer – automatisch nach Skill oder fest
+- **Fehler-Wiederholung über Tage** (Leitner-Boxen: 1, 2, 4, 7, 14 Tage) und eine **Tagesempfehlung** auf der Startseite
+- **Verlauf pro Kategorie** (14 Tage) auf der Analyse-Seite
+- **Themes** (Neon, OLED, Pastel, System), Einstellungen, Haptik/Sound, ±-Taste für Minus auf iOS
+- **PWA**: auf dem Handy installierbar, funktioniert offline (außer KI)
 
 ## Lokal starten
 

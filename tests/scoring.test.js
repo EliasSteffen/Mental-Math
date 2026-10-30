@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  timeFactor, evaluate, skill, categoryStats, subtypeStats, overall, weaknesses, errorPatterns, sessionSummary,
+  timeFactor, evaluate, skill, levelFor, categoryStats, subtypeStats, overall, weaknesses, errorPatterns, sessionSummary,
 } from '../public/js/scoring.js';
 import { SUBTYPES, CATEGORIES } from '../public/js/generators.js';
 
@@ -143,4 +143,27 @@ test('evaluate: pct.change akzeptiert negatives Vorzeichen', () => {
   const t = task({ expected: 20, subtype: 'pct.change', unit: '%' });
   assert.equal(evaluate(t, -20, 1000).correct, true);
   assert.equal(evaluate(t, 25, 1000).correct, false);
+});
+
+test('untimed: timeFactor 1, speed ignoriert', () => {
+  assert.equal(evaluate(task(), 408, 99000, { untimed: true }).points, 100);
+  assert.equal(evaluate(task(), 408, 99000, { untimed: true }).timeFactor, 1);
+  const s = skill([att(), att(), att(), att({ untimed: true, timeMs: 99000 })]);
+  near(s.speed, 1);
+  near(s.accuracy, 1);
+  near(s.avgTimeMs, 5000);
+  assert.equal(skill([att({ untimed: true }), att({ untimed: true }), att({ untimed: true })]).speed, 0);
+});
+
+test('levelFor', () => {
+  const mk = (n, ok) => Array(n).fill(0).map(() => att({ correct: ok, timeMs: 5000 }));
+  assert.equal(levelFor('pct.of', [], 'auto'), 1);
+  assert.equal(levelFor('pct.of', mk(2, true), 'auto'), 1);
+  assert.equal(levelFor('pct.of', mk(5, false), 'auto'), 1);
+  assert.equal(levelFor('pct.of', mk(5, true), 'auto'), 3);
+  assert.equal(levelFor('pct.of', [...mk(3, true), ...mk(2, false)], 'auto'), 2);
+  assert.equal(levelFor('pct.of', mk(5, true).map((a) => ({ ...a, subtype: 'x' })), 'auto'), 1);
+  assert.equal(levelFor('pct.of', mk(5, false), 3), 3);
+  assert.equal(levelFor('pct.of', mk(5, true), '1'), 1);
+  assert.equal(levelFor('pct.of', mk(5, true)), 3);
 });

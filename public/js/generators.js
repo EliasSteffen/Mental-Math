@@ -53,6 +53,12 @@ export const SUBTYPES = Object.fromEntries(
   ]),
 );
 
+export const LEVEL_NAMES = { 1: 'Leicht', 2: 'Mittel', 3: 'Schwer' };
+export const LEVEL_WEIGHT = { 1: 0.75, 2: 1, 3: 1.5 };
+const LEVEL_TIME = { 1: 1, 2: 1, 3: 1.3 };
+const lv = (level, a, b, c) => (level === 1 ? a : level === 3 ? c : b);
+const normLevel = (l) => (l === 1 || l === 3 ? l : 2);
+
 const randomId = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
 
 function task(id, o) {
@@ -86,39 +92,55 @@ function bigStr(v) {
 }
 
 const GEN = {
-  'mult.2x1': (rng) => {
-    const a = randInt(12, 99, rng), b = randInt(3, 9, rng);
-    return task('mult.2x1', { params: { a, b }, prompt: `${fmt(a)} × ${fmt(b)}`, expected: a * b });
-  },
-  'mult.2x2': (rng) => {
+  'mult.2x1': (rng, L) => {
     for (;;) {
-      const a = randInt(12, 99, rng), b = randInt(12, 99, rng);
+      const a = randInt(lv(L, 12, 12, 111), lv(L, 49, 99, 399), rng), b = randInt(lv(L, 3, 3, 6), lv(L, 6, 9, 9), rng);
+      if (L === 3 && a % 10 === 0) continue;
+      return task('mult.2x1', { params: { a, b }, prompt: `${fmt(a)} × ${fmt(b)}`, expected: a * b });
+    }
+  },
+  'mult.2x2': (rng, L) => {
+    for (;;) {
+      let a, b;
+      if (L === 1) {
+        b = randInt(12, 99, rng);
+        a = rng() < 0.5 ? randInt(12, 19, rng) : 10 * randInt(2, 9, rng) + pick([-2, -1, 1, 2], rng);
+      } else if (L === 3) {
+        a = randInt(31, 99, rng); b = randInt(31, 99, rng);
+        if (a % 5 === 0 || b % 5 === 0 || Math.abs(a % 10 - 5) < 2 || Math.abs(b % 10 - 5) < 2) continue;
+      } else {
+        a = randInt(12, 99, rng); b = randInt(12, 99, rng);
+      }
       if (a % 10 === 0 || b % 10 === 0) continue;
       return task('mult.2x2', { params: { a, b }, prompt: `${fmt(a)} × ${fmt(b)}`, expected: a * b });
     }
   },
-  'mult.easy': (rng) => {
-    const f = pick([5, 25, 50], rng), a = randInt(12, 480, rng);
+  'mult.easy': (rng, L) => {
+    const f = pick(lv(L, [5, 50], [5, 25, 50], [5, 25, 50]), rng), a = randInt(lv(L, 12, 12, 120), lv(L, 120, 480, 980), rng);
     return task('mult.easy', { params: { a, f }, prompt: `${fmt(a)} × ${fmt(f)}`, expected: a * f });
   },
-  'mult.square': (rng) => {
+  'mult.square': (rng, L) => {
     for (;;) {
-      const a = randInt(13, 99, rng);
+      const a = randInt(lv(L, 11, 13, 61), lv(L, 25, 99, 99), rng);
       if (a % 10 === 0) continue;
+      if (L === 3 && a % 5 === 0) continue;
       return task('mult.square', { params: { a }, prompt: `${fmt(a)} × ${fmt(a)}`, expected: a * a });
     }
   },
-  'div.exact': (rng) => {
-    const d = pick([3, 4, 6, 7, 8, 9, 12, 15, 25], rng), q = randInt(12, 250, rng);
+  'div.exact': (rng, L) => {
+    const d = pick(lv(L, [2, 3, 4, 5, 6, 8], [3, 4, 6, 7, 8, 9, 12, 15, 25], [7, 9, 12, 15, 16, 18, 24, 25]), rng);
+    const q = randInt(lv(L, 12, 12, 100), lv(L, 100, 250, 999), rng);
     return task('div.exact', { params: { n: d * q, d }, prompt: `${fmt(d * q)} ÷ ${fmt(d)}`, expected: q });
   },
-  'div.decimal': (rng) => {
-    const d = pick([0.2, 0.25, 0.4, 0.5, 0.8, 1.5, 2.5], rng), q = 20 * randInt(1, 40, rng);
+  'div.decimal': (rng, L) => {
+    const d = pick(lv(L, [0.2, 0.25, 0.5], [0.2, 0.25, 0.4, 0.5, 0.8, 1.5, 2.5], [0.4, 0.8, 1.5, 2.5, 0.75, 1.2]), rng);
+    const q = 20 * randInt(1, lv(L, 15, 40, 100), rng);
     return task('div.decimal', { params: { n: round(q * d, 4), d }, prompt: `${fmt(round(q * d, 4))} ÷ ${fmt(d)}`, expected: q });
   },
-  'div.round': (rng) => {
+  'div.round': (rng, L) => {
     for (;;) {
-      const d = pick([6, 7, 8, 9, 11, 12], rng), n = randInt(200, 2000, rng);
+      const d = pick(lv(L, [3, 4, 6, 8], [6, 7, 8, 9, 11, 12], [7, 11, 13, 17, 19]), rng);
+      const n = randInt(lv(L, 60, 200, 1000), lv(L, 400, 2000, 9000), rng);
       if (n % d === 0) continue;
       return task('div.round', { params: { n, d },
         prompt: `${fmt(n)} ÷ ${fmt(d)}`,
@@ -128,15 +150,19 @@ const GEN = {
       });
     }
   },
-  'big.mult': (rng) => {
+  'big.mult': (rng, L) => {
     for (;;) {
-      const m = pick([1.2, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5, 6, 7.5, 8], rng);
+      const m = pick(lv(L, [2, 3, 4, 5], [1.2, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5, 6, 7.5, 8], [1.2, 1.8, 2.4, 3.6, 4.8, 6.4, 7.2, 8.4, 9.6]), rng);
       const uName = pick(['Tsd.', 'Mio.'], rng);
-      const b = pick([20, 30, 40, 50, 60, 80, 200, 300, 400, 500, 2000, 3000, 4000, 5000, 20000, 40000], rng);
+      const b = pick(lv(L,
+        [20, 30, 40, 50, 200, 300, 500, 2000],
+        [20, 30, 40, 50, 60, 80, 200, 300, 400, 500, 2000, 3000, 4000, 5000, 20000, 40000],
+        [30, 60, 70, 90, 120, 150, 700, 1200, 1500, 6000, 7000, 9000]), rng);
       const P = round(m * UNIT_VALUE[uName] * b, 4);
       const ua = P >= 1e9 ? 'Mrd.' : P >= 1e6 ? 'Mio.' : 'Tsd.';
       const e = P / UNIT_VALUE[ua];
       if (round(e, 3) !== round(e, 4) && Math.abs(e - round(e, 2)) > 1e-9) continue;
+      if (L === 3 && Math.abs(e - round(e, 2)) > 1e-9) continue;
       return task('big.mult', { params: { m, u: uName, b, ua },
         prompt: `${fmt(m)} ${uName} × ${fmt(b)}`,
         unit: ua,
@@ -145,14 +171,18 @@ const GEN = {
       });
     }
   },
-  'big.div': (rng) => {
+  'big.div': (rng, L) => {
     for (;;) {
-      const q = pick([2, 3, 4, 5, 6, 8, 12, 15, 20, 25, 30, 40, 50, 60, 75, 80], rng);
-      const k = pick([3, 4, 5, 6], rng);
+      const q = pick(lv(L, [2, 3, 4, 5, 10, 20, 25, 50], [2, 3, 4, 5, 6, 8, 12, 15, 20, 25, 30, 40, 50, 60, 75, 80], [12, 15, 24, 36, 45, 60, 75, 120, 125]), rng);
+      const k = pick(lv(L, [3, 4, 5], [3, 4, 5, 6], [3, 4, 5, 6]), rng);
       const A = q * 10 ** k;
-      const d = pick([200, 300, 400, 500, 2000, 4000, 5000, 20000, 40000, 400000], rng);
+      const d = pick(lv(L,
+        [200, 500, 2000, 5000, 20000],
+        [200, 300, 400, 500, 2000, 4000, 5000, 20000, 40000, 400000],
+        [300, 600, 1200, 1500, 4000, 25000, 60000, 150000]), rng);
       const D = A * d;
       if (D < 1e5 || D >= 1e12) continue;
+      if (L === 1 && D >= 1e9) continue;
       const dm = D >= 1e9 ? D / 1e9 : D >= 1e6 ? D / 1e6 : D;
       if (Math.abs(dm - round(dm, 2)) > 1e-9) continue;
       const ua = A >= 1e6 ? 'Mio.' : 'Tsd.';
@@ -164,31 +194,39 @@ const GEN = {
       });
     }
   },
-  'big.percapita': (rng) => {
-    const T = 0.5 * randInt(1, 60, rng);
-    const [label, base] = pick([
+  'big.percapita': (rng, L) => {
+    const T = L === 1 ? randInt(1, 12, rng) : L === 3 ? 0.1 * randInt(5, 300, rng) : 0.5 * randInt(1, 60, rng);
+    const [label, base] = pick(lv(L, [
+      ['84 Mio. Einwohner', 84],
+      ['450 Mio. EU-Bürger', 450],
+    ], [
       ['84 Mio. Einwohner', 84],
       ['41 Mio. Haushalte', 41],
       ['46 Mio. Erwerbstätige', 46],
       ['450 Mio. EU-Bürger', 450],
-    ], rng);
-    return task('big.percapita', { params: { T, base },
-      prompt: `${fmt(T)} Mrd. € verteilt auf ${label} – wie viel € pro Kopf?`,
+    ], [
+      ['84 Mio. Einwohner', 84],
+      ['41 Mio. Haushalte', 41],
+      ['46 Mio. Erwerbstätige', 46],
+      ['450 Mio. EU-Bürger', 450],
+    ]), rng);
+    return task('big.percapita', { params: { T: round(T, 4), base },
+      prompt: `${fmt(round(T, 4))} Mrd. € verteilt auf ${label} – wie viel € pro Kopf?`,
       unit: '€',
       hint: PCT_HINT,
       expected: (T * 1000) / base,
       rel: 0.03,
     });
   },
-  'pct.of': (rng) => {
-    const p = pick([3, 5, 8, 10, 12, 15, 17, 20, 25, 30, 35, 40, 45, 60, 75], rng);
-    const y = randInt(4, 96, rng) * pick([10, 100], rng);
+  'pct.of': (rng, L) => {
+    const p = pick(lv(L, [5, 10, 20, 25, 50], [3, 5, 8, 10, 12, 15, 17, 20, 25, 30, 35, 40, 45, 60, 75], [7, 13, 16, 18, 22, 27, 33, 36, 48, 65, 85]), rng);
+    const y = L === 1 ? randInt(2, 50, rng) * 10 : L === 3 ? randInt(12, 199, rng) * 10 : randInt(4, 96, rng) * pick([10, 100], rng);
     return task('pct.of', { params: { p, y }, prompt: `${fmt(p)} % von ${fmt(y)}`, expected: (p * y) / 100, abs: 0.01 });
   },
-  'pct.change': (rng) => {
+  'pct.change': (rng, L) => {
     for (;;) {
-      const alt = pick([20, 25, 40, 50, 60, 75, 80, 120, 150, 200, 250, 400], rng);
-      const r = pick([5, 10, 12.5, 15, 20, 25, 30, 40, 50], rng);
+      const alt = pick(lv(L, [20, 40, 50, 100, 200], [20, 25, 40, 50, 60, 75, 80, 120, 150, 200, 250, 400], [30, 35, 45, 64, 72, 85, 90, 125, 160, 240, 360]), rng);
+      const r = pick(lv(L, [10, 20, 25, 50], [5, 10, 12.5, 15, 20, 25, 30, 40, 50], [4, 6, 8, 12, 15, 16, 18, 24, 35, 45]), rng);
       const up = rng() < 0.5;
       const neu = round(alt * (1 + (up ? r : -r) / 100), 4);
       if (Math.abs(neu * 10 - Math.round(neu * 10)) > 1e-6 || neu <= 0) continue;
@@ -199,10 +237,12 @@ const GEN = {
       });
     }
   },
-  'pct.reverse': (rng) => {
-    const O = 20 * randInt(2, 20, rng);
+  'pct.reverse': (rng, L) => {
+    const O = L === 1 ? 100 * randInt(1, 10, rng) : L === 3 ? 20 * randInt(5, 60, rng) : 20 * randInt(2, 20, rng);
     const discount = rng() < 0.5;
-    const r = discount ? pick([10, 20, 25, 40, 50], rng) : pick([10, 20, 25, 50], rng);
+    const r = discount
+      ? pick(lv(L, [10, 20, 50], [10, 20, 25, 40, 50], [15, 30, 35, 40, 45, 60]), rng)
+      : pick(lv(L, [10, 20, 50], [10, 20, 25, 50], [15, 30, 35, 40, 45, 60]), rng);
     const nach = round(O * (1 + (discount ? -r : r) / 100), 4);
     return task('pct.reverse', { params: { r, nach, discount: discount ? 1 : 0 },
       prompt: `Nach ${fmt(r)} % ${discount ? 'Rabatt' : 'Preiserhöhung'} kostet ein Produkt ${fmt(nach)} €. Ursprünglicher Preis?`,
@@ -210,8 +250,9 @@ const GEN = {
       expected: O,
     });
   },
-  'pct.points': (rng) => {
-    const m1 = pick([4, 5, 8, 10, 12, 15, 20, 25], rng), d = randInt(1, 5, rng), m2 = m1 + d;
+  'pct.points': (rng, L) => {
+    const m1 = pick(lv(L, [5, 10, 20, 25], [4, 5, 8, 10, 12, 15, 20, 25], [6, 7, 9, 12, 15, 18, 24]), rng);
+    const d = L === 1 ? pick([1, 2, 5], rng) : randInt(1, L === 3 ? 6 : 5, rng), m2 = m1 + d;
     const e = round((d / m1) * 100, 4);
     return task('pct.points', { params: { m1, m2 },
       prompt: `Die Marge steigt von ${fmt(m1)} % auf ${fmt(m2)} %. Um wie viel Prozent (nicht Prozentpunkte)?`,
@@ -221,8 +262,8 @@ const GEN = {
       abs: 0.1,
     });
   },
-  'pct.chain': (rng) => {
-    const R = [10, 20, 25, 50, -10, -20, -25, -50];
+  'pct.chain': (rng, L) => {
+    const R = lv(L, [10, 20, 50, -10, -20, -50], [10, 20, 25, 50, -10, -20, -25, -50], [5, 15, 30, 40, -5, -15, -30, -40, 20, -20]);
     const r1 = pick(R, rng), r2 = pick(R, rng);
     const word = (r, pron) => `${r > 0 ? 'steigt' : 'sinkt'}${pron} um ${fmt(Math.abs(r))} %`;
     return task('pct.chain', { params: { r1, r2 },
@@ -233,11 +274,15 @@ const GEN = {
       abs: 0.05,
     });
   },
-  'frac.topct': (rng) => {
-    const [n, d] = pick([
+  'frac.topct': (rng, L) => {
+    const [n, d] = pick(lv(L, [
+      [1, 2], [1, 4], [3, 4], [1, 5], [2, 5], [3, 5], [4, 5], [1, 10], [1, 20], [1, 25],
+    ], [
       [1, 2], [1, 3], [2, 3], [1, 4], [3, 4], [1, 5], [2, 5], [3, 5], [4, 5], [1, 6], [5, 6], [1, 7],
       [1, 8], [3, 8], [5, 8], [7, 8], [1, 9], [1, 10], [1, 11], [1, 12], [1, 15], [1, 20], [1, 25], [1, 40],
-    ], rng);
+    ], [
+      [1, 6], [5, 6], [1, 7], [1, 9], [2, 9], [4, 9], [1, 11], [1, 12], [5, 12], [7, 12], [1, 15], [1, 16], [3, 16], [1, 40], [3, 40],
+    ]), rng);
     const e = round((n / d) * 100, 4);
     return task('frac.topct', { params: { n, d },
       prompt: `${n}/${d} in Prozent`,
@@ -247,14 +292,14 @@ const GEN = {
       abs: 0.15,
     });
   },
-  'frac.of': (rng) => {
-    const d = pick([3, 4, 5, 6, 8, 12, 25], rng), n = randInt(1, d - 1, rng);
-    const y = d * randInt(3, 60, rng) * pick([1, 10], rng);
+  'frac.of': (rng, L) => {
+    const d = pick(lv(L, [2, 3, 4, 5, 10], [3, 4, 5, 6, 8, 12, 25], [6, 7, 8, 9, 12, 15, 25]), rng), n = randInt(1, d - 1, rng);
+    const y = d * randInt(lv(L, 2, 3, 8), lv(L, 20, 60, 99), rng) * (L === 3 ? pick([1, 10], rng) : L === 1 ? 1 : pick([1, 10], rng));
     return task('frac.of', { params: { n, d, y }, prompt: `${n}/${d} von ${fmt(y)}`, expected: (n * y) / d });
   },
-  'growth.compound': (rng) => {
-    const r = pick([2, 3, 4, 5, 6, 8, 10, 15, 20], rng);
-    const n = randInt(2, r >= 15 ? 3 : 5, rng);
+  'growth.compound': (rng, L) => {
+    const r = pick(lv(L, [2, 5, 10], [2, 3, 4, 5, 6, 8, 10, 15, 20], [3, 6, 7, 8, 12, 15, 25]), rng);
+    const n = randInt(L === 3 ? 3 : 2, L === 1 ? 3 : r >= 15 ? 3 : L === 3 ? 6 : 5, rng);
     return task('growth.compound', { params: { r, n },
       prompt: `${fmt(r)} % Wachstum pro Jahr über ${n} Jahre – Gesamtwachstum?`,
       unit: '%',
@@ -264,8 +309,8 @@ const GEN = {
       rel: 0.02,
     });
   },
-  'growth.rule72': (rng) => {
-    const r = pick([2, 3, 4, 6, 8, 9, 12, 18, 24], rng);
+  'growth.rule72': (rng, L) => {
+    const r = pick(lv(L, [3, 4, 6, 8, 9, 12], [2, 3, 4, 6, 8, 9, 12, 18, 24], [5, 7, 10, 11, 14, 15, 16, 20]), rng);
     return task('growth.rule72', { params: { r },
       prompt: `Bei ${fmt(r)} % Wachstum p. a. – nach wie vielen Jahren verdoppelt sich der Wert (ca.)?`,
       unit: 'Jahre',
@@ -273,9 +318,11 @@ const GEN = {
       rel: 0.1,
     });
   },
-  'growth.cagr': (rng) => {
+  'growth.cagr': (rng, L) => {
     for (;;) {
-      const r = pick([5, 10, 20, 25, 50], rng), n = pick([2, 3], rng), S = pick([100, 200, 400, 800, 1000], rng);
+      const r = pick(lv(L, [10, 20, 50], [5, 10, 20, 25, 50], [8, 12, 15, 25, 30]), rng);
+      const n = pick(lv(L, [2], [2, 3], [2, 3, 4]), rng);
+      const S = pick(lv(L, [100, 200], [100, 200, 400, 800, 1000], [100, 250, 400, 500, 800]), rng);
       const E = S * (1 + r / 100) ** n;
       if (Math.abs(E * 100 - Math.round(E * 100)) > 1e-6) continue;
       return task('growth.cagr', { params: { r, n, S, E },
@@ -286,10 +333,10 @@ const GEN = {
       });
     }
   },
-  'biz.payback': (rng) => {
+  'biz.payback': (rng, L) => {
     for (;;) {
-      const I = pick([2, 3, 4, 5, 6, 8, 10, 12, 15, 20, 24, 30], rng);
-      const s = pick([0.5, 1, 1.5, 2, 2.5, 3, 4, 5, 6, 8], rng);
+      const I = pick(lv(L, [2, 4, 6, 8, 10, 12, 20], [2, 3, 4, 5, 6, 8, 10, 12, 15, 20, 24, 30], [7, 9, 14, 18, 22, 35, 45]), rng);
+      const s = pick(lv(L, [1, 2, 4, 5], [0.5, 1, 1.5, 2, 2.5, 3, 4, 5, 6, 8], [1.5, 2.5, 3, 4, 6, 7]), rng);
       if (I / s > 10) continue;
       const e = round(I / s, 4);
       return task('biz.payback', { params: { I, s },
@@ -301,12 +348,12 @@ const GEN = {
       });
     }
   },
-  'biz.breakeven': (rng) => {
+  'biz.breakeven': (rng, L) => {
     for (;;) {
-      const db = pick([5, 8, 10, 12, 15, 20, 25, 40, 50], rng);
-      const p = 5 * randInt(4, 40, rng);
+      const db = pick(lv(L, [10, 20, 25, 50], [5, 8, 10, 12, 15, 20, 25, 40, 50], [12, 15, 18, 24, 35, 45]), rng);
+      const p = L === 1 ? 10 * randInt(3, 20, rng) : L === 3 ? randInt(40, 400, rng) : 5 * randInt(4, 40, rng);
       if (p <= db) continue;
-      const v = p - db, Q = 1000 * randInt(2, 80, rng), F = db * Q;
+      const v = p - db, Q = 1000 * randInt(lv(L, 2, 2, 8), lv(L, 20, 80, 150), rng), F = db * Q;
       return task('biz.breakeven', { params: { F, p, v },
         prompt: `Fixkosten ${fmt(F)} €, Preis ${fmt(p)} €, variable Kosten ${fmt(v)} € pro Stück. Break-even-Menge?`,
         unit: 'Stück',
@@ -314,10 +361,10 @@ const GEN = {
       });
     }
   },
-  'biz.margin': (rng) => {
+  'biz.margin': (rng, L) => {
     for (;;) {
-      const R = pick([20, 40, 50, 80, 120, 150, 200, 250, 400, 500], rng);
-      const m = pick([2, 4, 5, 8, 10, 12, 15, 20, 25], rng);
+      const R = pick(lv(L, [20, 40, 50, 100, 200, 400], [20, 40, 50, 80, 120, 150, 200, 250, 400, 500], [60, 75, 90, 120, 160, 180, 240, 350, 450, 640]), rng);
+      const m = pick(lv(L, [5, 10, 20, 25], [2, 4, 5, 8, 10, 12, 15, 20, 25], [6, 7, 8, 9, 12, 15, 18, 24, 35]), rng);
       const G = (R * m) / 100;
       if (Math.abs(G * 10 - Math.round(G * 10)) > 1e-6) continue;
       return task('biz.margin', { params: { R, G },
@@ -327,8 +374,9 @@ const GEN = {
       });
     }
   },
-  'biz.roi': (rng) => {
-    const C = pick([2, 4, 5, 8, 10, 20], rng), roi = pick([10, 20, 25, 40, 50, 75, 100, 150, 200], rng);
+  'biz.roi': (rng, L) => {
+    const C = pick(lv(L, [2, 4, 5, 10], [2, 4, 5, 8, 10, 20], [3, 6, 7, 9, 12, 15, 25, 40]), rng);
+    const roi = pick(lv(L, [10, 20, 50, 100], [10, 20, 25, 40, 50, 75, 100, 150, 200], [15, 30, 35, 45, 60, 80, 120, 175, 250]), rng);
     const B = round(C * (1 + roi / 100), 4);
     return task('biz.roi', { params: { C, B },
       prompt: `Investition ${fmt(C)} Mio. €, Nutzen insgesamt ${fmt(B)} Mio. €. ROI in %?`,
@@ -336,19 +384,21 @@ const GEN = {
       expected: roi,
     });
   },
-  'biz.tco': (rng) => {
-    const O = pick([2, 3, 5, 8, 10, 12, 15], rng);
-    const A = pick([1.5, 2, 2.5, 3, 4, 5, 7.5, 12, 15, 20], rng);
-    const n = pick([3, 4, 5], rng);
+  'biz.tco': (rng, L) => {
+    const O = pick(lv(L, [2, 5, 10], [2, 3, 5, 8, 10, 12, 15], [3.5, 7.5, 12, 18, 24]), rng);
+    const A = pick(lv(L, [1, 2, 3, 5, 10], [1.5, 2, 2.5, 3, 4, 5, 7.5, 12, 15, 20], [2.4, 3.6, 4.5, 6.5, 8.5, 12.5]), rng);
+    const n = pick(lv(L, [2, 3, 5], [3, 4, 5], [4, 5, 6, 7]), rng);
     return task('biz.tco', { params: { O, A, n },
       prompt: `Einmalkosten ${fmt(O)} Mio. €, laufende Kosten ${fmt(A)} Mio. € pro Jahr, ${n} Jahre. TCO?`,
       unit: 'Mio. €',
       expected: O + n * A,
     });
   },
-  'biz.fte': (rng) => {
-    const V = pick([0.5, 1, 1.2, 1.5, 2, 3], rng), t = pick([3, 4, 5, 6, 8, 10, 12], rng);
-    const s = pick([10, 20, 25, 30, 40, 50], rng), H = pick([1500, 1600], rng);
+  'biz.fte': (rng, L) => {
+    const V = pick(lv(L, [0.5, 1, 2], [0.5, 1, 1.2, 1.5, 2, 3], [0.7, 1.2, 1.8, 2.5, 3.5, 4.2]), rng);
+    const t = pick(lv(L, [3, 5, 6, 10], [3, 4, 5, 6, 8, 10, 12], [7, 9, 11, 13, 15]), rng);
+    const s = pick(lv(L, [10, 20, 25, 50], [10, 20, 25, 30, 40, 50], [15, 35, 45, 60]), rng);
+    const H = pick(lv(L, [1600], [1500, 1600], [1500, 1600, 1650, 1720]), rng);
     return task('biz.fte', { params: { V, t, s, H },
       prompt: `${fmt(V)} Mio. Anfragen/Jahr à ${fmt(t)} min, KI spart ${fmt(s)} % der Zeit. Wie viele FTE werden frei (${fmt(H)} h pro FTE)?`,
       unit: 'FTE',
@@ -357,8 +407,8 @@ const GEN = {
       rel: 0.05,
     });
   },
-  'biz.sla': (rng) => {
-    const a = pick([99, 99.5, 99.9, 99.95, 99.99], rng);
+  'biz.sla': (rng, L) => {
+    const a = pick(lv(L, [99, 99.9], [99, 99.5, 99.9, 99.95, 99.99], [99.5, 99.95, 99.99, 99.8, 99.7]), rng);
     const minutes = a === 99.99;
     const hours = ((100 - a) / 100) * 8760;
     return task('biz.sla', { params: { a },
@@ -369,8 +419,11 @@ const GEN = {
       rel: 0.05,
     });
   },
-  'est.mult': (rng) => {
-    const a = rng() < 0.5 ? randInt(110, 990, rng) : randInt(1100, 9900, rng), b = randInt(11, 99, rng);
+  'est.mult': (rng, L) => {
+    let a, b;
+    if (L === 1) { a = 10 * randInt(11, 99, rng); b = randInt(11, 30, rng); }
+    else if (L === 3) { a = randInt(1100, 9900, rng); b = randInt(110, 990, rng); }
+    else { a = rng() < 0.5 ? randInt(110, 990, rng) : randInt(1100, 9900, rng); b = randInt(11, 99, rng); }
     return task('est.mult', { params: { a, b },
       prompt: `${fmt(a)} × ${fmt(b)}`,
       hint: 'Schätzung, ±8 % ok',
@@ -378,8 +431,9 @@ const GEN = {
       rel: 0.08,
     });
   },
-  'est.div': (rng) => {
-    const n = randInt(1000, 99000, rng), d = randInt(13, 97, rng);
+  'est.div': (rng, L) => {
+    const n = L === 1 ? randInt(10, 99, rng) * 100 : L === 3 ? randInt(10000, 990000, rng) : randInt(1000, 99000, rng);
+    const d = randInt(lv(L, 11, 13, 13), lv(L, 49, 97, 97), rng);
     return task('est.div', { params: { n, d },
       prompt: `${fmt(n)} ÷ ${fmt(d)}`,
       hint: 'Schätzung, ±8 % ok',
@@ -387,11 +441,11 @@ const GEN = {
       rel: 0.08,
     });
   },
-  'est.pct': (rng) => {
+  'est.pct': (rng, L) => {
     for (;;) {
-      const p = randInt(11, 89, rng);
+      const p = L === 1 ? pick([11, 12, 19, 21, 22, 29, 31, 39], rng) : randInt(11, 89, rng);
       if (p % 5 === 0) continue;
-      const y = randInt(1100, 9900, rng);
+      const y = L === 1 ? 100 * randInt(12, 99, rng) : L === 3 ? randInt(11000, 99900, rng) : randInt(1100, 9900, rng);
       return task('est.pct', { params: { p, y },
         prompt: `${fmt(p)} % von ${fmt(y)}`,
         hint: 'Schätzung, ±8 % ok',
@@ -402,27 +456,37 @@ const GEN = {
   },
 };
 
-export function generate(subtypeId, rng = Math.random) {
+export function generate(subtypeId, rng = Math.random, { level = 2 } = {}) {
   const g = GEN[subtypeId];
   if (!g) throw new Error(`Unbekannter Aufgabentyp: ${subtypeId}`);
-  return g(rng);
+  const L = normLevel(level);
+  const t = g(rng, L);
+  t.level = L;
+  t.weight = round(SUBTYPES[subtypeId].weight * LEVEL_WEIGHT[L], 4);
+  t.targetMs = Math.round(SUBTYPES[subtypeId].targetMs * LEVEL_TIME[L]);
+  return t;
 }
 
 const subtypesOf = (cat) => Object.values(SUBTYPES).filter((s) => s.category === cat).map((s) => s.id);
+const idOf = (x) => (typeof x === 'string' ? x : x?.subtype);
 
-export function generateForMode(mode, { weakSubtypes = [] } = {}, rng = Math.random) {
+export function generateForMode(mode, { weakSubtypes = [], reviewSubtypes = [], levelFor } = {}, rng = Math.random) {
   let id;
   if (SUBTYPES[mode]) {
     id = mode;
   } else if (CATEGORIES.some((c) => c.id === mode)) {
     id = pick(subtypesOf(mode), rng);
   } else if (mode === 'weak') {
-    const valid = (weakSubtypes || []).map((w) => (typeof w === 'string' ? w : w?.subtype)).filter((w) => SUBTYPES[w]);
+    const valid = (weakSubtypes || []).map(idOf).filter((w) => SUBTYPES[w]);
+    id = valid.length ? pick(valid, rng) : pick(subtypesOf(pick(CATEGORIES, rng).id), rng);
+  } else if (mode === 'review') {
+    const valid = (reviewSubtypes || []).map(idOf).filter((w) => SUBTYPES[w]);
     id = valid.length ? pick(valid, rng) : pick(subtypesOf(pick(CATEGORIES, rng).id), rng);
   } else {
     id = pick(subtypesOf(pick(CATEGORIES, rng).id), rng);
   }
-  const t = generate(id, rng);
+  const lvl = typeof levelFor === 'function' ? levelFor(id) : 2;
+  const t = generate(id, rng, { level: lvl });
   t.mode = mode;
   return t;
 }
