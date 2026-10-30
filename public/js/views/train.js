@@ -24,7 +24,7 @@ export function renderTrain(mode, { n: nOverride = null, intro = false } = {}) {
   let notice = null;
   let genMode = mode;
   if (mode === 'weak') {
-    weakSubtypes = weaknesses(getAttempts()).map((w) => w.subtype);
+    weakSubtypes = weaknesses(getAttempts(), undefined, { enabledCategories: settings.enabledCategories }).map((w) => w.subtype);
     if (weakSubtypes.length === 0) {
       genMode = 'all';
       notice = 'Noch zu wenig Daten – gemischtes Training';
@@ -74,6 +74,7 @@ export function renderTrain(mode, { n: nOverride = null, intro = false } = {}) {
   function showTask() {
     stop();
     const task = generateForMode(genMode, {
+      enabledCategories: settings.enabledCategories,
       weakSubtypes, reviewSubtypes,
       levelFor: (id) => levelFor(id, getAttempts(), settings.difficulty),
     });
@@ -84,7 +85,9 @@ export function renderTrain(mode, { n: nOverride = null, intro = false } = {}) {
     let assisted = false;
     const question = h('div', { class: `question${task.prompt.length > 22 ? ' long' : ''}` }, task.prompt);
 
-    const kp = useKeypad(settings.keypad || 'auto');
+    const isChoice = task.kind === 'choice' && Array.isArray(task.choices);
+    const kp = isChoice ? false : useKeypad(settings.keypad || 'auto');
+    const choiceBtns = [];
     let keypadEl = null;
     const input = h('input', {
       type: 'text', inputmode: kp ? 'none' : 'decimal', autocomplete: 'off', enterkeyhint: 'done',
@@ -119,6 +122,13 @@ export function renderTrain(mode, { n: nOverride = null, intro = false } = {}) {
       stop();
       if (timed) timer.textContent = `${fmtSeconds(timeMs)} / ${fmtSeconds(task.targetMs)}`;
       input.disabled = true;
+      if (isChoice) {
+        choiceBtns.forEach((b, i) => {
+          b.disabled = true;
+          if (i === task.expected) b.classList.add('is-correct');
+          else if (i === given) b.classList.add('is-wrong');
+        });
+      }
       helpWrap.remove();
       if (keypadEl) { keypadEl.remove(); keypadEl = null; }
       const ev = evaluate(task, given, timeMs, { assisted, untimed: !timed });
@@ -129,6 +139,7 @@ export function renderTrain(mode, { n: nOverride = null, intro = false } = {}) {
         prompt: task.prompt, unit: task.unit, expected: task.expected, given,
         correct: ev.correct, errorType: ev.errorType, timeMs, targetMs: task.targetMs,
         weight: task.weight, points: ev.points, params: task.params, assisted,
+        ...(isChoice ? { kind: 'choice', choices: task.choices.slice() } : {}),
         level: task.level, untimed: !timed, isReview: mode === 'review',
       });
       setReviews(recordResult(getReviews(), {
@@ -152,7 +163,7 @@ export function renderTrain(mode, { n: nOverride = null, intro = false } = {}) {
       const fullText = uF > 1
         ? ` (= ${fmt(Number((task.expected * uF).toPrecision(12)))}${task.unit.includes('€') ? ' €' : ''})`
         : '';
-      const answerText = `${fmt(task.expected)}${task.unit ? ' ' + task.unit : ''}${fullText}`;
+      const answerText = isChoice ? String(task.choices[task.expected]) : `${fmt(task.expected)}${task.unit ? ' ' + task.unit : ''}${fullText}`;
       const assistNote = assisted ? h('div', { class: 'fb-tip' }, 'Hilfe genutzt – halbe Punkte') : null;
       if (ev.correct) {
         appendChildren(fb, [
@@ -210,7 +221,8 @@ export function renderTrain(mode, { n: nOverride = null, intro = false } = {}) {
       },
     }, 'Prüfen ↵');
     const skip = h('button', { type: 'button', class: 'btn', onclick: () => finish(null) }, 'Weiß nicht');
-    if (kp) actions.append(inputError);
+    if (isChoice) actions.append(h('div', { class: 'btn-row' }, skip));
+    else if (kp) actions.append(inputError);
     else actions.append(inputError, h('div', { class: 'btn-row' }, check, skip));
 
     const helpBox = h('div', { class: 'help', hidden: true });
@@ -230,25 +242,38 @@ export function renderTrain(mode, { n: nOverride = null, intro = false } = {}) {
           helpBtn.setAttribute('aria-expanded', String(opening));
           // mit offener Hilfe darf die Seite trotz Tastenfeld scrollen
           document.body.classList.toggle('kp-scroll', opening);
-          input.focus();
+          if (!isChoice) input.focus();
         },
       }, 'Wie geht das?')
       : null;
     const helpWrap = h('div', { class: 'help-wrap' }, helpBtn, helpBox);
 
     onKey = (e) => {
-      if (e.key === 'Enter') {
+      if (isChoice && !answered && /^[1-4]$/.test(e.key) && Number(e.key) <= task.choices.length) {
+        e.preventDefault();
+        finish(Number(e.key) - 1);
+      } else if (e.key === 'Enter') {
         const t = e.target;
         if (t instanceof Element && (t.closest('button, a, summary, .ai-box'))) return;
         e.preventDefault();
         if (answered) next();
-        else check.click();
+        else if (!isChoice) check.click();
       } else if (e.key === 'Escape' && !answered) {
         e.preventDefault();
         finish(null);
       }
     };
     document.addEventListener('keydown', onKey);
+
+    const choicesEl = isChoice
+      ? h('div', { class: 'choices', role: 'group', 'aria-label': 'Antwortmöglichkeiten' },
+        task.choices.map((c, i) => {
+          const b = h('button', { type: 'button', class: 'choice', onclick: () => finish(i) },
+            h('span', { class: 'choice-key', 'aria-hidden': 'true' }, String(i + 1)), h('span', { class: 'choice-text' }, c));
+          choiceBtns.push(b);
+          return b;
+        }))
+      : null;
 
     root.replaceChildren();
     appendChildren(root, [
@@ -258,9 +283,10 @@ export function renderTrain(mode, { n: nOverride = null, intro = false } = {}) {
         // Typ nur zeigen, wenn er nicht schon in der Kopfzeile steht (gemischte Runden)
         SUBTYPES[mode] ? null : h('div', { class: 'task-type' }, sub ? sub.name : task.subtype),
         question,
-        h('div', { class: 'hint' }, task.hint || (unitFactor(task.unit) > 1 ? `in ${task.unit} oder als volle Zahl` : '')),
-        h('div', { class: 'answer' }, kp ? null : signBtn, input, task.unit ? h('span', { class: 'unit' }, task.unit) : null),
+        h('div', { class: 'hint' }, task.hint || (!isChoice && unitFactor(task.unit) > 1 ? `in ${task.unit} oder als volle Zahl` : '')),
+        isChoice ? null : h('div', { class: 'answer' }, kp ? null : signBtn, input, task.unit ? h('span', { class: 'unit' }, task.unit) : null),
         helpWrap,
+        choicesEl,
         actions)]);
     if (kp) {
       keypadEl = createKeypad({
@@ -275,7 +301,7 @@ export function renderTrain(mode, { n: nOverride = null, intro = false } = {}) {
       root.append(keypadEl);
       document.body.classList.add('has-keypad');
     }
-    input.focus();
+    if (!isChoice) input.focus();
   }
 
   function showResult() {
@@ -294,7 +320,10 @@ export function renderTrain(mode, { n: nOverride = null, intro = false } = {}) {
     for (const r of results) {
       const ok = r.ev.correct;
       const unit = r.task.unit ? ` ${r.task.unit}` : '';
-      const mid = ok
+      const rc = r.task.kind === 'choice' && Array.isArray(r.task.choices) ? r.task.choices : null;
+      const mid = rc
+        ? (ok ? String(rc[r.task.expected]) : `${r.given === null ? '–' : rc[r.given]} → ${rc[r.task.expected]}`)
+        : ok
         ? `${fmt(r.task.expected)}${unit}`
         : `${r.given === null ? '–' : fmt(r.given)} → ${fmt(r.task.expected)}${unit}`;
       list.append(h('li', null,

@@ -1,5 +1,6 @@
 import { getSettings, setSettings, resetAll, exportJSON } from '../storage.js';
 import { applyTheme } from '../theme.js';
+import { CATEGORIES } from '../generators.js';
 import { app, h, appendChildren, rerender } from '../ui.js';
 
 function segmented(label, options, current, onPick) {
@@ -36,6 +37,37 @@ function download() {
   a.click();
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function categoriesSection(s) {
+  const all = CATEGORIES.map((c) => c.id);
+  const enabled = Array.isArray(s.enabledCategories)
+    ? all.filter((id) => s.enabledCategories.includes(id)) : all;
+  const save = (ids) => {
+    setSettings({ enabledCategories: ids.length >= all.length ? null : ids });
+    rerender();
+  };
+  const rows = CATEGORIES.map((c) => {
+    const on = enabled.includes(c.id);
+    const last = on && enabled.length === 1;
+    const input = h('input', {
+      type: 'checkbox', 'aria-label': c.name, checked: on ? true : null, disabled: last ? true : null,
+      onchange: () => save(input.checked ? all.filter((id) => id === c.id || enabled.includes(id)) : enabled.filter((id) => id !== c.id)),
+    });
+    return h('div', { class: 'setting-row cat-row' },
+      h('div', null, c.name, h('div', { class: 'small muted' }, c.description)),
+      h('label', { class: 'switch' }, input, h('span', { class: 'switch-track' })));
+  });
+  return h('section', { class: 'settings-section' },
+    h('h2', { class: 'section-title' }, 'Kategorien'),
+    h('p', { class: 'small muted' }, 'Nur aktive Kategorien erscheinen im Training, auf der Startseite und in der Analyse. Mindestens eine bleibt aktiv.'),
+    ...rows,
+    enabled.length === 1 ? h('p', { class: 'small muted' }, 'Die letzte aktive Kategorie kann nicht deaktiviert werden.') : null,
+    h('div', { class: 'btn-row' },
+      h('button', {
+        type: 'button', class: 'btn', disabled: enabled.length === all.length ? true : null,
+        onclick: () => save(all),
+      }, 'Alle aktivieren')));
 }
 
 export function renderSettings() {
@@ -82,6 +114,7 @@ export function renderSettings() {
         [['auto', 'Automatisch'], ['on', 'An'], ['off', 'Aus']], s.keypad || 'auto', (v) => setSettings({ keypad: v })),
       'Eigene Zahlentastatur mit „Prüfen“-Taste'),
       row('Timer', toggle('Timer', 'timer', s), 'Aus: ohne Zeitdruck, Tempo zählt nicht')),
+    categoriesSection(s),
     h('section', { class: 'settings-section' },
       h('h2', { class: 'section-title' }, 'Feedback'),
       row('Haptik', toggle('Haptik', 'haptics', s)),
@@ -92,7 +125,7 @@ export function renderSettings() {
       row('Alle Daten löschen', resetBtn)),
     h('section', { class: 'settings-section' },
       h('h2', { class: 'section-title' }, 'Über'),
-      row('Version', h('span', { class: 'muted' }, 'Version 3')),
+      row('Version', h('span', { class: 'muted' }, 'Version 4')),
       row('Quellcode', h('a', { class: 'linkbtn', href: 'https://github.com/EliasSteffen/Mental-Math', target: '_blank', rel: 'noopener' }, 'GitHub'))),
   ]);
 }

@@ -1,4 +1,4 @@
-const VERSION = 'v3-10';
+const VERSION = 'v4-1';
 const CACHE = `mentalmath-${VERSION}`;
 
 const JS = ['app', 'ai', 'charts', 'generators', 'methods', 'numbers', 'progress', 'review', 'scoring',

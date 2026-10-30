@@ -1,5 +1,5 @@
 // Fortschritt: Serie, Heatmap, Verlauf, XP, Empfehlung (reine Funktionen, Datum lokal)
-import { SUBTYPES, CATEGORIES } from './generators.js';
+import { SUBTYPES, activeCategories } from './generators.js';
 import { weaknesses } from './scoring.js';
 import { dueReviews } from './review.js';
 
@@ -94,8 +94,10 @@ export function xpInfo(attempts) {
   return { xp, level, into: rest, needed: 500 * level };
 }
 
-export function recommendation(attempts, reviews, now = Date.now()) {
-  const due = dueReviews(reviews, now);
+export function recommendation(attempts, reviews, now = Date.now(), { enabledCategories = null } = {}) {
+  const cats = activeCategories(enabledCategories);
+  const active = new Set(cats.map((c) => c.id));
+  const due = dueReviews(reviews, now).filter((r) => SUBTYPES[r.subtype] && active.has(SUBTYPES[r.subtype].category));
   if (due.length) {
     return {
       kind: 'review', mode: 'review', subtype: null,
@@ -103,7 +105,7 @@ export function recommendation(attempts, reviews, now = Date.now()) {
       reason: `${due.length} ${due.length === 1 ? 'Wiederholung' : 'Wiederholungen'} fällig`,
     };
   }
-  const weak = weaknesses(attempts, 1)[0];
+  const weak = weaknesses(attempts, 1, { enabledCategories })[0];
   if (weak) {
     return {
       kind: 'weak', mode: weak.subtype, subtype: weak.subtype,
@@ -112,7 +114,7 @@ export function recommendation(attempts, reviews, now = Date.now()) {
     };
   }
   const seen = new Set((attempts || []).map((a) => a.subtype));
-  for (const c of CATEGORIES) {
+  for (const c of cats) {
     const s = Object.values(SUBTYPES).find((x) => x.category === c.id && !seen.has(x.id));
     if (s) return { kind: 'new', mode: s.id, subtype: s.id, title: s.name, reason: 'Noch nie geübt' };
   }

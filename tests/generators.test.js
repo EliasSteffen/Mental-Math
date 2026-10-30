@@ -6,9 +6,10 @@ import { unitFactor } from '../public/js/numbers.js';
 
 // Exakte Typen mit legitim nicht-ganzzahliger Antwort (z. B. 12,5 % bzw. 7,5 Mio. €)
 const FRACTIONAL_OK = new Set(['pct.change', 'biz.tco']);
+const lastOk = (t, steps) => steps[steps.length - 1].includes(t.kind === 'choice' ? t.choices[t.expected] : fmt(t.expected));
 
-test('8 Kategorien, jede mit mindestens 2 Typen', () => {
-  assert.equal(CATEGORIES.length, 8);
+test('10 Kategorien, jede mit mindestens 2 Typen', () => {
+  assert.equal(CATEGORIES.length, 10);
   for (const c of CATEGORIES) {
     const n = Object.values(SUBTYPES).filter((s) => s.category === c.id).length;
     assert.ok(n >= 2, `${c.id} hat ${n} Typen`);
@@ -94,7 +95,8 @@ for (const id of Object.keys(SUBTYPES)) {
         const steps = solutionSteps(t);
         const ctx = `L${level} ${t.prompt} → ${JSON.stringify(steps)}`;
         assert.ok(steps.length >= 3 && steps.length <= 6, ctx);
-        assert.ok(steps[steps.length - 1].includes(fmt(t.expected)), ctx);
+        const answer = t.kind === 'choice' ? t.choices[t.expected] : fmt(t.expected);
+        assert.ok(steps[steps.length - 1].includes(answer), ctx);
         assert.equal(evaluate(t, t.expected, 1000).correct, true, ctx);
         assert.doesNotMatch(t.prompt, /NaN|undefined|Infinity/);
       }

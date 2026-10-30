@@ -92,7 +92,7 @@ test('recommendation: Priorität', () => {
   assert.equal(r.mode, 'review');
   assert.equal(r.subtype, null);
   assert.equal(r.reason, '2 Wiederholungen fällig');
-  assert.equal(recommendation(bad, { a: { box: 0, dueAt: NOW, lastTs: 0 }, 'pct.of': { box: 0, dueAt: NOW + 1, lastTs: 0 } }, NOW).reason, '1 Wiederholung fällig');
+  assert.equal(recommendation(bad, { 'biz.roi': { box: 0, dueAt: NOW, lastTs: 0 }, 'pct.of': { box: 0, dueAt: NOW + 1, lastTs: 0 } }, NOW).reason, '1 Wiederholung fällig');
   r = recommendation(bad, {}, NOW);
   assert.deepEqual(r, { kind: 'weak', mode: 'pct.reverse', subtype: 'pct.reverse', title: 'Rückwärts-Prozent', reason: '40 % richtig in den letzten Versuchen' });
   r = recommendation([], {}, NOW);

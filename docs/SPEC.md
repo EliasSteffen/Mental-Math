@@ -434,3 +434,47 @@ Dazu `-soft`-Varianten (≈ 15 % Deckkraft der Farbe über `color-mix`), `--glow
 
 ## PWA
 `public/manifest.webmanifest` (name „Mental Math“, short_name „Mental Math“, start_url „/“, display „standalone“, theme/background #121214, Icons 192/512 PNG + maskable), `public/sw.js` (Precache der statischen Dateien, Stale-While-Revalidate, `/api/` nie cachen, Versions-Konstante), `public/js/pwa.js` → `registerSW()`. `index.html`: manifest-Link, `theme-color`, `apple-touch-icon` (180 PNG), `apple-mobile-web-app-capable`. `_headers`: `/sw.js` mit `Cache-Control: no-cache`, `/manifest.webmanifest` mit `Content-Type: application/manifest+json`.
+
+---
+
+# v4 – Neue Kategorien, Auswahl-Aufgaben, Kategorienauswahl
+
+## 1. Prozente als Dezimalzahl
+`evaluate()`: Ist `task.unit === '%'`, zählt zusätzlich der Kandidat `given × 100` (0,15 → 15 %). Gilt für alle Prozent-Aufgaben.
+
+## 2. Neue Kategorien (in `CATEGORIES` hinten anhängen)
+
+| Kategorie | ID | Beschreibung |
+|---|---|---|
+| Einheiten | `units` | „Dimensionen, Umrechnen“ |
+| Größenordnungen | `mag` | „Zehnerpotenzen, Schätzen“ |
+
+| Subtyp-ID | Name | Art | Inhalt | Ziel ms | weight |
+|---|---|---|---|---|---|
+| `units.dimless` | Dimensionslos machen | **choice** | „Umsatz [€/Jahr] ÷ ? = dimensionslos“, „Kosten [€] ÷ ? = Anteil (dimensionslos)“, „Ausfallzeit [h/Jahr] ÷ ? = Anteil“ … Fehlende Einheit wählen. 4 Optionen, 1 richtig, Distraktoren = plausible Verwechslungen (Kehrwert, falsche Zeitbasis) | 10000 | 1 |
+| `units.result` | Ergebnis-Einheit | **choice** | „[€/h] × [h/Jahr] = ?“, „[Stück/Tag] × [€/Stück] = ?“, „[€] ÷ [Mitarbeiter] = ?“ → Einheit des Ergebnisses | 10000 | 1 |
+| `units.convert` | Einheiten umrechnen | number | „120 Tsd. €/Monat = ? Mio. €/Jahr“, „36 km/h = ? m/s“, „8 h/Tag × 220 Tage = ? h/Jahr“, „0,5 €/Min. = ? €/h“ | 15000 | 1.5 |
+| `mag.exponent` | Zehnerpotenz einer Zahl | number | „4,2 Mrd. = a × 10^n (1 ≤ a < 10). n = ?“, auch Dezimalzahlen (0,003 → −3) | 6000 | 1 |
+| `mag.facts` | Größenordnungen kennen | number | Bekannte Consulting-Größen, n = ⌊log10(Wert)⌋: Einwohner DE (8,4·10⁷ → 7), Haushalte DE (4,1·10⁷ → 7), Erwerbstätige DE (4,6·10⁷ → 7), EU (4,5·10⁸ → 8), Welt (8,2·10⁹ → 9), BIP DE in € (4,3·10¹² → 12), Sekunden/Jahr (3,15·10⁷ → 7), Stunden/Jahr (8.760 → 3), Arbeitsstunden/FTE/Jahr (1.700 → 3), Pkw in DE (4,9·10⁷ → 7) – die Antwort-Erklärung nennt den Wert | 8000 | 1 |
+| `mag.product` | Größenordnung von Produkten | number | „3·10⁴ × 5·10⁵“ (Mantissen-Übertrag beachten → 1,5·10¹⁰ → 10), auch mit Einheiten-Wörtern („40 Mio. × 3.000“) | 10000 | 1.5 |
+| `mag.ratio` | Größenordnung von Quotienten | number | „6 Mrd. ÷ 2.000“ → 3·10⁶ → 6; auch Ergebnisse < 1 (negativer Exponent) | 10000 | 1.5 |
+
+Alle neuen Subtypen haben Level 1–3 (L1 glatte Zahlen/einfache Einheiten, L3 mehr Schritte), `params`, `solutionSteps` (3–6 Schritte, letzter Schritt enthält die richtige Antwort; bei choice den Text der richtigen Option) und eine Methode in `METHODS`.
+
+## 3. Auswahl-Aufgaben (choice)
+```js
+Task = { …, kind: 'choice', choices: ['€/Jahr', '€', 'Jahr', '1/Jahr'], expected: 0 /* Index */, unit: '', tolerance: { abs: 0, rel: 0 },
+         params: { …, c0, c1, c2, c3 /* Optionstexte als Strings, damit /api/explain sie validiert */ } }
+// Numerische Tasks: kind fehlt oder 'number'.
+evaluate(choiceTask, givenIndex, timeMs) → correct bei Gleichheit; Fehler immer errorType 'falsch' (nie 'nullen'/'knapp'), null → 'skip'.
+// Optionen werden gemischt; die richtige Option steht an zufälligem Index.
+```
+**UI:** statt Eingabe/Tastenfeld ein 2×2-Raster `.choices` mit `button.choice` (groß, ≥ 56 px); Tipp = sofort prüfen. Tastatur: 1–4 wählt Option. Nach dem Prüfen: richtige Option `.is-correct`, falsch gewählte `.is-wrong`, alle deaktiviert. Feedback „Richtig: <Optionstext>“. Attempt speichert zusätzlich `kind` und `choices`, damit Ergebnis/Analyse Texte statt Indizes zeigen. KI-Erklärung: Server übersetzt `given`-Index über `params.c0…c3` in Text.
+
+## 4. Kategorienauswahl
+`settings.enabledCategories`: `null` (= alle) oder Array von Kategorie-IDs (mind. 1).
+- `generators.activeCategories(enabled) → CATEGORIES gefiltert` (null → alle).
+- `generateForMode('all' | 'weak' | 'review', { enabledCategories, … })`: nur Subtypen aktiver Kategorien (weak/review: filtern; leer → wie 'all').
+- `progress.recommendation(attempts, reviews, now, { enabledCategories })` und `scoring.weaknesses(attempts, limit, { enabledCategories })` filtern ebenso.
+- **Startseite:** Kategorie-Raster und „Alle Kategorien“ nur mit aktiven Kategorien. **Analyse:** Kategorien-Karten nur aktive (Daten bleiben erhalten). **Lernen:** zeigt weiterhin alle.
+- **Einstellungen:** Abschnitt „Kategorien“ mit Chips/Schaltern je Kategorie (Name + Beschreibung), „Alle“-Knopf; die letzte aktive lässt sich nicht abwählen.

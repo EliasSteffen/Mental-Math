@@ -7,7 +7,7 @@ const filled = (s) => typeof s === 'string' && s.trim().length > 0;
 
 test('jeder Subtyp hat eine Methode, keine überzähligen Schlüssel', () => {
   const ids = Object.keys(SUBTYPES).sort();
-  assert.equal(ids.length, 30);
+  assert.equal(ids.length, 37);
   assert.deepEqual(Object.keys(METHODS).sort(), ids);
 });
 

@@ -1,5 +1,6 @@
 // Lösungswege fürs Kopfrechnen: solutionSteps(task) → string[] (3–6 kurze deutsche Schritte)
 import { fmt, round } from './numbers.js';
+import { parseU, uMul, uDiv, uInv, uStr, uRaw, p10 } from './generators.js';
 
 const SUP = '⁰¹²³⁴⁵⁶⁷⁸⁹';
 const sup = (n) => String(n).split('').map((c) => SUP[+c] ?? c).join('');
@@ -521,7 +522,163 @@ const S = {
     const { a: pr, b: yr } = best;
     return [roundNote([[p, pr], [y, yr]]), ...pctOfSteps(pr, yr), `Exakt: ${fmt(task.expected)}`];
   },
+
+  'units.dimless': (p, task) => {
+    const ans = optText(p, task);
+    const base = parseU(p.ua);
+    if (p.k === 3) {
+      const comb = p.o1 === '×' ? uMul(base, parseU(p.ub)) : uDiv(base, parseU(p.ub));
+      return [
+        'Dimensionslos heißt: alle Einheiten kürzen sich weg',
+        `Erst zusammenfassen: [${p.ua}] ${p.o1} [${p.ub}] = [${uStr(comb)}]`,
+        p.o2 === '÷'
+          ? `Teilen durch ? soll alles kürzen: [${uStr(comb)}] ÷ ? = 1 → ? hat dieselbe Einheit wie das Ergebnis`
+          : `Mal ? soll alles kürzen: [${uStr(comb)}] × ? = 1 → ? ist der Kehrwert der Einheit`,
+        `Das Fragezeichen hat die Einheit ${ans}`,
+      ];
+    }
+    return [
+      'Dimensionslos heißt: alle Einheiten kürzen sich weg',
+      `Gegeben: [${p.ua}]`,
+      p.o2 === '÷'
+        ? `Teilen: [${p.ua}] ÷ [${p.ua}] = 1 → durch dieselbe Einheit teilen`
+        : `Malnehmen: nur der Kehrwert kürzt sich weg – [${p.ua}] × [${uStr(uInv(base))}] = 1`,
+      `Das Fragezeichen hat die Einheit ${ans}`,
+    ];
+  },
+
+  'units.result': (p, task) => {
+    const ex = [p.ua, p.o1, p.ub, ...(p.o2 ? [p.o2, p.uc] : [])];
+    let raw = parseU(ex[0]);
+    for (let i = 1; i < ex.length; i += 2) raw = ex[i] === '×' ? uMul(raw, parseU(ex[i + 1])) : uDiv(raw, parseU(ex[i + 1]));
+    const names = [...new Set(raw.map(([n]) => n))];
+    const cancelled = names.filter((n) => raw.some(([x, e]) => x === n && e > 0) && raw.some(([x, e]) => x === n && e < 0));
+    const steps = ['Einheiten rechnen wie Brüche: was oben und unten steht, kürzt sich'];
+    if (ex.includes('÷')) steps.push('Teilen heißt mit dem Kehrwert malnehmen');
+    steps.push(`Ausschreiben: ${ex.map((x, i) => (i % 2 ? x : `[${x}]`)).join(' ')} = ${uRaw(raw)}`);
+    steps.push(cancelled.length ? `Kürzen: ${cancelled.join(', ')}` : 'Hier kürzt sich nichts – die Einheiten setzen sich zusammen');
+    steps.push(`Ergebnis: ${optText(p, task)}`);
+    return steps;
+  },
+
+  'units.convert': (p, task) => {
+    const { x, y, fam } = p, F = (n) => fmt(n, 4), u = task.unit, res = `Ergebnis: ${F(task.expected)} ${u}`;
+    switch (fam) {
+      case 1: return [
+        'Erst die Zeit: Monat → Jahr heißt × 12',
+        `${F(x)} Tsd. € × 12 = ${F(x * 12)} Tsd. €/Jahr`,
+        'Dann die Größe: 1.000 Tsd. = 1 Mio. → ÷ 1.000',
+        `${F(x * 12)} ÷ 1.000 = ${F(task.expected)}`, res,
+      ];
+      case 2: return [
+        '1 m/s = 3,6 km/h – also km/h durch 3,6 teilen',
+        `Bequemer: ÷ 3,6 = × 10 ÷ 36 → ${F(x)} × 10 = ${F(x * 10)}`,
+        `${F(x * 10)} ÷ 36 = ${F(task.expected)}`, res,
+      ];
+      case 3: return [
+        '1 m/s = 3,6 km/h – also m/s mal 3,6',
+        `3,6 = 4 − 0,4: ${F(x)} × 4 = ${F(x * 4)} und ${F(x)} × 0,4 = ${F(x * 0.4)}`,
+        `${F(x * 4)} − ${F(x * 0.4)} = ${F(task.expected)}`, res,
+      ];
+      case 4: {
+        const w = Math.trunc(x), r = round(x - w, 4);
+        return [
+          'h/Tag × Tage: „Tag“ kürzt sich, es bleibt h/Jahr',
+          r > 0 ? `Zerlegen: ${F(y)} × ${F(w)} = ${F(y * w)} und ${F(y)} × ${F(r)} = ${F(y * r)}` : `${F(y)} × ${F(w)} = ${F(y * w)}`,
+          r > 0 ? `${F(y * w)} + ${F(y * r)} = ${F(task.expected)}` : `Probe: ${F(task.expected)} ÷ ${F(y)} = ${F(x)}`, res,
+        ];
+      }
+      case 5: return [
+        '1 h = 60 Min. → pro Stunde ist 60-mal so viel wie pro Minute',
+        `${F(x)} × 60 = ${F(x)} × 6 × 10`,
+        `${F(x)} × 6 = ${F(x * 6)}, dann × 10 = ${F(task.expected)}`, res,
+      ];
+      case 6: return [
+        'Größe: Mio. → Tsd. heißt × 1.000',
+        `${F(x)} Mio. = ${F(x * 1000)} Tsd. €/Jahr`,
+        'Zeit: Jahr → Monat heißt ÷ 12',
+        `${F(x * 1000)} ÷ 12 = ${F(task.expected)}`, res,
+      ];
+      case 7: return [
+        'Stück/Tag × Tage: „Tag“ kürzt sich, es bleibt Stück/Jahr',
+        `${F(x)} × ${F(y)} = ${F(x * y)} Stück/Jahr`,
+        'Stück → Tsd. Stück: ÷ 1.000',
+        `${F(x * y)} ÷ 1.000 = ${F(task.expected)}`, res,
+      ];
+      case 8: return [
+        'Erst Minuten pro Jahr: Min./Tag × Tage',
+        `${F(x)} × ${F(y)} = ${F(x * y)} Min./Jahr`,
+        'Minuten → Stunden: ÷ 60',
+        `${F(x * y)} ÷ 60 = ${F(task.expected)}`, res,
+      ];
+      default: return [
+        `Mio. ausschreiben: ${F(x)} Mio. = ${F(x * 1e6)} Stück/Jahr`,
+        `Pro Tag heißt: durch ${F(y)} Tage teilen`,
+        `${F(x * 1e6)} ÷ ${F(y)} = ${F(task.expected)}`, res,
+      ];
+    }
+  },
+
+  'mag.exponent': (p, task) => {
+    const { a, k, e, n, u, disp } = p, F = (v) => fmt(v, 4);
+    const goal = 'Ziel: a × 10ⁿ mit genau einer Ziffer 1–9 vor dem Komma';
+    if (u) {
+      const m = F(round(a * 10 ** k, 6));
+      return [
+        goal,
+        `${u} = ${p10(e)}, also ${disp} = ${m} × ${p10(e)}`,
+        `${m} = ${F(a)} × ${p10(k)} (Komma ${k === 0 ? 'ist schon richtig' : k > 0 ? `${k} Stelle(n) nach links` : `${-k} Stelle(n) nach rechts`})`,
+        `Exponenten addieren: ${F(k)} + ${e} = ${F(n)}`,
+        `Ergebnis: ${F(a)} × ${p10(n)} → n = ${F(n)}`,
+      ];
+    }
+    return [
+      goal,
+      `Komma verschieben, bis genau eine Ziffer ≠ 0 vor dem Komma steht: ${disp} → ${F(a)}`,
+      n >= 0 ? `Komma ${n} Stellen nach links geschoben → große Zahl, n positiv` : `Komma ${-n} Stellen nach rechts geschoben → kleine Zahl, n negativ`,
+      `Ergebnis: ${F(a)} × ${p10(n)} → n = ${F(n)}`,
+    ];
+  },
+
+  'mag.facts': (p) => {
+    const F = (v) => fmt(v, 4);
+    return [
+      `${p.fact} ≈ ${p.v}`,
+      `Als a × 10ⁿ geschrieben: ${F(p.a)} × ${p10(p.n)}`,
+      `Merkhilfe: n = Anzahl Stellen vor dem Komma − 1 (bei ${p.v}: ${F(p.n + 1)} − 1)`,
+      `Ergebnis: n = ${F(p.n)}`,
+    ];
+  },
+
+  'mag.product': (p) => {
+    const F = (v) => fmt(v, 4), P = (v) => (v < 0 ? `(${F(v)})` : F(v));
+    const m = round(p.a1 * p.a2, 4), s = p.p1 + p.p2, carry = m >= 10;
+    return [
+      `Beide als a × 10ⁿ: ${p.d1} = ${F(p.a1)} × ${p10(p.p1)} und ${p.d2} = ${F(p.a2)} × ${p10(p.p2)}`,
+      `Mantissen multiplizieren: ${F(p.a1)} × ${F(p.a2)} = ${F(m)}`,
+      `Exponenten addieren: ${P(p.p1)} + ${P(p.p2)} = ${F(s)}`,
+      carry ? `${F(m)} ist ≥ 10 → ${F(m)} = ${F(m / 10)} × 10 → Exponent + 1 = ${F(s + 1)}` : `${F(m)} liegt zwischen 1 und 10 → kein Übertrag`,
+      `Ergebnis: ${F(carry ? m / 10 : m)} × ${p10(s + (carry ? 1 : 0))} → n = ${F(s + (carry ? 1 : 0))}`,
+    ];
+  },
+
+  'mag.ratio': (p) => {
+    const F = (v) => fmt(v, 4), P = (v) => (v < 0 ? `(${F(v)})` : F(v));
+    const m = p.a1 / p.a2, s = p.p1 - p.p2, borrow = p.a1 < p.a2, n = s - (borrow ? 1 : 0);
+    return [
+      `Beide als a × 10ⁿ: ${p.d1} = ${F(p.a1)} × ${p10(p.p1)} und ${p.d2} = ${F(p.a2)} × ${p10(p.p2)}`,
+      `Mantissen teilen: ${F(p.a1)} ÷ ${F(p.a2)} ≈ ${fmt(m, 2)}`,
+      `Exponenten subtrahieren: ${P(p.p1)} − ${P(p.p2)} = ${F(s)}`,
+      borrow ? `${fmt(m, 2)} ist < 1 → ${fmt(m, 2)} = ${fmt(m * 10, 2)} × 10⁻¹ → Exponent − 1 = ${F(n)}` : `${fmt(m, 2)} liegt zwischen 1 und 10 → keine Korrektur`,
+      `Ergebnis: ${fmt(borrow ? m * 10 : m, 2)} × ${p10(n)} → n = ${F(n)}`,
+    ];
+  },
 };
+
+function optText(p, task) {
+  const v = p['c' + task.expected];
+  return typeof v === 'string' ? v : '';
+}
 
 export function solutionSteps(task) {
   try {

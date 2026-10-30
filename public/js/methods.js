@@ -438,6 +438,110 @@ export const METHODS = {
       'In die falsche Richtung korrigieren: 23 % < 25 %, also abziehen.',
     ],
   },
+
+  'units.dimless': {
+    idea: 'Einheiten verhalten sich wie Zahlen: Sie lassen sich kürzen. Eine Größe wird dimensionslos (ein reiner Anteil), wenn du sie durch etwas mit genau derselben Einheit teilst.',
+    steps: [
+      'Schreibe die Einheit der gegebenen Größe als Bruch (€/Jahr = € pro Jahr).',
+      'Überlege, was im Nenner stehen muss, damit sich alles wegkürzt: dieselbe Einheit, auch dieselbe Zeitbasis.',
+      'Kürze Zähler- und Nenner-Einheiten gegeneinander.',
+      'Prüfe, was übrig bleibt: nichts mehr = dimensionslos (ein Anteil oder eine Quote).',
+    ],
+    trick: 'Umsatz [€/Jahr] ÷ Marktvolumen [€/Jahr] = Marktanteil (ohne Einheit). Auch Ausfallzeit [h/Jahr] ÷ Jahresstunden [h/Jahr] = Anteil.',
+    pitfalls: [
+      'Die Zeitbasis mischen: €/Monat durch €/Jahr geteilt kürzt sich nicht sauber (Faktor 12 daneben).',
+      'Den Kehrwert nehmen: Marktvolumen ÷ Umsatz ist zwar dimensionslos, aber nicht der gesuchte Anteil.',
+    ],
+  },
+  'units.result': {
+    idea: 'Beim Multiplizieren und Dividieren rechnest du mit Einheiten wie mit Brüchen: Gleiche Einheiten in Zähler und Nenner kürzen sich weg, der Rest ist die Einheit des Ergebnisses.',
+    steps: [
+      'Schreibe beide Einheiten als Brüche untereinander oder nebeneinander.',
+      'Bei Multiplikation: Zähler mal Zähler, Nenner mal Nenner. Bei Division: mit dem Kehrwert multiplizieren.',
+      'Kürze alles, was oben und unten gleich vorkommt.',
+      'Lies die übrig gebliebene Einheit ab und prüfe, ob sie zur Fragestellung passt.',
+    ],
+    trick: '€/h × h/Jahr = €/Jahr (h kürzt sich). Stück/Tag × €/Stück = €/Tag. € ÷ Mitarbeiter = €/Mitarbeiter.',
+    pitfalls: [
+      'Bei Division den Kehrwert vergessen: ÷ (h/Jahr) heißt × (Jahr/h).',
+      'Eine Einheit nicht kürzen, obwohl sie oben und unten steht.',
+    ],
+  },
+  'units.convert': {
+    idea: 'Du rechnest um, indem du Umrechnungsfaktoren so hintereinanderschaltest, dass die ungewollten Einheiten sich wegkürzen und nur die gewünschte übrig bleibt.',
+    steps: [
+      'Schreibe die Ausgangsgröße samt Einheit auf und notiere die Zieleinheit.',
+      'Wähle Umrechnungsfaktoren so, dass die alte Einheit im Nenner steht und die neue im Zähler (1 Jahr = 12 Monate).',
+      'Multipliziere die Zahlen, kürze die Einheiten und zähle Nullen separat.',
+      'Plausibilität: Wird die Einheit kleiner, wird die Zahl größer, und umgekehrt.',
+    ],
+    trick: '36 km/h = 36.000 m ÷ 3.600 s = 10 m/s (Faustregel: ÷ 3,6). Monatswert × 12 = Jahreswert. 220 Arbeitstage × 8 h = 1.760 h pro Jahr. 0,5 €/Min. × 60 = 30 €/h.',
+    pitfalls: [
+      'Den Faktor in die falsche Richtung anwenden (÷ 12 statt × 12 beim Hochrechnen auf das Jahr).',
+      'Nur einen Teil der Einheit umrechnen, etwa km in m, aber h nicht in s.',
+      'Bei Tsd. / Mio. die Nullen verzählen (120 Tsd. × 12 = 1,44 Mio., nicht 14,4 Mio.).',
+    ],
+  },
+
+  'mag.exponent': {
+    idea: 'Jede Zahl lässt sich als a × 10ⁿ schreiben, mit 1 ≤ a < 10. Der Exponent n ist die Größenordnung: Er sagt, wie viele Stellen die Zahl hat.',
+    steps: [
+      'Zähle bei großen Zahlen die Stellen vor dem Komma; n = Stellenzahl − 1 (85.000 hat 5 Stellen, n = 4).',
+      'Bei Einheiten-Wörtern: Tsd. = 10³, Mio. = 10⁶, Mrd. = 10⁹, Bio. = 10¹². Dann a beachten: 4,2 Mrd. = 4,2 × 10⁹, also n = 9.',
+      'Bei Dezimalzahlen kleiner als 1: Suche die erste Ziffer ungleich null. Ihre Position nach dem Komma ist −n (0,003 → n = −3).',
+      'Prüfe, ob a zwischen 1 und 10 liegt; sonst verschiebe das Komma und passe n an (12 × 10⁶ = 1,2 × 10⁷).',
+    ],
+    trick: '4,2 Mrd. = 4,2 × 10⁹ → n = 9. 85.000 = 8,5 × 10⁴ → n = 4. 0,003 = 3 × 10⁻³ → n = −3. 0,047 = 4,7 × 10⁻² → n = −2.',
+    pitfalls: [
+      'Stellen statt Stellen − 1 nehmen: 85.000 hat 5 Stellen, aber n = 4.',
+      'Bei Zahlen unter 1 das Vorzeichen vergessen oder um 1 danebenliegen (0,003 ist 10⁻³, nicht 10⁻²).',
+      'Die Einheit falsch zuordnen: Mrd. ist 10⁹, Bio. ist 10¹², nicht 10¹⁵.',
+    ],
+  },
+  'mag.facts': {
+    idea: 'Mit einer kleinen Liste von Ankerwerten schätzt du in Cases sicher die Größenordnung. Merke dir die Zahl und leite den Exponenten daraus ab.',
+    steps: [
+      'Rufe den Ankerwert ab (Einwohner Deutschland ≈ 84 Mio.).',
+      'Schreibe ihn als a × 10ⁿ (84 Mio. = 8,4 × 10⁷).',
+      'Lies n ab: der Exponent der Zehnerpotenz.',
+      'Nutze den Anker, um verwandte Größen einzuordnen (Haushalte ≈ halb so viele wie Einwohner, also gleiche Größenordnung).',
+    ],
+    trick: 'Einwohner DE 84 Mio. ≈ 8 × 10⁷ (n = 7). Haushalte 41 Mio., Erwerbstätige 46 Mio. (beide n = 7). EU 450 Mio. = 4,5 × 10⁸. Welt 8,2 Mrd. = 8,2 × 10⁹. BIP DE ≈ 4,3 Bio. € = 4,3 × 10¹². 1 Jahr ≈ 3,15 × 10⁷ s. 8.760 h pro Jahr (n = 3). ca. 1.700 Arbeitsstunden pro FTE (n = 3).',
+    pitfalls: [
+      'Mio. und Mrd. verwechseln: Deutschland hat Mio. Einwohner (10⁷), die Welt Mrd. (10⁹).',
+      'Beim BIP die Einheit Bio. = 10¹² mit Mrd. = 10⁹ vertauschen.',
+    ],
+  },
+  'mag.product': {
+    idea: 'Bei Produkten in Zehnerpotenz-Schreibweise multiplizierst du die Mantissen und addierst die Exponenten. Danach prüfst du, ob die Mantisse noch zwischen 1 und 10 liegt.',
+    steps: [
+      'Schreibe beide Faktoren als a × 10ⁿ (40 Mio. = 4 × 10⁷; 3.000 = 3 × 10³).',
+      'Multipliziere die Mantissen (4 × 3 = 12).',
+      'Addiere die Exponenten (7 + 3 = 10).',
+      'Normalisiere: Ist die Mantisse ≥ 10, schiebe das Komma um eine Stelle und erhöhe n um 1 (12 × 10¹⁰ = 1,2 × 10¹¹).',
+    ],
+    trick: '3 × 10⁴ × 5 × 10⁵ = 15 × 10⁹ = 1,5 × 10¹⁰ → n = 10. Und 40 Mio. × 3.000 = 12 × 10¹⁰ = 1,2 × 10¹¹ → n = 11.',
+    pitfalls: [
+      'Den Mantissen-Übertrag vergessen: 15 × 10⁹ hat n = 10, nicht 9.',
+      'Die Exponenten multiplizieren statt addieren.',
+      'Eine Null verzählen, wenn du Tsd./Mio. in Potenzen übersetzt.',
+    ],
+  },
+  'mag.ratio': {
+    idea: 'Bei Quotienten teilst du die Mantissen und subtrahierst die Exponenten. Ist die Mantisse danach kleiner als 1, normalisierst du nach unten.',
+    steps: [
+      'Schreibe Zähler und Nenner als a × 10ⁿ (6 Mrd. = 6 × 10⁹; 2.000 = 2 × 10³).',
+      'Teile die Mantissen (6 ÷ 2 = 3).',
+      'Subtrahiere die Exponenten (9 − 3 = 6).',
+      'Normalisiere: Ist die Mantisse < 1, schiebe das Komma nach rechts und verringere n um 1 (0,5 × 10⁻² = 5 × 10⁻³).',
+    ],
+    trick: '6 Mrd. ÷ 2.000 = 3 × 10⁶ → n = 6. Und 2 × 10³ ÷ 4 × 10⁵ = 0,5 × 10⁻² = 5 × 10⁻³ → n = −3.',
+    pitfalls: [
+      'Die Exponenten addieren statt subtrahieren.',
+      'Bei Mantisse < 1 nicht normalisieren: 0,5 × 10⁻² hat n = −3, nicht −2.',
+      'Die Reihenfolge vertauschen (Nenner − Zähler) und das Vorzeichen des Exponenten falsch bekommen.',
+    ],
+  },
 };
 
 export function getMethod(subtypeId) {

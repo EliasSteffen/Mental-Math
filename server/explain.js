@@ -61,11 +61,22 @@ export function buildPrompt(value) {
   const lines = [`Aufgabentyp: ${sub.name}`, `Kategorie: ${cat ? cat.name : sub.category}`];
   if (value.kind === 'task') {
     lines.push(`Aufgabe: ${value.prompt}`);
-    lines.push(`Richtige Antwort: ${num(value.expected)}${value.unit ? ' ' + value.unit : ''}`);
-    if (value.given !== null && value.given !== undefined) {
-      lines.push(`Antwort des Nutzers (falsch): ${num(value.given)}${value.unit ? ' ' + value.unit : ''}`);
+    const p = value.params || {};
+    const opts = [0, 1, 2, 3].map((i) => p['c' + i]).filter((x) => typeof x === 'string');
+    const isChoice = typeof p.c0 === 'string';
+    if (isChoice) {
+      lines.push('Auswahl-Aufgabe mit den Optionen: ' + opts.map((o, i) => `${i + 1}) ${o}`).join(' | '));
+      lines.push(`Richtige Antwort: ${opts[value.expected] ?? num(value.expected)}`);
+      if (value.given !== null && value.given !== undefined) {
+        lines.push(`Antwort des Nutzers (falsch): ${opts[value.given] ?? num(value.given)}`);
+      }
+    } else {
+      lines.push(`Richtige Antwort: ${num(value.expected)}${value.unit ? ' ' + value.unit : ''}`);
+      if (value.given !== null && value.given !== undefined) {
+        lines.push(`Antwort des Nutzers (falsch): ${num(value.given)}${value.unit ? ' ' + value.unit : ''}`);
+      }
     }
-    const entries = Object.entries(value.params || {});
+    const entries = Object.entries(p).filter(([k]) => !(isChoice && /^c[0-3]$/.test(k)));
     if (entries.length) lines.push('Parameter: ' + entries.map(([k, v]) => `${k}=${v}`).join(', '));
   } else {
     lines.push('Erkläre die Methode für diesen Aufgabentyp allgemein.');

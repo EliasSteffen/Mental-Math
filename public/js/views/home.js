@@ -1,4 +1,4 @@
-import { CATEGORIES, SUBTYPES } from '../generators.js';
+import { SUBTYPES, activeCategories } from '../generators.js';
 import { categoryStats, overall } from '../scoring.js';
 import { getAttempts, getReviews, getActivity, getSettings } from '../storage.js';
 import { streakInfo, xpInfo, recommendation } from '../progress.js';
@@ -14,7 +14,7 @@ export function renderHome() {
   const goalMs = (settings.dailyGoalMin || 15) * 60000;
   const st = streakInfo(getActivity(), goalMs, now);
   const xp = xpInfo(attempts);
-  const rec = recommendation(attempts, reviews, now);
+  const rec = recommendation(attempts, reviews, now, { enabledCategories: settings.enabledCategories });
   const due = dueReviews(reviews, now);
   const stats = categoryStats(attempts);
   const counts = {};
@@ -78,7 +78,7 @@ export function renderHome() {
     h('div', { class: 'sub' }, `Gemischt · ${attempts.length} Aufgaben bisher`));
 
   const grid = h('div', { class: 'cat-grid' });
-  for (const c of CATEGORIES) {
+  for (const c of activeCategories(settings.enabledCategories)) {
     const sc = stats[c.id] ? stats[c.id].score : null;
     grid.append(h('a', { class: 'cat-card', href: `#/train/${c.id}` },
       ring((sc || 0) / 100, { size: 'sm', text: sc === null ? '–' : String(sc) }),

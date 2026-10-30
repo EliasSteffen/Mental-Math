@@ -1,5 +1,5 @@
 // Bewertung, Punkte, Skill, Schwächen
-import { SUBTYPES, CATEGORIES } from './generators.js';
+import { SUBTYPES, CATEGORIES, activeCategories } from './generators.js';
 import { unitFactor } from './numbers.js';
 
 const clamp = (x, lo, hi) => Math.min(hi, Math.max(lo, x));
@@ -15,10 +15,18 @@ export function evaluate(task, given, timeMs, { assisted = false, untimed = fals
     return { correct: false, errorType: 'skip', points: 0, timeFactor: tf };
   }
   const { expected } = task;
+  if (task.kind === 'choice') {
+    if (given === expected) {
+      const points = Math.round(100 * task.weight * tf);
+      return { correct: true, errorType: null, points: assisted ? Math.round(points * 0.5) : points, timeFactor: tf };
+    }
+    return { correct: false, errorType: 'falsch', points: 0, timeFactor: tf };
+  }
   const { abs = 0, rel = 0 } = task.tolerance || {};
   const F = unitFactor(task.unit);
   const candidates = [given];
   if (F > 1) candidates.push(given / F);
+  if (task.unit === '%') candidates.push(given * 100);
   if (task.subtype === 'pct.change') candidates.push(Math.abs(given));
   const tol = Math.max(abs, rel * Math.abs(expected)) + 1e-9;
   const isOk = (c) => Math.abs(c - expected) <= tol;
@@ -100,12 +108,13 @@ export function overall(attempts) {
 
 const LABELS = { nullen: 'Nullen-Fehler', ungenau: 'Ungenau', langsam: 'Zu langsam' };
 
-export function weaknesses(attempts, limit = 3) {
+export function weaknesses(attempts, limit = 3, { enabledCategories = null } = {}) {
   const g = groupBy(attempts, 'subtype');
+  const active = new Set(activeCategories(enabledCategories).map((c) => c.id));
   const out = [];
   for (const [id, list] of Object.entries(g)) {
     const s = SUBTYPES[id];
-    if (!s) continue;
+    if (!s || !active.has(s.category)) continue;
     const sk = skill(list);
     if (sk.n < 3 || sk.score >= 85) continue;
     const nullen = list.slice(-25).filter((a) => a.errorType === 'nullen').length;

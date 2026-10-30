@@ -14,7 +14,9 @@ function learnCard(sub, stat, open, lvl) {
   function drawExample() {
     const task = generate(sub.id);
     const steps = safeSteps(task);
-    const answer = `${fmt(task.expected)}${task.unit ? ' ' + task.unit : ''}`;
+    const isChoice = task.kind === 'choice' && Array.isArray(task.choices);
+    const answer = isChoice ? String(task.choices[task.expected])
+      : `${fmt(task.expected)}${task.unit ? ' ' + task.unit : ''}`;
     const solution = h('div', { class: 'example-solution', hidden: true },
       steps.length ? stepsList(steps) : h('p', null, `Lösung: ${answer}`));
     const showBtn = h('button', {
@@ -27,7 +29,8 @@ function learnCard(sub, stat, open, lvl) {
     const newBtn = h('button', { type: 'button', class: 'btn small', onclick: drawExample }, 'Neues Beispiel');
     exBody.replaceChildren(
       h('div', { class: 'example-prompt' }, task.prompt),
-      task.hint || task.unit
+      isChoice ? h('ul', { class: 'bullets' }, task.choices.map((c) => h('li', null, c))) : null,
+      task.hint || (!isChoice && task.unit)
         ? h('div', { class: 'small muted' }, [task.hint, task.unit ? `Antwort in ${task.unit}` : null].filter(Boolean).join(' · '))
         : null,
       h('div', { class: 'card-actions' }, showBtn, newBtn),

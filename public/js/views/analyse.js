@@ -1,5 +1,5 @@
 import { fmtSeconds, fmt } from '../numbers.js';
-import { CATEGORIES, SUBTYPES, LEVEL_NAMES } from '../generators.js';
+import { SUBTYPES, LEVEL_NAMES, activeCategories } from '../generators.js';
 import { categoryStats, subtypeStats, overall, weaknesses, errorPatterns, levelFor } from '../scoring.js';
 import { getAttempts, getSettings, getReviews, getActivity } from '../storage.js';
 import { streakInfo, heatmap, dailySeries } from '../progress.js';
@@ -83,8 +83,8 @@ function reviewSection(now) {
   return sec;
 }
 
-function weakSection(attempts) {
-  const weak = weaknesses(attempts);
+function weakSection(attempts, settings) {
+  const weak = weaknesses(attempts, undefined, { enabledCategories: settings.enabledCategories });
   const sec = h('section', null, h('h2', { class: 'section-title' }, 'Deine Schwächen'));
   if (!weak.length) {
     sec.append(h('p', { class: 'muted' }, 'Keine Schwächen erkannt – weiter so.'));
@@ -112,7 +112,7 @@ function categorySection(attempts, settings, now) {
   const cats = categoryStats(attempts);
   const subs = subtypeStats(attempts);
   const stack = h('div', { class: 'stack' });
-  for (const c of CATEGORIES) {
+  for (const c of activeCategories(settings.enabledCategories)) {
     const s = cats[c.id] || { n: 0, score: null };
     const values = dailySeries(attempts, { category: c.id, days: 14, now }).map((d) => d.accuracy);
     const meta = s.n
@@ -153,11 +153,15 @@ function errorsSection(attempts) {
     const steps = a.params
       ? safeSteps({ subtype: a.subtype, params: a.params, expected: a.expected, unit: a.unit, prompt: a.prompt })
       : [];
+    const isChoice = a.kind === 'choice' && Array.isArray(a.choices);
+    const givenText = a.given === null || a.given === undefined ? 'übersprungen'
+      : isChoice ? String(a.choices[a.given]) : fmt(a.given);
+    const expectedText = isChoice ? String(a.choices[a.expected]) : `${fmt(a.expected)}${unit}`;
     list.append(h('li', null,
       h('span', { class: 'mark bad' }, '✗'),
       h('span', { class: 'item-main' }, a.prompt),
       h('span', { class: 'item-meta' }, fmtSeconds(a.timeMs)),
-      h('span', { class: 'item-sub' }, `deine: ${a.given === null ? 'übersprungen' : fmt(a.given)} · richtig: ${fmt(a.expected)}${unit}`),
+      h('span', { class: 'item-sub' }, `deine: ${givenText} · richtig: ${expectedText}`),
       steps.length ? h('div', { class: 'item-steps' }, fold('Lösungsweg', stepsList(steps))) : null));
   }
   return h('section', null, h('h2', { class: 'section-title' }, 'Letzte Fehler'), list);
@@ -191,7 +195,7 @@ export function renderAnalyse() {
     headerBento(attempts, settings, now),
     heatmapSection(settings.dailyGoalMin * 60000, now),
     reviewSection(now),
-    weakSection(attempts),
+    weakSection(attempts, settings),
     categorySection(attempts, settings, now),
     h('section', null, h('h2', { class: 'section-title' }, 'Fehlermuster'), patternTiles),
     errorsSection(attempts),

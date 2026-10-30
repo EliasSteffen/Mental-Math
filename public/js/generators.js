@@ -10,6 +10,8 @@ export const CATEGORIES = [
   { id: 'growth', name: 'Wachstum', description: 'Zinseszins, 72er-Regel, CAGR' },
   { id: 'biz', name: 'Business', description: 'Payback, Break-even, Marge, ROI, TCO, FTE, SLA' },
   { id: 'est', name: 'Überschlag', description: 'Schätzen auf ±8 %' },
+  { id: 'units', name: 'Einheiten', description: 'Dimensionen, Umrechnen' },
+  { id: 'mag', name: 'Größenordnungen', description: 'Zehnerpotenzen, Schätzen' },
 ];
 
 // [id, name, targetMs, weight, tip]
@@ -44,6 +46,13 @@ const META = [
   ['est.mult', 'Multiplikation schätzen', 6000, 1, 'Gegenläufig runden: 487 × 21 ≈ 500 × 20'],
   ['est.div', 'Division schätzen', 8000, 1, '7.830 ÷ 39 ≈ 8.000 ÷ 40 = 200'],
   ['est.pct', 'Prozent schätzen', 8000, 1, '23 % von 4.870 ≈ 25 % von 4.800 = 1.200'],
+  ['units.dimless', 'Dimensionslos machen', 10000, 1, 'Durch die eigene Einheit teilen → dimensionslos; mal nehmen → Kehrwert-Einheit'],
+  ['units.result', 'Ergebnis-Einheit', 10000, 1, 'Einheiten wie Brüche kürzen: €/h × h/Jahr = €/Jahr'],
+  ['units.convert', 'Einheiten umrechnen', 15000, 1.5, 'Erst die Zeitbasis, dann die Größe (Tsd./Mio.) umrechnen – 36 km/h = 10 m/s'],
+  ['mag.exponent', 'Zehnerpotenz einer Zahl', 6000, 1, 'a × 10ⁿ mit 1 ≤ a < 10: Komma verschieben, Stellen zählen'],
+  ['mag.facts', 'Größenordnungen kennen', 8000, 1, 'Anker: 84 Mio. Einwohner ≈ 10⁷, 8.760 h/Jahr ≈ 10³, 3,15 · 10⁷ s/Jahr'],
+  ['mag.product', 'Größenordnung von Produkten', 10000, 1.5, 'Mantissen multiplizieren, Exponenten addieren – Mantisse ≥ 10 gibt +1'],
+  ['mag.ratio', 'Größenordnung von Quotienten', 10000, 1.5, 'Mantissen teilen, Exponenten subtrahieren – Mantisse < 1 gibt −1'],
 ];
 
 export const SUBTYPES = Object.fromEntries(
@@ -63,7 +72,7 @@ const randomId = () => Math.random().toString(36).slice(2, 10) + Date.now().toSt
 
 function task(id, o) {
   const s = SUBTYPES[id];
-  return {
+  const t = {
     id: randomId(),
     category: s.category,
     subtype: id,
@@ -76,10 +85,111 @@ function task(id, o) {
     targetMs: s.targetMs,
     weight: s.weight,
   };
+  if (o.choices) { t.kind = 'choice'; t.choices = o.choices; }
+  return t;
+}
+
+function shuffle(arr, rng) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+// Auswahl-Aufgabe: richtige Option + 3 Distraktoren, gemischt; expected = Index der richtigen Option
+function choiceTask(id, rng, { prompt, correct, distractors, params = {}, hint = '' }) {
+  const wrong = [];
+  for (const d of distractors) if (d !== correct && !wrong.includes(d)) wrong.push(d);
+  const choices = shuffle([correct, ...wrong.slice(0, 3)], rng);
+  const c = Object.fromEntries(choices.map((x, i) => ['c' + i, x]));
+  return task(id, { prompt, choices, hint, expected: choices.indexOf(correct), params: { ...params, ...c } });
+}
+
+// ---------- Einheiten-Algebra (Liste aus [Basiseinheit, Exponent], ungekürzt) ----------
+export function parseU(str) {
+  const [n, d] = String(str).split('/');
+  const part = (s, sign) => (s && s !== '1' ? s.replace(/[()]/g, '').split('·').map((x) => [x.trim(), sign]) : []);
+  return [...part(n, 1), ...part(d, -1)];
+}
+export const uMul = (a, b) => [...a, ...b];
+export const uDiv = (a, b) => [...a, ...b.map(([n, e]) => [n, -e])];
+export const uInv = (a) => a.map(([n, e]) => [n, -e]);
+export function uMap(list) {
+  const m = new Map();
+  for (const [n, e] of list) m.set(n, (m.get(n) || 0) + e);
+  return [...m].filter(([, e]) => e !== 0);
+}
+export function uStr(list) {
+  const m = uMap(list);
+  const sup = (e) => String(e).replace(/\d/g, (d) => '⁰¹²³⁴⁵⁶⁷⁸⁹'[d]);
+  const num = m.filter(([, e]) => e > 0).map(([n, e]) => (e === 1 ? n : `${n}${sup(e)}`)).sort();
+  const den = m.filter(([, e]) => e < 0).map(([n, e]) => (e === -1 ? n : `${n}${sup(-e)}`)).sort();
+  if (!num.length && !den.length) return 'dimensionslos';
+  const top = num.length ? num.join('·') : '1';
+  if (!den.length) return top;
+  return `${top}/${den.length > 1 ? `(${den.join('·')})` : den[0]}`;
+}
+// Ungekürzte Bruchschreibweise, z. B. "(€ · h) / (h · Jahr)"
+export function uRaw(list) {
+  const num = list.filter(([, e]) => e > 0).map(([n]) => n);
+  const den = list.filter(([, e]) => e < 0).map(([n]) => n);
+  const g = (xs) => (xs.length > 1 ? `(${xs.join(' · ')})` : xs[0]);
+  if (!den.length) return num.join(' · ') || '1';
+  return `${num.length ? g(num) : '1'} / ${g(den)}`;
+}
+const TIME_SWAP = { Jahr: ['Monat', 'Tag'], Monat: ['Jahr', 'Tag'], Tag: ['Jahr', 'h'], h: ['Tag', 'Jahr'] };
+
+// Plausible Fehlantworten für eine Einheit: Kehrwert, Einzelfaktoren, falsche Zeitbasis
+function unitDistractors(list, rng, extra = []) {
+  const m = uMap(list);
+  const correct = uStr(list);
+  const prio = [uStr(uInv(list)), ...extra];
+  for (const [n, e] of m) prio.push(uStr([[n, e]]), uStr([[n, -e]]));
+  m.forEach(([n], i) => {
+    for (const s of TIME_SWAP[n] || []) prio.push(uStr(m.map(([x, y], j) => [j === i ? s : x, y])));
+  });
+  const all = [...shuffle(prio, rng), ...shuffle(['€', '1/Jahr', '€/Jahr', 'Stück', 'h', '€/Stück', 'Jahr', 'dimensionslos'], rng)];
+  return all.filter((x, i) => x !== correct && all.indexOf(x) === i && x.length <= 40);
+}
+
+const RES_PAIRS = [
+  ['€/h', '×', 'h/Jahr'], ['Stück/Tag', '×', '€/Stück'], ['€', '÷', 'Mitarbeiter'], ['km/h', '×', 'h'],
+  ['Mitarbeiter', '×', '€/Mitarbeiter'], ['€/Jahr', '÷', 'Stück/Jahr'], ['Tag/Jahr', '×', 'h/Tag'], ['€', '÷', 'Stück'],
+  ['€/Stück', '×', 'Stück'], ['€/Monat', '×', 'Monat/Jahr'], ['km', '÷', 'h'], ['€/Jahr', '÷', 'Mitarbeiter'],
+  ['Stück', '÷', 'Stück/Tag'], ['€/Jahr', '÷', '€'], ['Kunde', '×', '€/Kunde'], ['€/Min.', '×', 'Min./h'],
+  ['h/Jahr', '÷', 'Tag/Jahr'], ['€', '÷', '€/Stück'],
+];
+const RES_TRIPLES = [
+  ['€/h', '×', 'h/Tag', '×', 'Tag/Jahr'], ['Stück/Tag', '×', '€/Stück', '×', 'Tag/Jahr'],
+  ['€/Jahr', '÷', 'Mitarbeiter', '÷', 'Stück/Mitarbeiter'], ['€', '÷', 'Stück', '÷', 'Tag'],
+  ['km/h', '×', 'h/Tag', '×', 'Tag'], ['€/Mitarbeiter', '×', 'Mitarbeiter', '÷', 'Jahr'],
+  ['Stück', '×', '€/Stück', '÷', 'Mitarbeiter'], ['€/Min.', '×', 'Min./h', '×', 'h/Jahr'],
+];
+const QUANT = {
+  '€/Jahr': ['Umsatz', 'Personalkosten', 'Gewinn'], '€': ['Kosten', 'Budget', 'Investition'],
+  'h/Jahr': ['Ausfallzeit', 'Arbeitszeit', 'Wartungszeit'], 'Stück/Tag': ['Produktion', 'Absatz'],
+  '€/Stück': ['Preis', 'Stückkosten'], 'km/h': ['Geschwindigkeit'], 'Stück': ['Absatz', 'Stückzahl'],
+  'h/Tag': ['Arbeitszeit'], '€/h': ['Stundensatz'], 'Mitarbeiter': ['Belegschaft'], '€/Monat': ['Miete', 'Umsatz'],
+  'Stück/Jahr': ['Absatz', 'Produktion'], '€/Mitarbeiter': ['Kosten pro Kopf'],
+};
+
+// Ausdruck aus [u1, op1, u2, (op2, u3)] auswerten → Einheitenliste
+function evalExpr(ex) {
+  let acc = parseU(ex[0]);
+  for (let i = 1; i < ex.length; i += 2) acc = ex[i] === '×' ? uMul(acc, parseU(ex[i + 1])) : uDiv(acc, parseU(ex[i + 1]));
+  return acc;
 }
 
 const isInt = (x) => Math.abs(x - Math.round(x)) < 1e-9;
 const decHint = (x) => (isInt(x) ? '' : 'auf 1 Nachkommastelle');
+// Hinweis mit der tatsächlichen Stellenzahl (z. B. 0,78 → „auf 2 Nachkommastellen“)
+function placesHint(x) {
+  const s = String(round(x, 4));
+  const d = s.includes('.') ? s.split('.')[1].length : 0;
+  return d === 0 ? '' : `auf ${d} Nachkommastelle${d > 1 ? 'n' : ''}`;
+}
 const PCT_HINT = '±3 % ok';
 
 const UNIT_VALUE = { 'Tsd.': 1e3, 'Mio.': 1e6, 'Mrd.': 1e9 };
@@ -90,6 +200,117 @@ function bigStr(v) {
   if (v >= 1e6) return fmt(v / 1e6) + ' Mio.';
   return fmt(v);
 }
+
+// ---------- Größenordnungen ----------
+const SUPD = '⁰¹²³⁴⁵⁶⁷⁸⁹';
+export const p10 = (n) => '10' + (n < 0 ? '⁻' : '') + String(Math.abs(n)).split('').map((c) => SUPD[+c]).join('');
+const WORD = { 3: 'Tsd.', 6: 'Mio.', 9: 'Mrd.' };
+const sciStr = (a, p) => (a === 1 ? p10(p) : `${fmt(a, 4)}·${p10(p)}`);
+
+// a × 10^p als Text: 'sci' (4,2·10⁵), 'word' (420 Tsd.), 'plain' (420.000); fällt auf sci zurück
+function dispNum(a, p, style) {
+  if (style === 'word') {
+    const e = [9, 6, 3].find((x) => x <= p && p - x <= 2);
+    if (e) return `${fmt(round(a * 10 ** (p - e), 6), 6)} ${WORD[e]}`;
+  } else if (style === 'plain' && p >= -5 && p <= 6) {
+    return fmt(round(a * 10 ** p, 8), 8);
+  }
+  return sciStr(a, p);
+}
+
+const FACTS = [
+  ['Einwohner Deutschland', '84 Mio.', 8.4, 7, 1], ['Sekunden pro Tag', '86.400', 8.64, 4, 1],
+  ['Stunden pro Jahr', '8.760', 8.76, 3, 1], ['Tage pro Jahr', '365', 3.65, 2, 1],
+  ['Einwohner Welt', '8,2 Mrd.', 8.2, 9, 1], ['Minuten pro Tag', '1.440', 1.44, 3, 1],
+  ['Wochen pro Jahr', '52', 5.2, 1, 1],
+  ['Haushalte Deutschland', '41 Mio.', 4.1, 7, 2], ['Erwerbstätige Deutschland', '46 Mio.', 4.6, 7, 2],
+  ['Einwohner EU', '450 Mio.', 4.5, 8, 2], ['Pkw in Deutschland', '49 Mio.', 4.9, 7, 2],
+  ['Arbeitsstunden pro FTE und Jahr', '1.700', 1.7, 3, 2], ['Einwohner USA', '335 Mio.', 3.35, 8, 2],
+  ['Einwohner Berlin', '3,7 Mio.', 3.7, 6, 2], ['Arbeitstage pro Jahr', '220', 2.2, 2, 2],
+  ['Minuten pro Jahr', '525.600', 5.256, 5, 2],
+  ['BIP Deutschland in €', '4.300 Mrd.', 4.3, 12, 3], ['Sekunden pro Jahr', '31,5 Mio.', 3.15, 7, 3],
+  ['Einwohner China', '1,4 Mrd.', 1.4, 9, 3], ['Einwohner Indien', '1,4 Mrd.', 1.4, 9, 3],
+  ['Sekunden pro Monat', '2,6 Mio.', 2.6, 6, 3],
+];
+const EXP_HINT = 'a × 10ⁿ mit 1 ≤ a < 10';
+
+// Zwei Faktoren a × 10^p für Produkt/Quotient
+function twoFactors(rng, L, kind) {
+  let a1, a2, p1, p2;
+  const styles = lv(L, ['sci', 'word', 'plain'], ['sci', 'word', 'plain', 'word'], ['sci', 'word', 'sci']);
+  for (;;) {
+    if (kind === 'product') {
+      if (L === 1) {
+        a1 = pick([1, 2, 3], rng); a2 = pick([1, 2, 3], rng); p1 = randInt(2, 6, rng); p2 = randInt(2, 5, rng);
+      } else if (L === 2) {
+        a1 = randInt(2, 9, rng); a2 = randInt(2, 9, rng); p1 = randInt(2, 7, rng); p2 = randInt(2, 6, rng);
+      } else {
+        a1 = pick([1.2, 1.5, 2.5, 3.2, 4, 6, 7.5, 8], rng); a2 = pick([1.5, 2.4, 3, 4, 5, 6.4, 8], rng);
+        p1 = randInt(-4, 9, rng); p2 = randInt(-4, 9, rng);
+      }
+    } else if (L === 1) {
+      a2 = pick([1, 2, 3, 4], rng); a1 = a2 * randInt(1, Math.floor(9 / a2), rng); p1 = randInt(6, 10, rng); p2 = randInt(2, 4, rng);
+    } else if (L === 2) {
+      a1 = randInt(1, 9, rng); a2 = randInt(2, 9, rng); p1 = randInt(3, 10, rng); p2 = randInt(2, 6, rng);
+    } else {
+      a1 = pick([1.2, 1.5, 2.4, 3, 4.5, 6, 7.5, 9], rng); a2 = pick([1.5, 2, 2.5, 4, 5, 6.4, 8], rng);
+      p1 = randInt(-3, 9, rng); p2 = randInt(-3, 9, rng);
+    }
+    if (a1 === a2 && L > 1) continue;
+    break;
+  }
+  const d1 = dispNum(a1, p1, pick(styles, rng)), d2 = dispNum(a2, p2, pick(styles, rng));
+  return { a1, a2, p1, p2, d1, d2 };
+}
+
+// ---------- Einheiten umrechnen ----------
+// Jede Familie: gen(rng, L) → { x, y, prompt, unit, expected, abs }
+const CONV = {
+  1: (rng, L) => {
+    const x = 5 * randInt(lv(L, 2, 2, 5), lv(L, 40, 100, 300), rng) * (L === 1 ? 2 : 1);
+    return { x, y: 0, prompt: `${fmt(x)} Tsd. €/Monat = ? Mio. €/Jahr`, unit: 'Mio. €/Jahr', expected: (x * 12) / 1000, abs: 0.005 };
+  },
+  2: (rng, L) => {
+    const x = 18 * pick(lv(L, [2, 3, 4, 5, 6], [2, 3, 4, 5, 6, 7, 8], [1, 3, 5, 7, 9, 10]), rng);
+    return { x, y: 0, prompt: `${fmt(x)} km/h = ? m/s`, unit: 'm/s', expected: x / 3.6 };
+  },
+  3: (rng, L) => {
+    const x = L === 3 ? pick([2, 4, 6, 8, 12, 14], rng) : 5 * randInt(1, 8, rng);
+    const e = round(x * 3.6, 4);
+    return { x, y: 0, prompt: `${fmt(x)} m/s = ? km/h`, unit: 'km/h', expected: e, abs: isInt(e) ? 0 : 0.05 };
+  },
+  4: (rng, L) => {
+    const x = pick(lv(L, [6, 8], [6, 7, 8, 9], [7.5, 8, 8.5, 9.5]), rng);
+    const y = pick(lv(L, [200, 220, 250], [200, 210, 220, 225, 230, 240, 250], [210, 220, 230, 240]), rng);
+    return { x, y, prompt: `${fmt(x)} h/Tag × ${fmt(y)} Tage = ? h/Jahr`, unit: 'h/Jahr', expected: x * y };
+  },
+  5: (rng, L) => {
+    const x = pick(lv(L, [0.5, 1, 2, 3, 5], [0.25, 0.5, 1.5, 2, 2.5, 4, 5], [0.35, 0.75, 1.2, 1.75, 2.25, 3.5]), rng);
+    return { x, y: 0, prompt: `${fmt(x)} €/Min. = ? €/h`, unit: '€/h', expected: x * 60 };
+  },
+  6: (rng, L) => {
+    const y = 5 * randInt(lv(L, 2, 2, 4), lv(L, 40, 100, 250), rng) * (L === 1 ? 2 : 1);
+    const x = round((y * 12) / 1000, 4);
+    return { x, y, prompt: `${fmt(x)} Mio. €/Jahr = ? Tsd. €/Monat`, unit: 'Tsd. €/Monat', expected: y };
+  },
+  7: (rng, L) => {
+    const x = 100 * pick(lv(L, [2, 4, 5, 10], [2, 4, 5, 8, 10, 12, 20, 25], [12, 15, 24, 36, 48, 75]), rng);
+    const y = pick(lv(L, [250], [200, 220, 250, 300], [210, 240, 250, 280, 300]), rng);
+    return { x, y, prompt: `${fmt(x)} Stück/Tag × ${fmt(y)} Tage = ? Tsd. Stück/Jahr`, unit: 'Tsd. Stück/Jahr', expected: (x * y) / 1000 };
+  },
+  8: (rng, L) => {
+    for (;;) {
+      const x = pick([6, 12, 15, 20, 30, 45, 90], rng), y = pick([200, 210, 220, 225, 240, 250], rng);
+      if ((x * y) % 60 !== 0) continue;
+      return { x, y, prompt: `${fmt(x)} Min./Tag × ${fmt(y)} Tage = ? h/Jahr`, unit: 'h/Jahr', expected: (x * y) / 60 };
+    }
+  },
+  9: (rng) => {
+    const y = pick([200, 250], rng), x = pick(y === 250 ? [0.5, 1, 1.5, 2, 2.5, 3, 5] : [0.5, 1, 2, 3, 5], rng);
+    return { x, y, prompt: `${fmt(x)} Mio. Stück/Jahr bei ${fmt(y)} Tagen = ? Stück/Tag`, unit: 'Stück/Tag', expected: (x * 1e6) / y };
+  },
+};
+const CONV_FAMS = { 1: [1, 2, 4, 5], 2: [1, 2, 3, 4, 5, 6, 7, 8], 3: [3, 6, 7, 8, 9, 1, 5] };
 
 const GEN = {
   'mult.2x1': (rng, L) => {
@@ -454,6 +675,115 @@ const GEN = {
       });
     }
   },
+  'units.dimless': (rng, L) => {
+    let ex, mode, ans;
+    if (L === 3) {
+      const [u1, op, u2] = pick(RES_PAIRS, rng);
+      ex = [u1, op, u2];
+      const comb = evalExpr(ex);
+      if (!uMap(comb).length) return GEN['units.dimless'](rng, L);
+      mode = rng() < 0.5 ? '÷' : '×';
+      ans = mode === '÷' ? comb : uInv(comb);
+      const prompt = `[${u1}] ${op} [${u2}] ${mode} ? = dimensionslos`;
+      return choiceTask('units.dimless', rng, {
+        prompt, correct: uStr(ans), distractors: unitDistractors(ans, rng, [uStr(comb)]),
+        params: { ua: u1, ub: u2, o1: op, o2: mode, k: 3 },
+        hint: 'Welche Einheit hat das Fragezeichen?',
+      });
+    }
+    const keys = Object.keys(QUANT);
+    const u = pick(L === 1 ? ['€/Jahr', '€', 'h/Jahr', 'Stück/Tag', '€/Stück', 'km/h'] : keys, rng);
+    const nm = pick(QUANT[u], rng);
+    mode = L === 1 ? '÷' : rng() < 0.5 ? '÷' : '×';
+    ans = mode === '÷' ? parseU(u) : uInv(parseU(u));
+    return choiceTask('units.dimless', rng, {
+      prompt: `${nm} [${u}] ${mode} ? = dimensionslos`,
+      correct: uStr(ans), distractors: unitDistractors(ans, rng, [uStr(parseU(u))]),
+      params: { ua: u, ub: '', o1: '', o2: mode, k: 1 },
+      hint: 'Welche Einheit hat das Fragezeichen?',
+    });
+  },
+  'units.result': (rng, L) => {
+    const ex = L === 3 ? pick(RES_TRIPLES, rng) : pick(L === 1 ? RES_PAIRS.slice(0, 9) : RES_PAIRS, rng);
+    const res = evalExpr(ex);
+    const prompt = ex.map((x, i) => (i % 2 === 0 ? `[${x}]` : x)).join(' ') + ' = ?';
+    const alt = [];
+    // gleiche Operanden mit vertauschten Rechenzeichen
+    for (let mask = 0; mask < 2 ** ((ex.length - 1) / 2); mask++) {
+      let acc = parseU(ex[0]);
+      for (let i = 1; i < ex.length; i += 2) {
+        const flip = (mask >> ((i - 1) / 2)) & 1;
+        const mul = (ex[i] === '×') !== !!flip;
+        acc = mul ? uMul(acc, parseU(ex[i + 1])) : uDiv(acc, parseU(ex[i + 1]));
+      }
+      alt.push(uStr(acc), uStr(uInv(acc)));
+    }
+    const correct = uStr(res);
+    return choiceTask('units.result', rng, {
+      prompt, correct,
+      distractors: [...shuffle(alt.filter((x) => x !== correct), rng), ...unitDistractors(res, rng)],
+      params: { ua: ex[0], o1: ex[1], ub: ex[2], o2: ex[3] || '', uc: ex[4] || '', k: (ex.length + 1) / 2 },
+      hint: 'Einheiten kürzen wie Brüche',
+    });
+  },
+  'units.convert': (rng, L) => {
+    const fam = pick(CONV_FAMS[L], rng);
+    const r = CONV[fam](rng, L);
+    return task('units.convert', {
+      params: { fam, x: r.x, y: r.y },
+      prompt: r.prompt, unit: r.unit, hint: placesHint(r.expected),
+      expected: r.expected, abs: r.abs,
+    });
+  },
+  'mag.exponent': (rng, L) => {
+    const a = pick(lv(L, [1.5, 2, 3, 4.2, 5, 6.5, 8, 9], [1.2, 2.5, 3.6, 4.8, 5.5, 7.2, 8.4, 9.5], [1.05, 2.4, 3.2, 4.5, 6.8, 7.5, 9.2]), rng);
+    const word = L === 1 ? rng() < 0.6 : rng() < 0.5;
+    let u = '', e = 0, k, n, disp;
+    if (word) {
+      e = pick([3, 6, 9], rng);
+      k = pick(lv(L, [0], [0, 1, 2], [-2, -1, 3, 2]), rng);
+      n = k + e;
+      u = WORD[e];
+      disp = `${fmt(round(a * 10 ** k, 6), 6)} ${u}`;
+    } else {
+      n = L === 1 ? randInt(3, 5, rng) : L === 2 ? randInt(-4, 6, rng) : randInt(-6, -2, rng);
+      if (L === 2 && n >= 0 && n < 3) n = n - 4;
+      k = n;
+      disp = fmt(round(a * 10 ** n, 9), 9);
+    }
+    return task('mag.exponent', { params: { a, k, e, n, u, disp },
+      prompt: `${disp} = a × 10ⁿ – wie lautet n?`,
+      hint: EXP_HINT,
+      expected: n,
+    });
+  },
+  'mag.facts': (rng, L) => {
+    const pool = FACTS.filter((f) => (L === 1 ? f[4] === 1 : L === 2 ? f[4] <= 2 : f[4] >= 2));
+    const [label, v, a, n] = pick(pool, rng);
+    return task('mag.facts', { params: { fact: label, v, a, n },
+      prompt: `Größenordnung: ${label} – Wert = a × 10ⁿ, n = ?`,
+      hint: EXP_HINT,
+      expected: n,
+    });
+  },
+  'mag.product': (rng, L) => {
+    const f = twoFactors(rng, L, 'product');
+    const carry = round(f.a1 * f.a2, 6) >= 10 ? 1 : 0;
+    return task('mag.product', { params: { a1: f.a1, p1: f.p1, a2: f.a2, p2: f.p2, d1: f.d1, d2: f.d2 },
+      prompt: `${f.d1} × ${f.d2} = a × 10ⁿ – wie lautet n?`,
+      hint: EXP_HINT,
+      expected: f.p1 + f.p2 + carry,
+    });
+  },
+  'mag.ratio': (rng, L) => {
+    const f = twoFactors(rng, L, 'ratio');
+    const borrow = f.a1 < f.a2 ? 1 : 0;
+    return task('mag.ratio', { params: { a1: f.a1, p1: f.p1, a2: f.a2, p2: f.p2, d1: f.d1, d2: f.d2 },
+      prompt: `${f.d1} ÷ ${f.d2} = a × 10ⁿ – wie lautet n?`,
+      hint: EXP_HINT,
+      expected: f.p1 - f.p2 - borrow,
+    });
+  },
 };
 
 export function generate(subtypeId, rng = Math.random, { level = 2 } = {}) {
@@ -470,20 +800,31 @@ export function generate(subtypeId, rng = Math.random, { level = 2 } = {}) {
 const subtypesOf = (cat) => Object.values(SUBTYPES).filter((s) => s.category === cat).map((s) => s.id);
 const idOf = (x) => (typeof x === 'string' ? x : x?.subtype);
 
-export function generateForMode(mode, { weakSubtypes = [], reviewSubtypes = [], levelFor } = {}, rng = Math.random) {
+// null/undefined → alle Kategorien; sonst gefiltert (leeres Ergebnis → alle)
+export function activeCategories(enabled) {
+  if (!Array.isArray(enabled)) return CATEGORIES;
+  const list = CATEGORIES.filter((c) => enabled.includes(c.id));
+  return list.length ? list : CATEGORIES;
+}
+
+export function generateForMode(mode, { weakSubtypes = [], reviewSubtypes = [], levelFor, enabledCategories = null } = {}, rng = Math.random) {
+  const cats = activeCategories(enabledCategories);
+  const catIds = new Set(cats.map((c) => c.id));
+  const any = () => pick(subtypesOf(pick(cats, rng).id), rng);
+  const filtered = (list) => (list || []).map(idOf).filter((w) => SUBTYPES[w] && catIds.has(SUBTYPES[w].category));
   let id;
   if (SUBTYPES[mode]) {
     id = mode;
   } else if (CATEGORIES.some((c) => c.id === mode)) {
     id = pick(subtypesOf(mode), rng);
   } else if (mode === 'weak') {
-    const valid = (weakSubtypes || []).map(idOf).filter((w) => SUBTYPES[w]);
-    id = valid.length ? pick(valid, rng) : pick(subtypesOf(pick(CATEGORIES, rng).id), rng);
+    const valid = filtered(weakSubtypes);
+    id = valid.length ? pick(valid, rng) : any();
   } else if (mode === 'review') {
-    const valid = (reviewSubtypes || []).map(idOf).filter((w) => SUBTYPES[w]);
-    id = valid.length ? pick(valid, rng) : pick(subtypesOf(pick(CATEGORIES, rng).id), rng);
+    const valid = filtered(reviewSubtypes);
+    id = valid.length ? pick(valid, rng) : any();
   } else {
-    id = pick(subtypesOf(pick(CATEGORIES, rng).id), rng);
+    id = any();
   }
   const lvl = typeof levelFor === 'function' ? levelFor(id) : 2;
   const t = generate(id, rng, { level: lvl });

@@ -16,7 +16,7 @@ for (const id of Object.keys(SUBTYPES)) {
         assert.ok(s.trim().length > 0, ctx);
         for (const bad of ['NaN', 'undefined', 'Infinity', '[object']) assert.ok(!s.includes(bad), `${bad}: ${ctx}`);
       }
-      assert.ok(steps[steps.length - 1].includes(fmt(t.expected)), `letzter Schritt: ${ctx}`);
+      assert.ok(steps[steps.length - 1].includes(t.kind === 'choice' ? t.choices[t.expected] : fmt(t.expected)), `letzter Schritt: ${ctx}`);
     }
   });
 }
