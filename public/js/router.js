@@ -36,6 +36,8 @@ export function render() {
   });
   app.replaceChildren();
   window.scrollTo(0, 0);
+  // Fokus-Modus: im Training keine Tab-Leiste, damit sie keine Buttons verdeckt
+  document.body.classList.toggle('in-play', route.name === 'train');
   if (route.name === 'analyse') renderAnalyse();
   else if (route.name === 'lernen') renderLernen(route.id);
   else if (route.name === 'settings') renderSettings();

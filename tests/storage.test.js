@@ -7,7 +7,7 @@ import {
 test('Defaults, alte Daten werden ergänzt (In-Memory)', () => {
   resetAll();
   assert.deepEqual(getSettings(), {
-    sessionLength: 10, dailyGoalMin: 15, theme: 'system', difficulty: 'auto', timer: true, sound: false, haptics: true, celebrated: '',
+    sessionLength: 10, dailyGoalMin: 15, theme: 'system', difficulty: 'auto', timer: true, sound: false, haptics: true, celebrated: '', keypad: 'auto',
   });
   assert.deepEqual(getReviews(), {});
   assert.deepEqual(getActivity(), {});

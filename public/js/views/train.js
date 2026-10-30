@@ -7,6 +7,7 @@ import { getAttempts, getSettings, addAttempt, addSession, getReviews, setReview
 import { recordResult, dueReviews } from '../review.js';
 import { icon } from '../charts.js';
 import { feedbackFx } from '../fx.js';
+import { useKeypad, createKeypad } from '../keypad.js';
 import {
   app, h, appendChildren, level, tile, modeName, safeSteps, stepsList, fold,
   methodBlock, aiControl, go, setCleanup,
@@ -48,6 +49,7 @@ export function renderTrain(mode, { n: nOverride = null, intro = false } = {}) {
   const stop = () => {
     if (timerId) { clearInterval(timerId); timerId = null; }
     if (onKey) { document.removeEventListener('keydown', onKey); onKey = null; }
+    document.body.classList.remove('has-keypad', 'kp-scroll');
   };
   setCleanup(stop);
 
@@ -77,8 +79,10 @@ export function renderTrain(mode, { n: nOverride = null, intro = false } = {}) {
     let assisted = false;
     const question = h('div', { class: `question${task.prompt.length > 22 ? ' long' : ''}` }, task.prompt);
 
+    const kp = useKeypad(settings.keypad || 'auto');
+    let keypadEl = null;
     const input = h('input', {
-      type: 'text', inputmode: 'decimal', autocomplete: 'off', enterkeyhint: 'done',
+      type: 'text', inputmode: kp ? 'none' : 'decimal', autocomplete: 'off', enterkeyhint: 'done',
       'aria-label': 'Antwort', spellcheck: 'false', autocapitalize: 'off',
     });
     const timer = timed ? h('div', { class: 'timer' }, '') : null;
@@ -88,8 +92,15 @@ export function renderTrain(mode, { n: nOverride = null, intro = false } = {}) {
 
     const updateTimer = () => {
       const el = performance.now() - t0;
-      timer.textContent = `${fmtSeconds(el)} · Ziel ${fmtSeconds(task.targetMs)}`;
+      timer.textContent = `${fmtSeconds(el)} / ${fmtSeconds(task.targetMs)}`;
       fill.style.setProperty('--w', String(Math.min(100, (el / task.targetMs) * 100)));
+      // Druck sichtbar machen: über Zielzeit orange, über doppelter Zielzeit rot
+      const warn = el > task.targetMs;
+      const over = el > 2 * task.targetMs;
+      timer.classList.toggle('is-warn', warn && !over);
+      timer.classList.toggle('is-over', over);
+      timerbar.classList.toggle('is-warn', warn && !over);
+      timerbar.classList.toggle('is-over', over);
     };
     if (timed) {
       updateTimer();
@@ -101,9 +112,10 @@ export function renderTrain(mode, { n: nOverride = null, intro = false } = {}) {
       answered = true;
       const timeMs = Math.round(performance.now() - t0);
       stop();
-      if (timed) timer.textContent = `${fmtSeconds(timeMs)} · Ziel ${fmtSeconds(task.targetMs)}`;
+      if (timed) timer.textContent = `${fmtSeconds(timeMs)} / ${fmtSeconds(task.targetMs)}`;
       input.disabled = true;
       helpWrap.remove();
+      if (keypadEl) { keypadEl.remove(); keypadEl = null; }
       const ev = evaluate(task, given, timeMs, { assisted, untimed: !timed });
       points += ev.points;
       results.push({ task, given, ev, timeMs });
@@ -159,7 +171,7 @@ export function renderTrain(mode, { n: nOverride = null, intro = false } = {}) {
         ? fold('So löst du diesen Typ', methodBlock(method, { pitfalls: true, link: `#/lernen/${task.subtype}` }))
         : null;
       const ai = isAiAvailable() ? aiControl('KI-Erklärung', () => aiExplainTask(task, given)) : null;
-      const nextBtn = h('button', { type: 'button', class: 'btn primary', onclick: next },
+      const nextBtn = h('button', { type: 'button', class: 'btn primary next-btn', onclick: next },
         index + 1 >= sessionLength ? 'Ergebnis ↵' : 'Weiter ↵');
       actions.replaceChildren(...[fb, solution, methodFold, ai, nextBtn].filter(Boolean));
       nextBtn.focus();
@@ -193,7 +205,8 @@ export function renderTrain(mode, { n: nOverride = null, intro = false } = {}) {
       },
     }, 'Prüfen ↵');
     const skip = h('button', { type: 'button', class: 'btn', onclick: () => finish(null) }, 'Weiß nicht');
-    actions.append(inputError, h('div', { class: 'btn-row' }, check, skip));
+    if (kp) actions.append(inputError);
+    else actions.append(inputError, h('div', { class: 'btn-row' }, check, skip));
 
     const helpBox = h('div', { class: 'help', hidden: true });
     const helpBtn = method
@@ -210,6 +223,8 @@ export function renderTrain(mode, { n: nOverride = null, intro = false } = {}) {
           }
           helpBox.hidden = !opening;
           helpBtn.setAttribute('aria-expanded', String(opening));
+          // mit offener Hilfe darf die Seite trotz Tastenfeld scrollen
+          document.body.classList.toggle('kp-scroll', opening);
           input.focus();
         },
       }, 'Wie geht das?')
@@ -238,12 +253,25 @@ export function renderTrain(mode, { n: nOverride = null, intro = false } = {}) {
       h('div', { class: 'task' },
         h('div', { class: 'task-type' }, sub ? sub.name : task.subtype,
           h('span', { class: 'chip' }, LEVEL_NAMES[task.level] || LEVEL_NAMES[2])),
+        timer,
         question,
         h('div', { class: 'hint' }, task.hint || (unitFactor(task.unit) > 1 ? `in ${task.unit} oder als volle Zahl` : '')),
-        h('div', { class: 'answer' }, signBtn, input, task.unit ? h('span', { class: 'unit' }, task.unit) : null),
+        h('div', { class: 'answer' }, kp ? null : signBtn, input, task.unit ? h('span', { class: 'unit' }, task.unit) : null),
         helpWrap,
-        actions,
-        timer)]);
+        actions)]);
+    if (kp) {
+      keypadEl = createKeypad({
+        input, haptics: settings.haptics !== false,
+        onSubmit: () => check.click(), onSkip: () => finish(null),
+      });
+      // „Wie geht das?“ wandert in die Kopfzeile des Tastenfelds, damit es nicht verdeckt wird
+      if (helpBtn) {
+        helpBtn.classList.add('keypad-help');
+        keypadEl.querySelector('.keypad-top').prepend(helpBtn);
+      }
+      root.append(keypadEl);
+      document.body.classList.add('has-keypad');
+    }
     input.focus();
   }
 

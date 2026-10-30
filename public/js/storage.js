@@ -9,7 +9,7 @@ const MAX_ACTIVITY_DAYS = 400;
 
 export const DEFAULT_SETTINGS = {
   sessionLength: 10, dailyGoalMin: 15, theme: 'system', difficulty: 'auto',
-  timer: true, sound: false, haptics: true, celebrated: '',
+  timer: true, sound: false, haptics: true, celebrated: '', keypad: 'auto',
 };
 
 const defaults = () => ({

@@ -1,8 +1,8 @@
-const VERSION = 'v3-3';
+const VERSION = 'v3-8';
 const CACHE = `mentalmath-${VERSION}`;
 
 const JS = ['app', 'ai', 'charts', 'generators', 'methods', 'numbers', 'progress', 'review', 'scoring',
-  'solutions', 'storage', 'pwa', 'ui', 'router', 'views/home', 'views/train', 'views/lernen',
+  'solutions', 'storage', 'keypad', 'pwa', 'ui', 'router', 'views/home', 'views/train', 'views/lernen',
   'views/analyse', 'views/settings'].map((f) => `/js/${f}.js`);
 
 const PRECACHE = [
