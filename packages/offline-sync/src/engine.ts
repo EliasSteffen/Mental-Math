@@ -134,23 +134,26 @@ export class SyncEngine {
     return best;
   }
 
+  /** Wendet eine Seite an; per batch() wird jede Collection einmal pro Seite geschrieben statt pro Datensatz. */
   private applyRecords(records: Array<{ collection: string; item: SyncRecord }>): number {
-    const maps = new Map<string, Map<string, SyncMeta>>();
-    let applied = 0;
-    for (const { collection, item } of records) {
-      if (!this.collections.has(collection) || !isObj(item) || typeof item.id !== 'string') continue;
-      let m = maps.get(collection);
-      if (!m) {
-        m = new Map(this.repo.list<SyncMeta>(collection, true).map((x) => [x.id, x]));
-        maps.set(collection, m);
+    return this.repo.batch(() => {
+      const maps = new Map<string, Map<string, SyncMeta>>();
+      let applied = 0;
+      for (const { collection, item } of records) {
+        if (!this.collections.has(collection) || !isObj(item) || typeof item.id !== 'string') continue;
+        let m = maps.get(collection);
+        if (!m) {
+          m = new Map(this.repo.list<SyncMeta>(collection, true).map((x) => [x.id, x]));
+          maps.set(collection, m);
+        }
+        const local = m.get(item.id);
+        if (local && compareMeta(item, local) <= 0) continue;
+        this.repo.upsert(collection, item, false);
+        m.set(item.id, item);
+        applied++;
       }
-      const local = m.get(item.id);
-      if (local && compareMeta(item, local) <= 0) continue;
-      this.repo.upsert(collection, item, false);
-      m.set(item.id, item);
-      applied++;
-    }
-    return applied;
+      return applied;
+    });
   }
 
   /** Passende DocSpec zum Remote-Namen (exakt oder perDevice `${name}:${id}`) samt Geräte-ID. */

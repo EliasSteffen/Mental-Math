@@ -260,14 +260,80 @@ test('Repository: clear(keep) und invalidate', () => {
   assert.equal(repo.deviceId, dev);
 });
 
-test('Repository: 5.000 Upserts neuer IDs bleiben schnell (Index statt O(n)-Suche)', () => {
-  const repo = new Repository(new MemoryAdapter());
+/** MemoryAdapter, der Schreibzugriffe je Schlüssel zählt. */
+class CountingAdapter extends MemoryAdapter {
+  sets = new Map<string, number>();
+  override set(key: string, value: string): void {
+    this.sets.set(key, (this.sets.get(key) ?? 0) + 1);
+    super.set(key, value);
+  }
+}
+
+test('Repository: 5.000 Upserts neuer IDs im batch() bleiben schnell (Index statt O(n)-Suche, ein Schreibzugriff)', () => {
+  const mem = new CountingAdapter();
+  const repo = new Repository(mem);
   const t0 = performance.now();
-  for (let i = 0; i < 5000; i++) repo.upsert('c', mk(`id${i}`), false);
+  repo.batch(() => {
+    for (let i = 0; i < 5000; i++) repo.upsert('c', mk(`id${i}`), false);
+  });
   const ms = performance.now() - t0;
+  assert.equal(mem.sets.get('col:c'), 1, 'Collection wird genau einmal serialisiert');
   assert.equal(repo.list('c', true).length, 5000);
+  assert.equal((JSON.parse(mem.get('col:c') ?? '[]') as unknown[]).length, 5000);
   assert.ok(ms < 2000, `zu langsam: ${Math.round(ms)} ms`);
   for (let i = 0; i < 100; i++) assert.equal(repo.remove('c', `id${i * 50}`), true);
+});
+
+test('Repository: batch() schreibt jeden Schlüssel einmal am Ende; Lesezugriffe sehen Änderungen sofort', () => {
+  const mem = new CountingAdapter();
+  const repo = new Repository(mem);
+  const idsOf = (r: Repository, c = 'c'): string[] => r.list(c).map((x) => x.id);
+
+  // ohne Batch: jeder Aufruf schreibt sofort
+  repo.upsert('c', mk('a'), false);
+  repo.upsert('c', mk('b'), false);
+  assert.equal(mem.sets.get('col:c'), 2);
+
+  const rev = repo.revision;
+  const n = repo.batch(() => {
+    repo.upsert('c', mk('x'), false);
+    repo.batch(() => repo.upsert('c', mk('y'), false)); // verschachtelt: erst der äußere Batch schreibt
+    repo.putDoc('d', 1, false);
+    assert.deepEqual(idsOf(repo), ['a', 'b', 'x', 'y']);
+    assert.equal(repo.getDoc('d'), 1);
+    assert.equal(mem.sets.get('col:c'), 2, 'im Batch noch nicht geschrieben');
+    assert.equal(mem.get('doc:d'), null);
+    return 42;
+  });
+  assert.equal(n, 42);
+  assert.ok(repo.revision > rev);
+  assert.equal(mem.sets.get('col:c'), 3);
+  assert.equal(mem.sets.get('doc:d'), 1);
+  assert.deepEqual(idsOf(new Repository(mem)), ['a', 'b', 'x', 'y']);
+
+  // wirft fn, wird der bis dahin geänderte Stand trotzdem geschrieben
+  assert.throws(() => repo.batch(() => {
+    repo.upsert('c', mk('z'), false);
+    throw new Error('kaputt');
+  }), /kaputt/);
+  assert.equal(new Repository(mem).list('c').length, 5);
+
+  // invalidate() im Batch verliert nichts
+  repo.batch(() => {
+    repo.upsert('c', mk('i'), false);
+    repo.invalidate();
+    assert.equal(repo.list('c').length, 6);
+  });
+  assert.equal(new Repository(mem).list('c').length, 6);
+
+  // clear() im Batch: Gesammeltes wird mitgelöscht, spätere Schreibzugriffe bleiben
+  repo.batch(() => {
+    repo.upsert('c', mk('j'), false);
+    repo.clear();
+    repo.upsert('e', mk('k'), false);
+  });
+  assert.equal(mem.get('col:c'), null);
+  assert.deepEqual(idsOf(new Repository(mem), 'e'), ['k']);
 });
 
 test('Repository: angewendete Lösch-Marke persistiert und überlebt clear()', () => {

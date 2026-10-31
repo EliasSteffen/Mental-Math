@@ -59,6 +59,11 @@ export class Repository {
   private write(key: string, value: unknown): void {
     this.cache.set(key, value);
     this.revision++;
+    if (this.batchDepth > 0) this.deferred.add(key);
+    else this.persist(key, value);
+  }
+
+  private persist(key: string, value: unknown): void {
     try {
       this.adapter.set(key, JSON.stringify(value));
     } catch {
@@ -66,8 +71,37 @@ export class Repository {
     }
   }
 
+  /** Verschachtelungstiefe von batch(); > 0 = Schreibzugriffe auf den Adapter werden gesammelt. */
+  private batchDepth = 0;
+  /** Schlüssel, deren Cache-Stand im laufenden Batch noch nicht im Adapter liegt. */
+  private deferred = new Set<string>();
+
+  private flushDeferred(): void {
+    if (!this.deferred.size) return;
+    const keys = [...this.deferred];
+    this.deferred.clear();
+    for (const k of keys) this.persist(k, this.cache.get(k));
+  }
+
+  /**
+   * Schreibzugriffe bündeln: Innerhalb von `fn` landen Änderungen sofort im Cache (alle Lesezugriffe
+   * dieses Repositorys sehen sie), der Adapter erhält jeden geänderten Schlüssel aber nur einmal am Ende.
+   * Ohne Batch serialisiert jedes upsert() die ganze Collection – n Upserts kosten dann O(n²).
+   * `fn` muss synchron sein; Verschachtelung ist erlaubt, geschrieben wird beim Verlassen des äußersten Batches
+   * (auch wenn `fn` wirft).
+   */
+  batch<R>(fn: () => R): R {
+    this.batchDepth++;
+    try {
+      return fn();
+    } finally {
+      if (--this.batchDepth === 0) this.flushDeferred();
+    }
+  }
+
   /** Cache verwerfen (externe Änderung, z. B. anderer Tab). */
   invalidate(): void {
+    this.flushDeferred();
     this.cache.clear();
     this.live.clear();
     this.index.clear();
@@ -77,6 +111,7 @@ export class Repository {
 
   /** Alle Schlüssel außer `keep` entfernen (Reset); Geräte-ID und Lösch-Marke bleiben immer. */
   clear(keep: readonly string[] = []): void {
+    this.flushDeferred();
     for (const k of this.adapter.keys('')) if (!keep.includes(k) && !ALWAYS_KEEP.includes(k)) this.adapter.remove(k);
     this.invalidate();
   }

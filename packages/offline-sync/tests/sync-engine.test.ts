@@ -299,6 +299,29 @@ test('Pagination mit kleiner Seitengröße und Chunking', async () => {
   assert.equal((await b.engine.syncNow()).pulled, 0);
 });
 
+test('Pull: jede Seite schreibt eine Collection nur einmal (batch statt Schreiben je Datensatz)', async () => {
+  const server = new FakeServer();
+  const a = device(server);
+  for (let i = 0; i < 30; i++) add(a, 'b', `r${i}`);
+  await a.engine.syncNow();
+
+  let writes = 0;
+  const mem = new MemoryAdapter();
+  const set = mem.set.bind(mem);
+  mem.set = (k: string, v: string): void => {
+    if (k === 'col:b') writes++;
+    set(k, v);
+  };
+  const repo = new Repository(mem, { now: () => clock.t });
+  const id = repo.deviceId;
+  const engine = new SyncEngine(repo, { schema: testSchema, deviceId: () => id, now: () => clock.t, pageSize: 10 });
+  engine.setProvider(server);
+  const st = await engine.syncNow();
+  assert.equal(st.pulled, 30);
+  assert.equal(repo.list('b').length, 30);
+  assert.equal(writes, 3, 'eine Schreiboperation je Seite');
+});
+
 test('Collection-Limit: nach dem Pull auf limit gekürzt, Tombstones zuerst', async () => {
   const server = new FakeServer();
   const a = device(server);
