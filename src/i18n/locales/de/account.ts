@@ -60,6 +60,7 @@ export const account = {
   'sync.syncedJustNow': 'Gerade eben synchronisiert',
   'sync.notYet': 'Noch nicht synchronisiert',
   'sync.pending': '{n} Änderungen ausstehend',
+  'sync.remoteWiped': 'Deine Trainingsdaten wurden auf einem anderen Gerät gelöscht.',
   'sync.rejected': '{n} Änderungen abgelehnt',
   'sync.syncNow': 'Jetzt synchronisieren',
   'sync.syncDone': 'Synchronisiert',

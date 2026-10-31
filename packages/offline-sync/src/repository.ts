@@ -6,6 +6,9 @@ import type { ChangeRecord, StorageAdapter, SyncMeta, SyncState } from './types.
 
 export const MAX_PENDING = 2000;
 const SYNC_KEY = 'sync';
+const WIPE_KEY = 'wipeAt';
+/** Schlüssel, die ein Reset immer behält. */
+const ALWAYS_KEEP: readonly string[] = ['deviceId', WIPE_KEY];
 
 const docKey = (name: string): string => `doc:${name}`;
 const colKey = (c: string): string => `col:${c}`;
@@ -72,10 +75,20 @@ export class Repository {
     this.revision++;
   }
 
-  /** Alle Schlüssel außer `keep` entfernen (Reset). */
+  /** Alle Schlüssel außer `keep` entfernen (Reset); Geräte-ID und Lösch-Marke bleiben immer. */
   clear(keep: readonly string[] = []): void {
-    for (const k of this.adapter.keys('')) if (!keep.includes(k)) this.adapter.remove(k);
+    for (const k of this.adapter.keys('')) if (!keep.includes(k) && !ALWAYS_KEEP.includes(k)) this.adapter.remove(k);
     this.invalidate();
+  }
+
+  /** Zeitpunkt der zuletzt angewendeten Lösch-Markierung (0 = keine). */
+  getAppliedWipe(): number {
+    const v = this.read(WIPE_KEY);
+    return typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : 0;
+  }
+
+  setAppliedWipe(at: number): void {
+    this.write(WIPE_KEY, at);
   }
 
   // ----- Dokumente -----

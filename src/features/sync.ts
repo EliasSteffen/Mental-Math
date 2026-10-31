@@ -80,6 +80,7 @@ async function linkAccount(userId: string): Promise<boolean> {
   if (decision === 'same') return true;
   if (decision === 'first') {
     updateProfile({ cloudUserId: userId });
+    getRepository().setAppliedWipe(Date.now()); // frühere Löschungen betreffen dieses Gerät nicht
     if (hasLocalData()) getRepository().markFullPush();
     return true;
   }
@@ -93,6 +94,7 @@ async function linkAccount(userId: string): Promise<boolean> {
     return false;
   }
   resetAll(); // frischer Cursor → vollständiger Pull
+  getRepository().setAppliedWipe(Date.now());
   updateProfile({ cloudUserId: userId });
   return true;
 }
@@ -129,7 +131,15 @@ function scheduleRerender(): void {
 export function startSync(): void {
   if (manager) return;
   const repo = getRepository();
-  engine = new SyncEngine(repo, { schema: APP_SYNC_SCHEMA, deviceId: () => getRepository().deviceId });
+  engine = new SyncEngine(repo, {
+    schema: APP_SYNC_SCHEMA,
+    deviceId: () => getRepository().deviceId,
+    onRemoteWipe: () => {
+      resetAll();
+      emitDataChange('remote');
+      void import('../ui/toast.ts').then((m) => m.toast(t('account.sync.remoteWiped'))); // lazy: braucht das DOM
+    },
+  });
   manager = new SyncManager(engine, {
     env: browserSyncEnv(),
     subscribeWrites: (cb) => getRepository().onTrackedChange((target) => { if (isSchemaTarget(target)) cb(); }),

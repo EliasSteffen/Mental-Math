@@ -11,7 +11,7 @@ export { initStorageAdapter } from './adapters/init.ts';
 export { Repository, MAX_PENDING } from './repository.ts';
 export type { RepositoryOptions } from './repository.ts';
 export { stableEqual, compareMeta, maxByKey, lwwByKey, lwwDoc, keepKeys, sumByKey } from './merge.ts';
-export { SyncEngine } from './engine.ts';
+export { SyncEngine, WIPE_DOC } from './engine.ts';
 export type { SyncEngineOptions } from './engine.ts';
 export { SyncManager, browserSyncEnv } from './manager.ts';
 export type { SyncEnv, SyncReason, SyncManagerOptions } from './manager.ts';

@@ -60,7 +60,7 @@ export const settings: Record<keyof typeof De, string> = {
   importLabel: 'Import',
   importDone: 'Import successful: {attempts} tasks, {sessions} rounds',
   resetConfirm: 'Really delete all data? This cannot be undone.',
-  resetConfirmCloud: 'Delete all data? This deletes it on this device AND in your account. Other devices keep their local copy until you reset them there as well. This cannot be undone.',
+  resetConfirmCloud: 'Delete all data? This deletes it on this device, in your account and, at their next sync, on your other devices too. This cannot be undone.',
   resetTitle: 'Reset everything?',
   deleteLabel: 'Delete',
   resetDone: 'All data has been deleted',

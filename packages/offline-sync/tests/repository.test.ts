@@ -269,3 +269,22 @@ test('Repository: 5.000 Upserts neuer IDs bleiben schnell (Index statt O(n)-Such
   assert.ok(ms < 2000, `zu langsam: ${Math.round(ms)} ms`);
   for (let i = 0; i < 100; i++) assert.equal(repo.remove('c', `id${i * 50}`), true);
 });
+
+test('Repository: angewendete Lösch-Marke persistiert und überlebt clear()', () => {
+  const mem = new MemoryAdapter();
+  const repo = new Repository(mem);
+  assert.equal(repo.getAppliedWipe(), 0);
+  repo.setAppliedWipe(1234);
+  assert.equal(repo.getAppliedWipe(), 1234);
+  assert.equal(mem.get('wipeAt'), '1234');
+  assert.equal(new Repository(mem).getAppliedWipe(), 1234);
+  mem.set('wipeAt', 'kaputt');
+  assert.equal(new Repository(mem).getAppliedWipe(), 0);
+  repo.setAppliedWipe(99);
+  const dev = repo.deviceId;
+  repo.putDoc('a', 1);
+  repo.clear();
+  assert.deepEqual([...mem.keys('')].sort(), ['deviceId', 'wipeAt']);
+  assert.equal(repo.getAppliedWipe(), 99);
+  assert.equal(repo.deviceId, dev);
+});

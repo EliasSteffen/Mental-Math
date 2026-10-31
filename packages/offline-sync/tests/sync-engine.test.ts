@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { MemoryAdapter } from '../src/adapters/memory.ts';
-import { SyncEngine } from '../src/engine.ts';
+import { SyncEngine, WIPE_DOC } from '../src/engine.ts';
 import { SyncError } from '../src/errors.ts';
 import { compareMeta } from '../src/merge.ts';
 import { createMeta } from '../src/meta.ts';
@@ -94,7 +94,7 @@ const clock = { t: 1000 };
 type Rec = SyncRecord & { v?: number };
 
 interface Dev { repo: Repository; engine: SyncEngine; id: string }
-function device(server: RemoteSyncProvider | null, o: { pageSize?: number; chunkSize?: number } = {}): Dev {
+function device(server: RemoteSyncProvider | null, o: { pageSize?: number; chunkSize?: number; onRemoteWipe?: (at: number) => void } = {}): Dev {
   const repo = new Repository(new MemoryAdapter(), { now: () => clock.t });
   const id = repo.deviceId;
   const engine = new SyncEngine(repo, { schema: testSchema, deviceId: () => id, now: () => clock.t, ...o });
@@ -386,4 +386,101 @@ test('Merge-Ergebnis gleich Remote löst keinen Rück-Upload aus (kein Ping-Pong
   await a.engine.syncNow();
   assert.deepEqual(a.repo.getDoc('log'), { k1: { ts: 5, v: 'a' }, k2: { ts: 1, v: 'b' } });
   assert.equal(a.engine.pendingCount(), 0);
+});
+
+// ---------- Lösch-Markierung ----------
+function wipeDevice(server: FakeServer, o: { pageSize?: number; throws?: boolean } = {}): Dev & { wipes: number[] } {
+  const wipes: number[] = [];
+  let d: Dev | null = null;
+  d = device(server, {
+    pageSize: o.pageSize,
+    onRemoteWipe: (at) => {
+      wipes.push(at);
+      if (o.throws) throw new Error('reset failed');
+      d?.repo.clear();
+    },
+  });
+  return { ...d, wipes };
+}
+
+test('Löschen auf allen Geräten: B setzt zurück, Ausstehendes wird nicht hochgeladen', async () => {
+  const server = new FakeServer();
+  const a = wipeDevice(server);
+  const b = wipeDevice(server);
+  add(a, 'a', 'r1');
+  await a.engine.syncNow();
+  await b.engine.syncNow();
+  assert.deepEqual(ids(b, 'a'), ['r1']);
+  add(b, 'a', 'offline1'); // B offline: ausstehend
+  clock.t += 10;
+  await a.engine.wipeRemote();
+  assert.deepEqual([...server.docs.keys()], [WIPE_DOC]);
+  assert.equal(server.records.size, 0);
+  const at = a.repo.getAppliedWipe();
+  assert.equal(at, clock.t);
+  await a.engine.syncNow();
+  assert.equal(a.wipes.length, 0, 'eigene Marke löst keinen Reset aus');
+
+  const st = await b.engine.syncNow();
+  assert.equal(st.phase, 'idle');
+  assert.deepEqual(b.wipes, [at]);
+  assert.deepEqual(ids(b, 'a'), []);
+  assert.equal(server.records.size, 0, 'Altes nicht hochgeladen');
+  assert.equal(b.repo.getAppliedWipe(), at);
+  assert.ok(st.pulled >= 1);
+
+  // (b) neue Daten von A erreichen B ohne erneuten Reset
+  clock.t += 10;
+  add(a, 'a', 'neu');
+  await a.engine.syncNow();
+  await b.engine.syncNow();
+  assert.deepEqual(ids(b, 'a'), ['neu']);
+  assert.equal(b.wipes.length, 1);
+});
+
+test('Löschen: neues Gerät mit gesetzter Marke behält seine Daten', async () => {
+  const server = new FakeServer();
+  const a = wipeDevice(server);
+  await a.engine.wipeRemote();
+  const c = wipeDevice(server);
+  add(c, 'a', 'mine');
+  c.repo.setAppliedWipe(Date.now() + 1000);
+  const st = await c.engine.syncNow();
+  assert.equal(st.phase, 'idle');
+  assert.equal(c.wipes.length, 0);
+  assert.deepEqual(ids(c, 'a'), ['mine']);
+  assert.ok(server.records.has('a:mine'));
+});
+
+test('Löschen: Fehler im onRemoteWipe -> Status error, nichts hochgeladen', async () => {
+  const server = new FakeServer();
+  const a = wipeDevice(server);
+  await a.engine.wipeRemote();
+  const b = wipeDevice(server, { throws: true });
+  add(b, 'a', 'x');
+  const st = await b.engine.syncNow();
+  assert.equal(st.phase, 'error');
+  assert.equal(st.lastError, 'server');
+  assert.equal(server.records.size, 0);
+  assert.equal(b.repo.getAppliedWipe(), 0);
+});
+
+test('Löschen: Marke auf späterer Seite -> Reset und korrektes Neuladen', async () => {
+  const server = new FakeServer();
+  const a = wipeDevice(server);
+  const b = wipeDevice(server, { pageSize: 2 });
+  for (let i = 0; i < 4; i++) add(b, 'a', `old${i}`);
+  await b.engine.syncNow();
+  clock.t += 10;
+  await a.engine.wipeRemote();
+  clock.t += 10;
+  for (let i = 0; i < 3; i++) add(a, 'a', `n${i}`); // Marke hat kleinere seq als diese
+  await a.engine.syncNow();
+  const seqWipe = server.docs.get(WIPE_DOC)?.seq ?? 0;
+  assert.ok(seqWipe < server.counter);
+  const st = await b.engine.syncNow();
+  assert.equal(st.phase, 'idle');
+  assert.equal(b.wipes.length, 1);
+  assert.deepEqual(ids(b, 'a'), ['n0', 'n1', 'n2']);
+  assert.equal((await b.engine.syncNow()).pulled, 0);
 });

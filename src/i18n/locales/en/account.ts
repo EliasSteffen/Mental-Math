@@ -62,6 +62,7 @@ export const account: Record<keyof typeof De, string> = {
   'sync.syncedJustNow': 'Synced just now',
   'sync.notYet': 'Not synced yet',
   'sync.pending': '{n} changes pending',
+  'sync.remoteWiped': 'Your training data was deleted on another device.',
   'sync.rejected': '{n} changes rejected',
   'sync.syncNow': 'Sync now',
   'sync.syncDone': 'Synced',

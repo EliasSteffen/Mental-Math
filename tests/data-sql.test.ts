@@ -156,12 +156,13 @@ describe('training data SQL', () => {
     await as('authenticated', A, async (tx) => {
       await upsertDoc(tx, A, `activity:${UUID}`);
       await upsertDoc(tx, A, 'chainBest');
+      await upsertDoc(tx, A, 'wipe');
       for (const bad of ['profile', 'activity:xyz']) {
         await tx.exec('savepoint s');
         await rejects(upsertDoc(tx, A, bad), /check constraint/i);
         await tx.exec('rollback to savepoint s');
       }
-      assert.equal(await count(tx, 'user_documents'), 2);
+      assert.equal(await count(tx, 'user_documents'), 3);
       await upsertDoc(tx, A, 'chainBest', 0); // älter -> No-op
       await upsertDoc(tx, A, 'chainBest', 5, 'd2');
     });

@@ -85,6 +85,10 @@ Reine, kommutative bzw. idempotente Funktionen; kaputte Eingaben zählen als `{}
 
 `RemoteSyncProvider` implementiert `upsertRecords`, `upsertDocs`, `pull(cursor, { limit, rewind })` und `deleteAll`. Er wirft **ausschließlich** `SyncError(kind)` mit `offline | auth | invalid | server`; die Engine bildet alles andere auf `server` ab. Erkannt wird per `isSyncError` (Name, nicht `instanceof`), damit Provider und Engine in getrennten Bundles liegen dürfen. `pull` liefert `cursor` (opak, nur der Provider versteht ihn) und `hasMore`. `rewind: true` (erste Seite einer Runde) setzt die Position um ca. 60 s zurück; das Anwenden ist idempotent.
 
+## Löschen auf allen Geräten
+
+`engine.wipeRemote()` löscht die Cloud-Daten und legt das reservierte Dokument `WIPE_DOC` (`{ at }`) ab. Findet ein anderes Gerät beim Pull eine Markierung mit `at > repo.getAppliedWipe()`, ruft die Engine `onRemoteWipe(at)` auf (Default: `repo.clear()`), merkt sich `at` und lädt komplett neu; Ausstehendes von vor dem Löschen wird nicht hochgeladen. Neue Geräte setzen vor dem ersten Sync `repo.setAppliedWipe(Date.now())`, damit ältere Markierungen sie nicht treffen. `clear()` behält `deviceId` und `wipeAt` immer.
+
 ## Supabase
 
 Der Provider für Supabase/PostgREST samt SQL (`sql/offline_sync_guard.sql`) liegt im Subpfad `offline-sync/supabase`. Details: siehe Abschnitt „Supabase“ weiter unten bzw. `src/supabase/`.

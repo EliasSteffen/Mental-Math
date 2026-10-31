@@ -11,6 +11,7 @@ Alle nennenswerten Änderungen an Mental Math. Format nach [Keep a Changelog](ht
 - Deine Daten liegen jetzt in IndexedDB: schneller, mehr Platz und auch offline verfügbar.
 - Automatische Synchronisierung aller Trainingsdaten zwischen deinen Geräten, sobald du angemeldet bist.
 - Konflikte werden zusammengeführt statt überschrieben.
+- „Alle Daten löschen“ wirkt im angemeldeten Zustand auf allen Geräten.
 - Status und „Jetzt synchronisieren“ findest du in den Einstellungen.
 
 ## [1.9.0] - 2026-10-31

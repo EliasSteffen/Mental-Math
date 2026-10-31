@@ -45,13 +45,17 @@ create table if not exists public.training_results (
 
 create table if not exists public.user_documents (
   user_id     uuid not null default auth.uid() references public.users(id) on delete cascade,
-  name        text not null check (name ~ '^(settings|reviews|dailyResults|chainBest|parallel|activity:[0-9a-f-]{36})$'),
+  name        text not null check (name ~ '^(settings|reviews|dailyResults|chainBest|parallel|wipe|activity:[0-9a-f-]{36})$'),
   data        jsonb not null check (jsonb_typeof(data) = 'object' and pg_column_size(data) <= 262144),
   updated_at  bigint not null,
   device_id   text not null check (char_length(device_id) <= 64),
   server_updated_at timestamptz not null default now(),
   primary key (user_id, name)
 );
+
+-- Bestehende Tabellen: Namensregel um die Lösch-Markierung 'wipe' erweitern (idempotent)
+alter table public.user_documents drop constraint if exists user_documents_name_check;
+alter table public.user_documents add constraint user_documents_name_check check (name ~ '^(settings|reviews|dailyResults|chainBest|parallel|wipe|activity:[0-9a-f-]{36})$');
 
 -- Keyset-Pull
 create index if not exists training_sessions_pull_idx on public.training_sessions (user_id, server_updated_at, id);

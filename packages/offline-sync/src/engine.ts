@@ -1,5 +1,5 @@
 // SyncEngine: Pull (Merge) dann Push (Outbox) gegen einen RemoteSyncProvider, gesteuert durch ein SyncSchema.
-import { isSyncError } from './errors.ts';
+import { SyncError, isSyncError } from './errors.ts';
 import { compareMeta, stableEqual } from './merge.ts';
 import type { Repository } from './repository.ts';
 import type {
@@ -12,7 +12,12 @@ export interface SyncEngineOptions {
   now?: () => number;
   pageSize?: number;
   chunkSize?: number;
+  /** Fremde Lösch-Markierung wurde gefunden; Default: `repo.clear()`. */
+  onRemoteWipe?: (at: number) => void;
 }
+
+/** Reserviertes Dokument der Lösch-Markierung (`{ at }`); gehört nicht ins Schema. */
+export const WIPE_DOC = 'wipe';
 
 const MAX_PAGES = 200;
 
@@ -63,6 +68,9 @@ export class SyncEngine {
   async wipeRemote(): Promise<void> {
     if (!this.provider) return;
     await this.provider.deleteAll();
+    const at = this.now();
+    await this.provider.upsertDocs([{ name: WIPE_DOC, data: { at }, updatedAt: at, deviceId: this.o.deviceId() }]);
+    this.repo.setAppliedWipe(at);
     this.repo.setCursor(null);
   }
 
@@ -87,9 +95,24 @@ export class SyncEngine {
     const limit = this.o.pageSize ?? 500;
     let cursor = this.repo.getSyncState().cursor;
     let first = true;
+    let wiped = false;
     for (let i = 0; i < MAX_PAGES; i++) {
       const page = await provider.pull(cursor, { limit, rewind: first });
       first = false;
+      const at = wiped ? null : this.findWipe(page.docs);
+      if (at !== null) {
+        wiped = true;
+        try {
+          (this.o.onRemoteWipe ?? (() => this.repo.clear()))(at);
+        } catch {
+          throw new SyncError('server');
+        }
+        this.repo.setAppliedWipe(at);
+        this.repo.setCursor(null);
+        c.pulled++;
+        cursor = null; // Seite verwerfen, komplett neu laden
+        continue;
+      }
       c.pulled += this.applyRecords(page.records);
       for (const d of page.docs) if (this.applyDoc(d)) c.pulled++;
       cursor = page.cursor;
@@ -97,6 +120,18 @@ export class SyncEngine {
       if (!page.hasMore) break;
     }
     for (const [name, max] of this.collections) if (max !== undefined) this.repo.trim(name, max);
+  }
+
+  /** Neueste Lösch-Markierung der Seite, die jünger als die angewendete ist. */
+  private findWipe(docs: RemoteDoc[]): number | null {
+    const applied = this.repo.getAppliedWipe();
+    let best: number | null = null;
+    for (const d of docs) {
+      if (!isObj(d) || d.name !== WIPE_DOC || !isObj(d.data)) continue;
+      const at = d.data.at;
+      if (typeof at === 'number' && Number.isFinite(at) && at > applied && (best === null || at > best)) best = at;
+    }
+    return best;
   }
 
   private applyRecords(records: Array<{ collection: string; item: SyncRecord }>): number {
@@ -131,7 +166,7 @@ export class SyncEngine {
   }
 
   private applyDoc(d: RemoteDoc): boolean {
-    if (!isObj(d) || typeof d.name !== 'string') return false;
+    if (!isObj(d) || typeof d.name !== 'string' || d.name === WIPE_DOC) return false;
     const hit = this.resolveDoc(d.name);
     if (!hit) return false;
     const { spec, id } = hit;
@@ -166,6 +201,7 @@ export class SyncEngine {
   }
 
   private unitFor(t: Pick<ChangeRecord, 'target' | 'id'>): Unit | null {
+    if (t.target === WIPE_DOC) return null;
     if (this.collections.has(t.target)) {
       const item = this.repo.list<SyncMeta>(t.target, true).find((x) => x.id === t.id);
       return item ? { kind: 'rec', collection: t.target, item: item as SyncRecord } : null;

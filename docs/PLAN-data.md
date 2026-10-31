@@ -321,3 +321,30 @@ Auf Wunsch des Nutzers wird der generische Teil zu einem wiederverwendbaren Work
 - **Phase 2b (parallel):** Agent P1 übernimmt Kern und Sync, Agent P2 Supabase und SQL. Beide ziehen die Dateien von A, B und C in das Paket um, machen sie generisch und nehmen ihre Tests mit.
 - **Phase 2c:** Agent P3 stellt die App auf das Paket um und löscht die umgezogenen Dateien. Alle 455 App-Tests müssen grün bleiben, angepasst nur dort, wo Importe umziehen.
 - **Phase 3:** Integration nach §4.
+
+---
+
+## 7. Löschen auf allen Geräten (Lösch-Markierung)
+
+**Problem:** `mm_delete_my_data` löscht die Zeilen hart. Andere Geräte erfahren davon beim Pull nichts. Sie behalten ihre lokale Kopie und laden noch ausstehende alte Änderungen wieder hoch.
+
+**Lösung, generisch im Paket:**
+- **Reserviertes Dokument `wipe`** (`WIPE_DOC`) mit `{ at: number }` (Epoch-ms). Es gehört nicht ins App-Schema, die Engine behandelt es selbst.
+- **`Repository`:**
+  - `getAppliedWipe(): number` liefert 0, wenn nichts gesetzt ist; dazu `setAppliedWipe(at)`. Beides liegt unter dem Adapter-Schlüssel `wipeAt`.
+  - `clear(keep)` behält **immer** `deviceId` und `wipeAt`.
+- **`SyncEngine.wipeRemote()`:**
+  1. `provider.deleteAll()`
+  2. `upsertDocs([{ name: 'wipe', data: { at }, updatedAt: at, deviceId }])`
+  3. `setAppliedWipe(at)` und `setCursor(null)`
+- **Pull:**
+  - Enthält eine Seite `wipe` mit `at > getAppliedWipe()`, ruft die Engine `onRemoteWipe()` auf. Default ist `repo.clear()`, die App übergibt `resetAll`.
+  - Danach folgen `setAppliedWipe(at)` und `setCursor(null)`, und der Pull startet neu, höchstens einmal pro Runde.
+  - Ausstehende Änderungen von vor dem Löschen werden **nicht** hochgeladen, `resetAll` leert die Warteschlange.
+  - Ist `at` nicht größer, wird die Markierung ignoriert.
+- **Neue Geräte:** Verknüpft ein Gerät sich zum ersten Mal mit dem Konto oder ersetzt es fremde Daten, setzt die App `setAppliedWipe(now)`. Frühere Löschungen betreffen dieses Gerät nicht.
+
+**App:**
+- Die Namensregel in `user_documents` erlaubt zusätzlich `wipe`. Das SQL ändert den Constraint idempotent mit `drop constraint if exists` und `add constraint`.
+- `features/sync.ts`: `onRemoteWipe` ruft `resetAll()` auf, dann `emitDataChange('remote')` und einen Toast „Deine Daten wurden auf einem anderen Gerät gelöscht“.
+- Der Bestätigungstext verspricht wieder das Löschen auf allen Geräten, ab dem nächsten Sync.
