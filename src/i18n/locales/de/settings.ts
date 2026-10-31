@@ -58,6 +58,7 @@ export const settings = {
   importLabel: 'Importieren',
   importDone: 'Import erfolgreich: {attempts} Aufgaben, {sessions} Runden',
   resetConfirm: 'Wirklich alle Daten löschen? Das lässt sich nicht rückgängig machen.',
+  resetConfirmCloud: 'Alle Daten löschen? Das löscht sie auf diesem Gerät UND in deinem Konto. Andere Geräte behalten ihre lokale Kopie, bis du sie dort ebenfalls zurücksetzt. Das lässt sich nicht rückgängig machen.',
   resetTitle: 'Alles zurücksetzen?',
   deleteLabel: 'Löschen',
   resetDone: 'Alle Daten wurden gelöscht',

@@ -5,6 +5,16 @@ const DATE = '2026-10-30';
 
 export const RELEASES: Release[] = [
   {
+    version: '1.10.0', date: '2026-10-31',
+    title: { de: 'Offline & Cloud-Sync', en: 'Offline & cloud sync' },
+    highlights: [
+      { de: 'Deine Daten liegen jetzt in IndexedDB: schneller, mehr Platz und auch offline verfügbar.', en: 'Your data now lives in IndexedDB: faster, more space and available offline.' },
+      { de: 'Automatische Synchronisierung aller Trainingsdaten zwischen deinen Geräten, sobald du angemeldet bist.', en: 'Automatic sync of all your training data between your devices once you are signed in.' },
+      { de: 'Konflikte werden zusammengeführt statt überschrieben.', en: 'Conflicts are merged instead of overwritten.' },
+      { de: 'Status und „Jetzt synchronisieren“ findest du in den Einstellungen.', en: 'Find the status and "Sync now" in the settings.' },
+    ],
+  },
+  {
     version: '1.9.0', date: '2026-10-31',
     title: { de: 'Konto mit Passkey', en: 'Passkey account' },
     highlights: [

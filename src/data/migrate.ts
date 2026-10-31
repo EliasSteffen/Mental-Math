@@ -4,7 +4,7 @@ import type { AppSettings, GameResult, SessionStats, UserProfile } from '../type
 import type { LegacyStore } from './adapters.ts';
 import { createMeta } from './meta.ts';
 import { newId } from './ids.ts';
-import type { Repository } from './repository.ts';
+import type { Repository } from 'offline-sync';
 import { normalize } from './schema.ts';
 
 export const LEGACY_KEY = 'kopfrechner.v1';

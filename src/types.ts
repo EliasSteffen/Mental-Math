@@ -256,15 +256,12 @@ export type AiInline = { text: string; bold: boolean; italic: boolean };
 export type AiBlock = { type: 'p'; parts: AiInline[] } | { type: 'ol' | 'ul'; items: AiInline[][] };
 
 // ---------- Persistenz v3 (lokal, vorbereitet für Cloud-Sync) ----------
-/** Metadaten, die jedes synchronisierbare Objekt trägt (Konfliktauflösung: höchstes updatedAt / rev gewinnt). */
-export interface SyncMeta {
-  id: string;            // UUID (crypto.randomUUID), global eindeutig
-  createdAt: number;     // Epoch-ms
-  updatedAt: number;     // Epoch-ms, bei jeder Änderung gesetzt
-  deletedAt: number | null; // Soft-Delete (Tombstone) statt physischem Löschen
-  deviceId: string;      // Gerät, das zuletzt geändert hat
-  rev: number;           // lokaler Revisionszähler, +1 je Änderung
-}
+// Sync-Verträge liegen im Paket offline-sync (docs/PLAN-data.md §6); hier nur re-exportiert.
+export type {
+  SyncMeta, ChangeRecord, SyncState, StorageAdapter, PersistentAdapter, SyncRecord, RemoteDoc, PullPage,
+  SyncErrorKind, RemoteSyncProvider, SyncPhase, SyncStatus,
+} from 'offline-sync';
+import type { SyncMeta, SyncState } from 'offline-sync';
 
 export interface UserProfile extends SyncMeta {
   displayName: string | null;
@@ -284,35 +281,36 @@ export interface SessionStats extends Session, SyncMeta {}
 export type SyncCollection = 'results' | 'sessions';
 export type SyncDocument = 'profile' | 'settings' | 'reviews' | 'activity' | 'dailyResults' | 'chainBest' | 'parallel';
 
-export interface ChangeRecord {
-  seq: number;                                // lokal fortlaufend
-  target: SyncCollection | SyncDocument;
-  id: string;                                 // Objekt-ID bzw. Dokumentname
-  op: 'upsert' | 'delete';
-  at: number;                                 // Epoch-ms
-}
+// ---------- Data-Layer & Cloud-Sync (v10, docs/PLAN-data.md) ----------
+export type SyncTarget = SyncCollection | SyncDocument;
 
-export interface SyncState {
-  lastPulledAt: number | null;
-  lastPushedSeq: number;
-  nextSeq: number;
-  pending: ChangeRecord[];                    // max. 2.000, älteste werden zusammengefasst
-}
-
-/** Low-Level-Schlüssel/Wert-Speicher (heute localStorage, später z. B. IndexedDB) */
-export interface StorageAdapter {
-  readonly name: string;
-  get(key: string): string | null;
-  set(key: string, value: string): void;
-  remove(key: string): void;
-  keys(prefix: string): string[];
-}
-
-/** Gegenstück für die spätere Cloud (Firebase, Supabase, eigene API). Heute: NoopSyncProvider. */
-export interface RemoteSyncProvider {
-  readonly name: string;
-  push(changes: ChangeRecord[], docs: Record<string, unknown>): Promise<{ acceptedSeqs: number[] }>;
-  pull(since: number | null): Promise<{ docs: Array<{ target: SyncCollection | SyncDocument; id: string; op: 'upsert' | 'delete'; doc: unknown }>; serverTime: number }>;
+/** Fassade, über die die App ausschließlich mit Daten spricht. Implementierung: src/data/storage.ts. */
+export interface IGameRepository {
+  getProfile(): UserProfile;
+  updateProfile(patch: Partial<Pick<UserProfile, 'displayName' | 'cloudUserId'>>): UserProfile;
+  getSyncState(): SyncState;
+  load(): State;
+  save(state: State): void;
+  getAttempts(): GameResult[];
+  getSessions(): SessionStats[];
+  addAttempt(attempt: Attempt): void;
+  addSession(session: Session): void;
+  getSettings(): Settings;
+  setSettings(partial: Partial<Settings>): Settings;
+  getReviews(): Reviews;
+  setReviews(reviews: Reviews): Reviews;
+  getActivity(): Activity;
+  addActivityMs(ms: number, ts?: number): number;
+  getDailyResults(): Record<string, DailyResult>;
+  setDailyResult(dateKey: string, result: DailyResult): Record<string, DailyResult>;
+  getChainBest(): Partial<Record<Level, number>>;
+  setChainBest(level: Level, value: number): Partial<Record<Level, number>>;
+  getParallelStats(): ParallelStats;
+  setParallelStats(stats: ParallelStats): ParallelStats;
+  resetAll(): void;
+  exportJSON(): string;
+  /** local = eigene Schreibzugriffe, remote = per Sync angewendet, external = anderer Tab */
+  onChange(cb: (source: 'local' | 'remote' | 'external') => void): () => void;
 }
 
 // ---------- Versionen & Release Notes (v8) ----------

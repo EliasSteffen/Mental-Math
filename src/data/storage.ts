@@ -1,12 +1,15 @@
 // Öffentliche Storage-API (unverändert) über dem v3-Repository (`mm:v3:*`, SyncMeta, Änderungsprotokoll).
 // Alles synchron (localStorage). Ein späterer async/IndexedDB-Adapter läuft hinter demselben Repository.
 import type {
-  Activity, Attempt, DailyResult, GameResult, Level, ParallelStats, Reviews, Session, SessionStats, Settings, State, SyncState, UserProfile,
+  Activity, Attempt, DailyResult, GameResult, IGameRepository, Level, ParallelStats, Reviews, Session, SessionStats, Settings, State,
+  SyncState, UserProfile,
 } from '../types.ts';
-import { createLegacyStore, getDefaultAdapter, V3_PREFIX } from './adapters.ts';
+import type { PersistentAdapter, StorageAdapter } from '../types.ts';
+import type { IdbOptions } from 'offline-sync';
+import { Repository, sumByKey } from '../vendor/storage.ts';
+import { createLegacyStore, getDefaultAdapter, initStorageAdapter, setDefaultAdapter, V3_PREFIX } from './adapters.ts';
 import { LEGACY_BACKUP_KEY, LEGACY_KEY, migrateV1 } from './migrate.ts';
 import { createMeta, touch } from './meta.ts';
-import { Repository } from './repository.ts';
 import { DEFAULT_PARALLEL_STATS, DEFAULT_SETTINGS, isObj, normalize, normalizeParallel } from './schema.ts';
 
 export { DEFAULT_PARALLEL_STATS, DEFAULT_SETTINGS, normalize };
@@ -16,10 +19,39 @@ const MAX_SESSIONS = 500;
 const MAX_ACTIVITY_DAYS = 400;
 const KEEP_ON_RESET = ['deviceId', 'doc:profile'];
 
-const adapter = getDefaultAdapter();
-const repo = new Repository(adapter);
+let repo = new Repository(getDefaultAdapter());
+let initPromise: Promise<void> | null = null;
 const legacy = createLegacyStore();
 let ready = false;
+
+// ---------- Änderungsmeldungen ----------
+export type ChangeSource = 'local' | 'remote' | 'external';
+const listeners = new Set<(source: ChangeSource) => void>();
+let unbindRepo: () => void = () => {};
+
+/** Meldet eine Datenänderung an alle `onChange`-Hörer (z. B. 'remote' nach einem Pull). */
+export function emitDataChange(source: ChangeSource): void {
+  for (const cb of [...listeners]) {
+    try {
+      cb(source);
+    } catch {
+      /* ein Hörer darf die anderen nicht blockieren */
+    }
+  }
+}
+
+/** Hängt die lokale Änderungsmeldung ans aktuelle Repository (bei Austausch neu aufrufen). */
+function bindRepo(): void {
+  unbindRepo();
+  unbindRepo = repo.onTrackedChange(() => emitDataChange('local'));
+}
+bindRepo();
+
+/** Registriert einen Hörer für Datenänderungen; Rückgabe: Abmelden. */
+export function onChange(cb: (source: ChangeSource) => void): () => void {
+  listeners.add(cb);
+  return () => { listeners.delete(cb); };
+}
 
 /** Repository; führt beim ersten Zugriff (und nach Invalidierung) die Migration von `kopfrechner.v1` aus. */
 function r(): Repository {
@@ -49,8 +81,39 @@ if (typeof globalThis.addEventListener === 'function') {
   // Änderungen aus anderen Tabs: Cache verwerfen
   globalThis.addEventListener('storage', (e: Event) => {
     const key = (e as StorageEvent).key;
-    if (key === null || key === undefined || key.startsWith(V3_PREFIX) || key === LEGACY_KEY) invalidateCache();
+    if (key === null || key === undefined || key.startsWith(V3_PREFIX) || key === LEGACY_KEY) {
+      invalidateCache();
+      emitDataChange('external');
+    }
   });
+}
+
+function isPersistent(a: StorageAdapter): a is PersistentAdapter {
+  return typeof (a as Partial<PersistentAdapter>).onExternalChange === 'function';
+}
+
+/** Das lebende, migrierte Repository (für die SyncEngine). Nach `initStorage` ist es ein anderes Objekt als davor. */
+export function getRepository(): Repository {
+  return r();
+}
+
+/** Wählt den Adapter (IndexedDB, sonst localStorage) und baut das Repository neu auf; idempotent (gemeinsames Promise). */
+export function initStorage(o?: IdbOptions): Promise<void> {
+  initPromise ??= (async (): Promise<void> => {
+    const a = await initStorageAdapter(o);
+    setDefaultAdapter(a);
+    repo = new Repository(a);
+    views.clear();
+    ready = false;
+    bindRepo();
+    if (isPersistent(a)) {
+      a.onExternalChange(() => {
+        invalidateCache();
+        emitDataChange('external');
+      });
+    }
+  })();
+  return initPromise;
 }
 
 /** Cache verwerfen (z. B. für Tests oder nach externen Änderungen) */
@@ -83,7 +146,7 @@ export const getSyncState = (): SyncState => r().getSyncState();
 export function load(): State {
   return {
     version: 2,
-    attempts: getAttempts(), sessions: getSessions(), settings: getSettings(), reviews: getReviews(), activity: getActivity(),
+    attempts: getAttempts(), sessions: getSessions(), settings: getSettings(), reviews: getReviews(), activity: ownActivity(),
     dailyResults: getDailyResults(), chainBest: getChainBest(), parallel: getParallelStats(),
   };
 }
@@ -150,13 +213,20 @@ export function setReviews(reviews: Reviews): Reviews {
   return doc;
 }
 
-export const getActivity = (): Activity => view('activity', () => {
+/** Eigene Aktivität (Dokument `activity`; wird als einziges geschrieben und hochgeladen). */
+function ownActivity(): Activity {
   const d = r().getDoc<unknown>('activity');
   return isObj(d) ? (d as Activity) : {};
+}
+
+/** Sicht: eigene Aktivität + Aktivität fremder Geräte (`activityRemote`: { [deviceId]: Activity }), tolerant gegen kaputte Daten. */
+export const getActivity = (): Activity => view('activity', () => {
+  const remote = r().getDoc<unknown>('activityRemote');
+  return sumByKey(ownActivity(), ...Object.values(isObj(remote) ? remote : {}));
 });
 
 export function addActivityMs(ms: number, ts: number = Date.now()): number {
-  const act: Activity = { ...getActivity() };
+  const act: Activity = { ...ownActivity() };
   const d = new Date(ts);
   const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   act[key] = (Number(act[key]) || 0) + (Number(ms) || 0);
@@ -214,3 +284,10 @@ export function exportJSON(): string {
     ...s, version: 3, exportedAt: Date.now(), deviceId: r().deviceId, profile: getProfile(),
   }, null, 2);
 }
+
+/** Fassade für die App (Interface in src/types.ts). */
+export const gameRepository = {
+  getProfile, updateProfile, getSyncState, load, save, getAttempts, getSessions, addAttempt, addSession,
+  getSettings, setSettings, getReviews, setReviews, getActivity, addActivityMs, getDailyResults, setDailyResult,
+  getChainBest, setChainBest, getParallelStats, setParallelStats, resetAll, exportJSON, onChange,
+} satisfies IGameRepository;

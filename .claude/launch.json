@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "kopfrechner",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-m", "http.server", "5179", "-d", "dist"],
+      "port": 5179
+    }
+  ]
+}

@@ -4,6 +4,15 @@ Alle nennenswerten Änderungen an Mental Math. Format nach [Keep a Changelog](ht
 
 <!-- Automatisch erzeugt mit `npm run changelog` aus src/releases.ts – nicht von Hand bearbeiten. -->
 
+## [1.10.0] - 2026-10-31
+
+### Offline & Cloud-Sync
+
+- Deine Daten liegen jetzt in IndexedDB: schneller, mehr Platz und auch offline verfügbar.
+- Automatische Synchronisierung aller Trainingsdaten zwischen deinen Geräten, sobald du angemeldet bist.
+- Konflikte werden zusammengeführt statt überschrieben.
+- Status und „Jetzt synchronisieren“ findest du in den Einstellungen.
+
 ## [1.9.0] - 2026-10-31
 
 ### Konto mit Passkey

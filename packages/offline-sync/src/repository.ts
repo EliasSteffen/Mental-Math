@@ -1,27 +1,40 @@
 // Repository: typisierter Zugriff auf Dokumente und Collections über einen StorageAdapter,
-// mit In-Memory-Cache und Änderungsprotokoll (SyncState) für eine spätere Cloud-Synchronisierung.
-import type { ChangeRecord, StorageAdapter, SyncCollection, SyncDocument, SyncMeta, SyncState } from '../types.ts';
+// mit In-Memory-Cache und Änderungsprotokoll (SyncState) für die Cloud-Synchronisierung.
 import { getDeviceId } from './ids.ts';
 import { tombstone } from './meta.ts';
+import type { ChangeRecord, StorageAdapter, SyncMeta, SyncState } from './types.ts';
 
 export const MAX_PENDING = 2000;
 const SYNC_KEY = 'sync';
-const DOC_NAMES: readonly string[] = ['profile', 'settings', 'reviews', 'activity', 'dailyResults', 'chainBest', 'parallel'];
 
 const docKey = (name: string): string => `doc:${name}`;
 const colKey = (c: string): string => `col:${c}`;
-const isDocName = (n: string): n is SyncDocument => DOC_NAMES.includes(n);
-const emptySync = (): SyncState => ({ lastPulledAt: null, lastPushedSeq: 0, nextSeq: 1, pending: [] });
+const emptySync = (): SyncState => ({ lastPulledAt: null, lastPushedSeq: 0, nextSeq: 1, pending: [], cursor: null, fullPushNeeded: false });
+const isDeleted = (x: { deletedAt?: unknown }): boolean => x.deletedAt !== null && x.deletedAt !== undefined;
+
+export interface RepositoryOptions {
+  now?: () => number;
+  maxPending?: number;
+}
+
+/** ID-Index einer Collection; gilt nur für genau dieses Array-Objekt. */
+interface Index { arr: unknown[]; byId: Map<string, number> }
 
 export class Repository {
   /** Zählt jede Schreib-/Invalidierungsoperation (für abgeleitete Sichten). */
   revision = 0;
   private cache = new Map<string, unknown>();
   private live = new Map<string, unknown[]>();
+  private index = new Map<string, Index>();
 
   readonly adapter: StorageAdapter;
   private readonly now: () => number;
-  constructor(adapter: StorageAdapter, now: () => number = Date.now) { this.adapter = adapter; this.now = now; }
+  private readonly maxPending: number;
+  constructor(adapter: StorageAdapter, o: RepositoryOptions = {}) {
+    this.adapter = adapter;
+    this.now = o.now ?? Date.now;
+    this.maxPending = o.maxPending ?? MAX_PENDING;
+  }
 
   private dev: string | null = null;
   get deviceId(): string { return (this.dev ??= getDeviceId(this.adapter)); }
@@ -54,6 +67,7 @@ export class Repository {
   invalidate(): void {
     this.cache.clear();
     this.live.clear();
+    this.index.clear();
     this.dev = null;
     this.revision++;
   }
@@ -70,9 +84,10 @@ export class Repository {
     return v === null || v === undefined ? null : (v as T);
   }
 
+  /** Dokument schreiben; `track` protokolliert die Änderung (Outbox) für beliebige Dokumentnamen. */
   putDoc<T>(name: string, value: T, track = true): void {
     this.write(docKey(name), value);
-    if (track && isDocName(name)) this.log(name, name, 'upsert');
+    if (track) this.log(name, name, 'upsert');
   }
 
   // ----- Collections -----
@@ -81,23 +96,40 @@ export class Repository {
     return Array.isArray(v) ? (v as T[]) : [];
   }
 
+  /** Index (id → Position) passend zum aktuellen Array; wird bei neuem Array-Objekt lazy neu gebaut. */
+  private idx(c: string, arr: unknown[]): Map<string, number> {
+    const cur = this.index.get(c);
+    if (cur && cur.arr === arr) return cur.byId;
+    const byId = new Map<string, number>();
+    for (let i = 0; i < arr.length; i++) {
+      const x = arr[i] as { id?: unknown } | null;
+      if (x && typeof x === 'object' && typeof x.id === 'string' && !byId.has(x.id)) byId.set(x.id, i);
+    }
+    this.index.set(c, { arr, byId });
+    return byId;
+  }
+
   /** Einträge einer Collection (ohne Tombstones, außer `includeDeleted`). */
-  list<T extends SyncMeta>(collection: SyncCollection, includeDeleted = false): T[] {
+  list<T extends SyncMeta>(collection: string, includeDeleted = false): T[] {
     const all = this.raw<T>(collection).filter((x) => x !== null && typeof x === 'object');
     if (includeDeleted) return all;
     let l = this.live.get(collection) as T[] | undefined;
     if (!l) {
-      l = all.filter((x) => x.deletedAt === null || x.deletedAt === undefined);
+      l = all.filter((x) => !isDeleted(x));
       this.live.set(collection, l);
     }
     return l;
   }
 
-  upsert<T extends SyncMeta>(collection: SyncCollection, item: T, track = true): T {
+  upsert<T extends SyncMeta>(collection: string, item: T, track = true): T {
     const arr = this.raw<T>(collection);
-    const idx = arr.findIndex((x) => x && x.id === item.id);
-    if (idx >= 0) arr[idx] = item;
-    else arr.push(item);
+    const byId = this.idx(collection, arr);
+    const i = byId.get(item.id);
+    if (i !== undefined) arr[i] = item;
+    else {
+      byId.set(item.id, arr.length);
+      arr.push(item);
+    }
     this.live.delete(collection);
     this.write(colKey(collection), arr);
     if (track) this.log(collection, item.id, 'upsert');
@@ -105,12 +137,12 @@ export class Repository {
   }
 
   /** Soft-Delete (Tombstone). Gibt false zurück, wenn es den Eintrag nicht (mehr) gibt. */
-  remove(collection: SyncCollection, id: string): boolean {
+  remove(collection: string, id: string): boolean {
     const arr = this.raw<SyncMeta>(collection);
-    const idx = arr.findIndex((x) => x && x.id === id);
-    const cur = arr[idx];
-    if (!cur || cur.deletedAt !== null && cur.deletedAt !== undefined) return false;
-    arr[idx] = tombstone(cur, this.now(), this.deviceId);
+    const i = this.idx(collection, arr).get(id);
+    const cur = i === undefined ? undefined : arr[i];
+    if (i === undefined || !cur || isDeleted(cur)) return false;
+    arr[i] = tombstone(cur, this.now(), this.deviceId);
     this.live.delete(collection);
     this.write(colKey(collection), arr);
     this.log(collection, id, 'delete');
@@ -118,8 +150,9 @@ export class Repository {
   }
 
   /** Ganze Collection ersetzen (Migration, Import). */
-  replaceCollection<T extends SyncMeta>(collection: SyncCollection, items: T[], track = true): void {
+  replaceCollection<T extends SyncMeta>(collection: string, items: T[], track = true): void {
     this.live.delete(collection);
+    this.index.delete(collection);
     this.write(colKey(collection), items);
     if (track) {
       for (const it of items) this.log(collection, it.id, 'upsert', false);
@@ -128,12 +161,12 @@ export class Repository {
   }
 
   /** Auf `max` Einträge kürzen: zuerst Tombstones, dann die ältesten (physisch, kein Sync-Delete). */
-  trim(collection: SyncCollection, max: number): void {
+  trim(collection: string, max: number): void {
     let arr = this.raw<SyncMeta>(collection);
     if (arr.length <= max) return;
     let excess = arr.length - max;
     arr = arr.filter((x) => {
-      if (excess > 0 && x && x.deletedAt !== null && x.deletedAt !== undefined) {
+      if (excess > 0 && x && isDeleted(x)) {
         excess--;
         return false;
       }
@@ -141,13 +174,20 @@ export class Repository {
     });
     if (excess > 0) arr = arr.slice(excess);
     this.live.delete(collection);
+    this.index.delete(collection);
     this.write(colKey(collection), arr);
   }
 
   // ----- Änderungsprotokoll -----
   getSyncState(): SyncState {
     const v = this.read(SYNC_KEY);
-    if (v !== null && typeof v === 'object' && Array.isArray((v as SyncState).pending)) return v as SyncState;
+    if (v !== null && typeof v === 'object' && Array.isArray((v as SyncState).pending)) {
+      const st = v as SyncState;
+      // Felder alter Stände auffüllen
+      if (st.cursor === undefined) st.cursor = null;
+      if (typeof st.fullPushNeeded !== 'boolean') st.fullPushNeeded = false;
+      return st;
+    }
     const s = emptySync();
     this.cache.set(SYNC_KEY, s);
     return s;
@@ -157,15 +197,44 @@ export class Repository {
     this.write(SYNC_KEY, this.getSyncState());
   }
 
-  /** Änderung protokollieren; je target+id zusammengefasst, max. MAX_PENDING (älteste fallen weg). */
-  private log(target: SyncCollection | SyncDocument, id: string, op: 'upsert' | 'delete', save = true): void {
+  private listeners = new Set<(target: string, id: string) => void>();
+
+  /** Meldet protokollierte (lokale) Änderungen; angewendete Remote-Daten lösen nichts aus. */
+  onTrackedChange(cb: (target: string, id: string) => void): () => void {
+    this.listeners.add(cb);
+    return () => { this.listeners.delete(cb); };
+  }
+
+  /** Änderung protokollieren; je target+id zusammengefasst; bei Überlauf → Vollabgleich. */
+  private log(target: string, id: string, op: 'upsert' | 'delete', save = true): void {
     const s = this.getSyncState();
     const i = s.pending.findIndex((c) => c.target === target && c.id === id);
     if (i >= 0) s.pending.splice(i, 1);
     const rec: ChangeRecord = { seq: s.nextSeq++, target, id, op, at: this.now() };
     s.pending.push(rec);
-    if (s.pending.length > MAX_PENDING) s.pending.splice(0, s.pending.length - MAX_PENDING);
+    if (s.pending.length > this.maxPending) {
+      s.fullPushNeeded = true;
+      s.pending = [];
+    }
     if (save) this.saveSync();
+    for (const cb of [...this.listeners]) {
+      try { cb(target, id); } catch { /* Listener-Fehler ignorieren */ }
+    }
+  }
+
+  markFullPush(): void {
+    this.getSyncState().fullPushNeeded = true;
+    this.saveSync();
+  }
+
+  clearFullPush(): void {
+    this.getSyncState().fullPushNeeded = false;
+    this.saveSync();
+  }
+
+  setCursor(c: string | null): void {
+    this.getSyncState().cursor = c;
+    this.saveSync();
   }
 
   /** Vom Provider bestätigte Änderungen entfernen. */

@@ -24,10 +24,10 @@ const abs: string[] = [
   ...DIRS.flatMap((d) => walk(join(DIST, d))),
   ...FILES.map((f) => join(DIST, f)).filter((p) => existsSync(p)),
 ];
-// js/vendor/ (Auth-Bundle) nicht vorab laden: es braucht ohnehin Netz und hält die SW-Installation klein.
+// Storage-Bundle wird beim Start offline gebraucht (vorladen); das Auth-Bundle braucht ohnehin Netz und bleibt draußen.
 const files: string[] = abs
   .map((p) => '/' + relative(DIST, p).split(sep).join('/'))
-  .filter((f) => !f.startsWith('/js/vendor/'))
+  .filter((f) => f !== '/js/vendor/auth.js')
   .sort();
 
 const hash = createHash('sha256');

@@ -3,3 +3,5 @@ export { createPasskeyAuth, PasskeyAuthError, normalizeUsername } from 'passkey-
 export type { AuthSession, AuthUser, PasskeyInfo, PasskeyAuthClient, AuthErrorCode, SupportInfo } from 'passkey-auth/client';
 export { createPasskeySupabaseClient, createAccountApi } from 'passkey-auth/supabase';
 export type { AccountApi } from 'passkey-auth/supabase';
+// Supabase-Sync-Provider: erst nach der Anmeldung nötig, daher im lazy geladenen Auth-Bundle.
+export { createSupabaseSyncProvider } from 'offline-sync/supabase';

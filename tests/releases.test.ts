@@ -30,7 +30,7 @@ test('compareVersions / releasesSince', () => {
   assert.equal(compareVersions('1.2.3', '1.2.3'), 0);
   assert.ok(compareVersions('1.2.3', '2.0.0') < 0);
   assert.deepEqual(releasesSince('').map((r) => r.version), [RELEASES[0]!.version]);
-  assert.deepEqual(releasesSince('1.6.0').map((r) => r.version), ['1.9.0', '1.8.0', '1.7.0']);
+  assert.deepEqual(releasesSince('1.6.0').map((r) => r.version), ['1.10.0', '1.9.0', '1.8.0', '1.7.0']);
   assert.deepEqual(releasesSince(RELEASES[0]!.version), []);
 });
 

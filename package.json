@@ -1,6 +1,6 @@
 {
   "name": "mental-math",
-  "version": "1.9.0",
+  "version": "1.10.0",
   "private": true,
   "type": "module",
   "workspaces": [
@@ -9,10 +9,10 @@
   "scripts": {
     "clean": "node scripts/clean.ts",
     "changelog": "node scripts/changelog.ts",
-    "build:pkg": "npm run build -w passkey-auth",
+    "build:pkg": "npm run build --workspaces",
     "build": "npm run build:pkg && node scripts/build-info.ts && node scripts/clean.ts && tsc -p tsconfig.json && tsc -p tsconfig.sw.json && node scripts/vendor.ts && node scripts/copy-static.ts && node scripts/precache.ts",
     "typecheck": "npm run build:pkg && node scripts/build-info.ts && tsc -p tsconfig.check.json",
-    "test": "npm run build:pkg && node scripts/build-info.ts && node --test tests/*.test.ts && npm test -w passkey-auth",
+    "test": "npm run build:pkg && node scripts/build-info.ts && node --test tests/*.test.ts && npm test --workspaces",
     "dev": "npm run build && python3 -m http.server 8080 -d dist",
     "dev:ai": "npm run build && npx wrangler pages dev dist --port 8788"
   },
@@ -20,6 +20,7 @@
     "@supabase/supabase-js": "2.118.0",
     "@types/node": "^24.19.2",
     "esbuild": "0.28.2",
+    "fake-indexeddb": "6.2.6",
     "typescript": "^5.9.3"
   }
 }

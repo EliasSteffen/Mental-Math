@@ -739,3 +739,6 @@ body.has-keypad .answer input { padding-top:10px; padding-bottom:10px; }
 .acct-edit { display:flex; flex-direction:column; gap:6px; min-width:0; flex:1 1 100%; }
 .acct-edit-row { display:flex; gap:8px; flex-wrap:wrap; }
 .acct-edit-row input { flex:1 1 140px; min-width:0; }
+
+/* Sync-Statuszeile in der Konto-Karte */
+.acct-sync { margin:0; overflow-wrap:anywhere; }

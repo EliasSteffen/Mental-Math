@@ -13,6 +13,7 @@ import { app, h, appendChildren } from '../ui/dom.ts';
 import { rerender, addCleanup } from '../router.ts';
 import type { PasskeyInfo } from '../vendor/auth.ts';
 import * as acct from '../features/account.ts';
+import { getSyncStatus, onSyncStatus, syncNow, syncStatusEntries, wipeCloudData } from '../features/sync.ts';
 
 type TabId = 'general' | 'gameplay' | 'data' | 'about';
 const TABS: ReadonlyArray<readonly [TabId, 'settings.tabGeneral' | 'settings.tabGameplay' | 'settings.tabData' | 'settings.tabAbout', string]> = [
@@ -270,6 +271,18 @@ function accountSignedOut(box: HTMLElement): void {
   void acct.support().then((info) => { if (!info.webauthn && controls.isConnected) controls.replaceWith(hint); }).catch(() => { /* Button-Aktionen melden Fehler selbst */ });
 }
 
+/** Statuszeile der Synchronisierung; aktualisiert sich live (Aufräumen über den Router). */
+function syncLine(): HTMLElement {
+  const line = h('p', { class: 'small muted acct-sync', role: 'status' });
+  const draw = (): void => {
+    const parts = syncStatusEntries(getSyncStatus()).map((e) => t(e.key, e.params));
+    line.textContent = parts.join(' · ');
+  };
+  draw();
+  addCleanup(onSyncStatus(draw));
+  return line;
+}
+
 function accountSignedIn(box: HTMLElement, username: string): void {
   let editingName = false;
   let editingId: string | null = null;
@@ -321,6 +334,13 @@ function accountSignedIn(box: HTMLElement, username: string): void {
       : h('div', { class: 'acct-name' },
         h('div', null, h('div', { class: 'small muted' }, t('account.signedInAs')), h('strong', null, username)),
         h('button', { type: 'button', class: 'btn', onclick: () => { editingName = true; draw(); } }, t('account.change')));
+    const syncBtn: HTMLButtonElement = h('button', { type: 'button', class: 'btn', onclick: () => {
+      void runBusy(syncBtn, async () => {
+        const res = await syncNow();
+        if (res.phase === 'idle') toast(t('account.sync.syncDone'), { kind: 'success' });
+        else toast(t(syncStatusEntries(res)[0]?.key ?? 'account.sync.failed'), { kind: 'error' });
+      });
+    } }, t('account.sync.syncNow'));
     const list = passkeys
       ? h('ul', { class: 'acct-pks' }, passkeys.map((p) => passkeyItem(p, passkeys !== null && passkeys.length <= 1)))
       : h('p', { class: 'small muted' }, t('account.loading'));
@@ -336,7 +356,7 @@ function accountSignedIn(box: HTMLElement, username: string): void {
         void runBusy(del, async () => { await acct.deleteAccount(); toast(t('account.accountDeleted'), { kind: 'info' }); });
       });
     } }, t('account.deleteAccount'));
-    appendChildren(body, [nameRow, h('h3', { class: 'acct-sub' }, t('account.passkeys')), list,
+    appendChildren(body, [nameRow, syncLine(), syncBtn, h('h3', { class: 'acct-sub' }, t('account.passkeys')), list,
       h('p', { class: 'small muted' }, t('account.addPasskeyHint')),
       h('div', { class: 'btn-row' }, add, out), h('div', { class: 'btn-row' }, del)]);
   }
@@ -401,9 +421,14 @@ function dataTab(): HTMLElement[] {
   const resetBtn = h('button', {
     type: 'button', class: 'btn danger',
     onclick: () => {
-      void confirmDialog(t('settings.resetConfirm'),
-        { title: t('settings.resetTitle'), confirmLabel: t('settings.deleteLabel'), danger: true }).then((yes) => {
+      const cloud = acct.getAccountState().status === 'signed-in';
+      void confirmDialog(t(cloud ? 'settings.resetConfirmCloud' : 'settings.resetConfirm'),
+        { title: t('settings.resetTitle'), confirmLabel: t('settings.deleteLabel'), danger: true }).then(async (yes) => {
         if (!yes) return;
+        if (cloud) {
+          // erst Cloud löschen; bei Fehler lokal nichts löschen (sonst käme alles beim nächsten Sync zurück)
+          try { await wipeCloudData(); } catch { toast(t('account.sync.wipeFailed'), { kind: 'error' }); return; }
+        }
         resetAll();
         applyTheme('system');
         setLang(detectLang('auto'));

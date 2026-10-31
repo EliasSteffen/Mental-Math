@@ -1,5 +1,7 @@
 // Konto per Passkey: Zustand + lazy geladenes Auth-Modul (src/vendor/auth.ts wird erst bei Bedarf importiert).
 import type { AccountApi, AuthErrorCode, AuthSession, AuthUser, PasskeyAuthClient, PasskeyInfo, SupportInfo } from '../vendor/auth.ts';
+import type { RemoteSyncProvider, SupabaseSyncSchema } from 'offline-sync';
+import { APP_SUPABASE_SCHEMA } from '../data/remote/supabase-schema.ts';
 import { PUBLIC_CONFIG } from '../generated/public-config.ts';
 
 export type AccountState =
@@ -13,6 +15,7 @@ export interface VendorModuleLike {
   createPasskeyAuth(): PasskeyAuthClient;
   createPasskeySupabaseClient(auth: PasskeyAuthClient, url: string, key: string): unknown;
   createAccountApi(db: never): AccountApi;
+  createSupabaseSyncProvider(client: never, userId: string, schema: SupabaseSyncSchema): RemoteSyncProvider;
 }
 
 const HINT_KEY = 'mm:v3:auth.hint';
@@ -24,7 +27,8 @@ const CODES: readonly AuthErrorCode[] = [
 
 let configGetter: () => { supabaseUrl: string; supabaseKey: string } = () => PUBLIC_CONFIG;
 let injected: VendorModuleLike | null = null;
-let ready: Promise<{ auth: PasskeyAuthClient; api: AccountApi }> | null = null;
+type Loaded = { auth: PasskeyAuthClient; api: AccountApi; db: unknown; mod: VendorModuleLike };
+let ready: Promise<Loaded> | null = null;
 let state: AccountState = accountEnabled() ? { status: 'signed-out' } : { status: 'disabled' };
 const listeners = new Set<(s: AccountState) => void>();
 
@@ -62,7 +66,7 @@ function onSession(s: AuthSession | null): void {
 }
 
 /** Lädt Vendor-Modul einmalig und baut Auth-Client + Konto-API. */
-function load(): Promise<{ auth: PasskeyAuthClient; api: AccountApi }> {
+function load(): Promise<Loaded> {
   if (ready) return ready;
   const p = (async () => {
     const m: VendorModuleLike = injected ?? (await import('../vendor/auth.ts') as unknown as VendorModuleLike);
@@ -71,7 +75,7 @@ function load(): Promise<{ auth: PasskeyAuthClient; api: AccountApi }> {
     const db = m.createPasskeySupabaseClient(auth, c.supabaseUrl, c.supabaseKey);
     const api = m.createAccountApi(db as never);
     auth.onChange(onSession);
-    return { auth, api };
+    return { auth, api, db, mod: m };
   })();
   ready = p;
   p.catch(() => { if (ready === p) ready = null; }); // nächster Versuch darf neu laden
@@ -87,6 +91,14 @@ export async function restoreAccount(): Promise<void> {
   } catch {
     setState({ status: 'signed-out' }); // Netzwerkfehler: still abgemeldet
   }
+}
+
+/** Sync-Provider für das angemeldete Konto; null, wenn nicht angemeldet. */
+export async function createSyncProvider(): Promise<RemoteSyncProvider | null> {
+  const st = state;
+  if (st.status !== 'signed-in') return null;
+  const { db, mod } = await load();
+  return mod.createSupabaseSyncProvider(db as never, st.user.id, APP_SUPABASE_SCHEMA);
 }
 
 export async function support(): Promise<SupportInfo> { return (await load()).auth.support(); }

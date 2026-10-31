@@ -1,10 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { LocalStorageAdapter, MemoryAdapter, createDefaultAdapter } from '../src/data/adapters.ts';
+import { LocalStorageAdapter, MemoryAdapter, createDefaultAdapter, V3_PREFIX } from '../src/data/adapters.ts';
 import { getDeviceId, newId } from '../src/data/ids.ts';
 import { createMeta, tombstone, touch } from '../src/data/meta.ts';
-import { MAX_PENDING, Repository } from '../src/data/repository.ts';
-import { NoopSyncProvider, SyncEngine } from '../src/data/sync.ts';
+import { MAX_PENDING, Repository, SyncEngine } from '../src/vendor/storage.ts';
+import { APP_SYNC_SCHEMA } from '../src/data/sync-schema.ts';
 import { migrateV1 } from '../src/data/migrate.ts';
 import { createLegacyStore } from '../src/data/adapters.ts';
 import {
@@ -56,7 +56,7 @@ test('Adapter: Memory und localStorage (Prefix mm:v3:, keys ohne Prefix)', () =>
   const fs = fakeStorage({ other: 'z' });
   (globalThis as { localStorage?: Storage }).localStorage = fs;
   try {
-    const a = new LocalStorageAdapter();
+    const a = new LocalStorageAdapter(V3_PREFIX);
     a.set('doc:x', '1');
     assert.equal(fs.raw.get('mm:v3:doc:x'), '1');
     assert.deepEqual(a.keys(''), ['doc:x']);
@@ -122,7 +122,7 @@ test('Repository: CRUD, Soft-Delete, Cache', () => {
   const mem = new MemoryAdapter();
   const counting = { name: 'c', get: (k: string) => { reads++; return mem.get(k); }, set: (k: string, v: string) => mem.set(k, v), remove: (k: string) => mem.remove(k), keys: (p: string) => mem.keys(p) };
   let now = 1000;
-  const repo = new Repository(counting, () => now);
+  const repo = new Repository(counting, { now: () => now });
   assert.equal(repo.getDoc('x'), null);
   repo.putDoc('x', { a: 1 });
   assert.deepEqual(repo.getDoc('x'), { a: 1 });
@@ -159,14 +159,13 @@ test('Repository: CRUD, Soft-Delete, Cache', () => {
 
 test('Repository: Änderungsprotokoll fasst zusammen und ist auf 2000 begrenzt', () => {
   let now = 1;
-  const repo = new Repository(new MemoryAdapter(), () => now);
+  const repo = new Repository(new MemoryAdapter(), { now: () => now });
   const item = (id: string): GameResult => ({ ...att(), ...createMeta(now, 'd', id) });
   repo.upsert('results', item('a'));
   now = 2;
   repo.upsert('results', item('a'));
   repo.putDoc('settings', { x: 1 });
   repo.putDoc('settings', { x: 2 });
-  repo.putDoc('misc', 1); // kein Sync-Dokument → nicht protokolliert
   let s = repo.getSyncState();
   assert.equal(s.pending.length, 2);
   assert.deepEqual(s.pending.map((c) => `${c.target}:${c.id}:${c.op}`), ['results:a:upsert', 'settings:settings:upsert']);
@@ -176,47 +175,48 @@ test('Repository: Änderungsprotokoll fasst zusammen und ist auf 2000 begrenzt',
   assert.equal(s.pending.length, 2);
   assert.deepEqual(s.pending.at(-1), { seq: s.nextSeq - 1, target: 'results', id: 'a', op: 'delete', at: 3 });
 
+  // Überlauf → Vollabgleich statt stillem Verwerfen
   for (let i = 0; i < MAX_PENDING + 50; i++) repo.upsert('results', item(`n${i}`));
   s = repo.getSyncState();
-  assert.equal(s.pending.length, MAX_PENDING);
-  assert.equal(s.pending.at(-1)?.id, `n${MAX_PENDING + 49}`);
+  assert.equal(s.fullPushNeeded, true);
+  assert.ok(s.pending.length < 60);
   const seqs = s.pending.map((c) => c.seq);
   assert.deepEqual(seqs, [...seqs].sort((x, y) => x - y));
+  assert.equal(repo.list('results').length, MAX_PENDING + 50);
 
+  const before = s.pending.length;
   repo.ackChanges([s.pending[0]?.seq ?? 0]);
-  assert.equal(repo.getSyncState().pending.length, MAX_PENDING - 1);
+  assert.equal(repo.getSyncState().pending.length, before - 1);
 });
 
 // ---------- Sync ----------
-test('SyncEngine: Noop gibt Status zurück, pending bleibt; Fake-Provider push/pull', async () => {
+// Ausführliche Engine-Tests: packages/offline-sync, Fachregeln: tests/sync-schema.test.ts
+test('SyncEngine: ohne Provider disabled, mit Fake-Provider push/pull', async () => {
   const repo = new Repository(new MemoryAdapter());
   repo.upsert('sessions', { ...({ id: 's1', ts: 1, mode: 'all', n: 1, correct: 1, points: 1, avgTimeMs: 1 } satisfies Session), ...createMeta(1, 'd', 's1') });
-  const st = await new SyncEngine(repo).syncNow();
-  assert.equal(st.ok, true);
-  assert.equal(st.skipped, true);
-  assert.equal(st.provider, 'noop');
+  const engine = new SyncEngine(repo, { schema: APP_SYNC_SCHEMA, deviceId: () => 'd' });
+  const st = await engine.syncNow();
+  assert.equal(st.phase, 'disabled');
   assert.equal(st.pending, 1);
-  assert.equal((await new NoopSyncProvider().push()).acceptedSeqs.length, 0);
 
-  const pushed: number[] = [];
-  const remote = { ...createMeta(5000, 'other', 's2'), id: 's2', ts: 2, mode: 'all', n: 1, correct: 0, points: 0, avgTimeMs: 1 };
+  const pushed: string[] = [];
+  const remote = { ...createMeta(5000, 'other', 's2'), ts: 2, mode: 'all', n: 1, correct: 0, points: 0, avgTimeMs: 1 };
   const fake: RemoteSyncProvider = {
     name: 'fake',
-    push: (changes) => { pushed.push(...changes.map((c) => c.seq)); return Promise.resolve({ acceptedSeqs: changes.map((c) => c.seq) }); },
-    pull: () => Promise.resolve({ docs: [{ target: 'sessions', id: 's2', op: 'upsert', doc: remote }], serverTime: 9 }),
+    upsertRecords: (_c, items) => { pushed.push(...items.map((i) => i.id)); return Promise.resolve(); },
+    upsertDocs: () => Promise.resolve(),
+    pull: () => Promise.resolve({ records: [{ collection: 'sessions', item: remote }], docs: [], cursor: 'c1', hasMore: false }),
+    deleteAll: () => Promise.resolve(),
   };
-  const st2 = await new SyncEngine(repo, fake).syncNow();
-  assert.equal(st2.ok, true);
+  engine.setProvider(fake);
+  const st2 = await engine.syncNow();
+  assert.equal(st2.phase, 'idle');
   assert.equal(st2.pushed, 1);
   assert.equal(st2.pulled, 1);
   assert.equal(st2.pending, 0);
+  assert.deepEqual(pushed, ['s1']);
   assert.equal(repo.list('sessions').length, 2);
-  assert.equal(repo.getSyncState().lastPulledAt, 9);
-  const bad: RemoteSyncProvider = { name: 'bad', push: () => Promise.reject(new Error('offline')), pull: () => Promise.reject(new Error('offline')) };
-  repo.putDoc('settings', { a: 1 });
-  const st3 = await new SyncEngine(repo, bad).syncNow();
-  assert.equal(st3.ok, false);
-  assert.equal(st3.error, 'offline');
+  assert.equal(repo.getSyncState().cursor, 'c1');
 });
 
 // ---------- Migration ----------
@@ -265,7 +265,7 @@ for (const [label, data] of [['v1', v1Data], ['v2', v2Data]] as const) {
       invalidateCache();
       assert.deepEqual(getAttempts().map((a) => a.id), ids);
       assert.equal(getSessions().length, 1);
-      const repo = new Repository(new LocalStorageAdapter());
+      const repo = new Repository(new LocalStorageAdapter(V3_PREFIX));
       assert.equal(migrateV1(repo, createLegacyStore()), 'none');
       assert.deepEqual(repo.list<GameResult>('results').map((a) => a.id), ids);
     });
@@ -275,7 +275,7 @@ for (const [label, data] of [['v1', v1Data], ['v2', v2Data]] as const) {
 test('Migration: Wiederholung nach Abbruch (Schlüssel noch da) dupliziert nichts', () => {
   const fs = fakeStorage({ 'kopfrechner.v1': JSON.stringify(v1Data) });
   withLS(fs, () => {
-    const repo = new Repository(new LocalStorageAdapter());
+    const repo = new Repository(new LocalStorageAdapter(V3_PREFIX));
     const legacy = createLegacyStore();
     assert.equal(migrateV1(repo, legacy), 'migrated');
     fs.raw.set('kopfrechner.v1', JSON.stringify(v1Data)); // simuliert Abbruch vor dem Entfernen

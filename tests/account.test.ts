@@ -38,7 +38,7 @@ function fakeModule(restoreResult: AuthSession | null = null): VendorModuleLike 
     deletePasskey: async () => {},
     deleteAccount: async () => {},
   };
-  return { createPasskeyAuth: () => auth, createPasskeySupabaseClient: () => ({}), createAccountApi: () => api };
+  return { createPasskeyAuth: () => auth, createPasskeySupabaseClient: () => ({}), createAccountApi: () => api, createSupabaseSyncProvider: () => ({}) as never };
 }
 
 beforeEach(() => { store.clear(); restored = 0; });

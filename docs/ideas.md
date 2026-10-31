@@ -1,3 +1,0 @@
-- @app/storage package
-  - interface
-  - implementation for local and cloud storage (supabase)
