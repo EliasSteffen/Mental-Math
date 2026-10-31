@@ -718,3 +718,24 @@ body.has-keypad .answer input { padding-top:10px; padding-bottom:10px; }
 @media (max-width: 359px) {
   .settings-tab { padding:0 10px; font-size:0.8125rem; gap:4px; }
 }
+
+/* ---------- Konto ---------- */
+.acct { display:flex; flex-direction:column; gap:12px; min-width:0; }
+.acct-controls, .acct-body { display:flex; flex-direction:column; gap:12px; min-width:0; }
+.acct-controls .btn { width:100%; }
+.acct-err { color:var(--bad); min-height:0; }
+.acct-err:empty { display:none; }
+.acct-divider { display:flex; align-items:center; gap:10px; color:var(--muted); font-size:0.8125rem; }
+.acct-divider::before, .acct-divider::after { content:""; flex:1; height:1px; background:var(--border); }
+.acct-name { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+.acct-name strong { overflow-wrap:anywhere; }
+.acct-sub { margin:4px 0 0; font-size:0.9375rem; }
+.acct-pks { list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:10px; }
+.acct-pk { display:flex; flex-direction:column; gap:8px; padding:10px 12px; border:1px solid var(--border); border-radius:var(--radius-md); background:var(--surface-2); min-width:0; }
+.acct-pk-info { min-width:0; overflow-wrap:anywhere; }
+.acct-pk-name { display:flex; align-items:center; gap:8px; flex-wrap:wrap; font-weight:700; }
+.acct-pk-actions { display:flex; gap:8px; flex-wrap:wrap; }
+.acct-pk-actions .btn { flex:1 1 100px; }
+.acct-edit { display:flex; flex-direction:column; gap:6px; min-width:0; flex:1 1 100%; }
+.acct-edit-row { display:flex; gap:8px; flex-wrap:wrap; }
+.acct-edit-row input { flex:1 1 140px; min-width:0; }

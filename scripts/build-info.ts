@@ -1,9 +1,12 @@
-// Schreibt src/generated/build-info.ts (Version aus package.json, Git-Kurz-Hash, Datum).
+// Schreibt src/generated/build-info.ts (Version aus package.json, Git-Kurz-Hash, Datum)
+// und src/generated/public-config.ts (öffentliche Supabase-Werte aus PUBLIC_* in process.env).
 import { execSync } from 'node:child_process';
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 const ROOT: string = fileURLToPath(new URL('..', import.meta.url));
+
+export interface PublicConfig { supabaseUrl: string; supabaseKey: string }
 
 function gitHash(): string {
   try {
@@ -20,15 +23,59 @@ function today(): string {
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
 }
 
-const pkg = JSON.parse(readFileSync(`${ROOT}package.json`, 'utf8')) as { version: string };
-const info = { version: pkg.version, build: gitHash(), date: today() };
+/** Supabase-Projekt-URL, z. B. https://abcdefgh.supabase.co */
+export function validPublicUrl(url: string): boolean {
+  return /^https:\/\/[a-z0-9-]+\.supabase\.co$/.test(url);
+}
 
-const out = `// AUTOMATISCH ERZEUGT von scripts/build-info.ts – nicht bearbeiten, nicht versionieren.
+/** Öffentlicher Schlüssel: neues Format sb_publishable_… oder altes anon-JWT (eyJ…) */
+export function validPublicKey(key: string): boolean {
+  return key.startsWith('sb_publishable_') || key.startsWith('eyJ');
+}
+
+/** Lädt die .env aus dem Projektroot, nur wenn PUBLIC_* fehlen. Werte werden nie ausgegeben. */
+function loadDotEnvIfNeeded(): void {
+  if (process.env.PUBLIC_SUPABASE_URL && process.env.PUBLIC_SUPABASE_ANON_KEY) return;
+  const path: string = `${ROOT}.env`;
+  if (!existsSync(path)) return;
+  try {
+    process.loadEnvFile(path);
+  } catch {
+    /* ungültige .env ignorieren, dann bleiben die Werte leer */
+  }
+}
+
+/** Liest die öffentliche Konfiguration; ungültige Werte werden zu leeren Strings. */
+export function readPublicConfig(): PublicConfig {
+  loadDotEnvIfNeeded();
+  const url: string = (process.env.PUBLIC_SUPABASE_URL ?? '').trim();
+  const key: string = (process.env.PUBLIC_SUPABASE_ANON_KEY ?? '').trim();
+  return {
+    supabaseUrl: validPublicUrl(url) ? url : '',
+    supabaseKey: validPublicKey(key) ? key : '',
+  };
+}
+
+function main(): void {
+  const pkg = JSON.parse(readFileSync(`${ROOT}package.json`, 'utf8')) as { version: string };
+  const info = { version: pkg.version, build: gitHash(), date: today() };
+
+  const out = `// AUTOMATISCH ERZEUGT von scripts/build-info.ts – nicht bearbeiten, nicht versionieren.
 import type { BuildInfo } from '../types.ts';
 
 export const BUILD_INFO: BuildInfo = ${JSON.stringify(info)};
 `;
 
-mkdirSync(`${ROOT}src/generated`, { recursive: true });
-writeFileSync(`${ROOT}src/generated/build-info.ts`, out);
-console.log(`build-info: ${info.version} (${info.build}, ${info.date})`);
+  const cfg: PublicConfig = readPublicConfig();
+  const publicOut = `// AUTOMATISCH ERZEUGT von scripts/build-info.ts – nicht bearbeiten. Nur öffentliche Werte.
+export const PUBLIC_CONFIG: { supabaseUrl: string; supabaseKey: string } = ${JSON.stringify(cfg)};
+`;
+
+  mkdirSync(`${ROOT}src/generated`, { recursive: true });
+  writeFileSync(`${ROOT}src/generated/build-info.ts`, out);
+  writeFileSync(`${ROOT}src/generated/public-config.ts`, publicOut);
+  console.log(`build-info: ${info.version} (${info.build}, ${info.date})`);
+  console.log(`public-config: Supabase-URL ${cfg.supabaseUrl ? 'gesetzt' : 'leer'}, Schlüssel ${cfg.supabaseKey ? 'gesetzt' : 'leer'}`);
+}
+
+if (import.meta.main) main();

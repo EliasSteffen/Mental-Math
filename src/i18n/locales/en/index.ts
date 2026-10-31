@@ -9,5 +9,6 @@ import { lernen } from './lernen.ts';
 import { settings } from './settings.ts';
 import { release } from './release.ts';
 import { core } from './core.ts';
+import { account } from './account.ts';
 
-export const dict = { common, home, train, parallel, chain, custom, analyse, lernen, settings, release, core } as const;
+export const dict = { common, home, train, parallel, chain, custom, analyse, lernen, settings, release, core, account } as const;

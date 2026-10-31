@@ -4,6 +4,15 @@ Alle nennenswerten Änderungen an Mental Math. Format nach [Keep a Changelog](ht
 
 <!-- Automatisch erzeugt mit `npm run changelog` aus src/releases.ts – nicht von Hand bearbeiten. -->
 
+## [1.9.0] - 2026-10-31
+
+### Konto mit Passkey
+
+- Neu: Konto ohne E-Mail und Passwort – anmelden per Passkey (Face ID, Touch ID oder Gerätesperre).
+- Mehrere Passkeys pro Konto: füge Geräte hinzu, benenne sie um oder entferne sie wieder.
+- Wichtig: Es gibt keine Wiederherstellung – wer alle Passkeys verliert, verliert das Konto.
+- Grundlage für die spätere Cloud-Synchronisierung deines Trainings.
+
 ## [1.8.0] - 2026-10-30
 
 ### Versionen, Einstellungen & Feinschliff

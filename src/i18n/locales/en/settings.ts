@@ -75,7 +75,7 @@ export const settings: Record<keyof typeof De, string> = {
   importJson: 'Import from JSON',
   importHint: 'Replaces the current data (export or older state)',
   deleteAll: 'Delete all data',
-  account: 'Account & cloud sync',
+  account: 'Device',
   accountSoon: 'Coming soon: create an account and sync your progress across all devices.',
   deviceId: 'Device ID',
   profileId: 'Profile ID',

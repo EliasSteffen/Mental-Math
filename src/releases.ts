@@ -5,6 +5,16 @@ const DATE = '2026-10-30';
 
 export const RELEASES: Release[] = [
   {
+    version: '1.9.0', date: '2026-10-31',
+    title: { de: 'Konto mit Passkey', en: 'Passkey account' },
+    highlights: [
+      { de: 'Neu: Konto ohne E-Mail und Passwort – anmelden per Passkey (Face ID, Touch ID oder Gerätesperre).', en: 'New: account without email or password – sign in with a passkey (Face ID, Touch ID or device lock).' },
+      { de: 'Mehrere Passkeys pro Konto: füge Geräte hinzu, benenne sie um oder entferne sie wieder.', en: 'Multiple passkeys per account: add devices, rename them or remove them again.' },
+      { de: 'Wichtig: Es gibt keine Wiederherstellung – wer alle Passkeys verliert, verliert das Konto.', en: 'Important: there is no recovery – if you lose all your passkeys, you lose the account.' },
+      { de: 'Grundlage für die spätere Cloud-Synchronisierung deines Trainings.', en: 'Foundation for syncing your training to the cloud later.' },
+    ],
+  },
+  {
     version: '1.8.0', date: DATE,
     title: { de: 'Versionen, Einstellungen & Feinschliff', en: 'Versions, settings & polish' },
     highlights: [

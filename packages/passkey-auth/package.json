@@ -1,0 +1,46 @@
+{
+  "name": "passkey-auth",
+  "version": "0.1.0",
+  "description": "Benutzername + Passkey (WebAuthn) Auth ohne E-Mail, mit Supabase-Adapter. Framework-frei.",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "exports": {
+    "./client": {
+      "types": "./dist/client/index.d.ts",
+      "default": "./dist/client/index.js"
+    },
+    "./server": {
+      "types": "./dist/server/index.d.ts",
+      "default": "./dist/server/index.js"
+    },
+    "./supabase": {
+      "types": "./dist/supabase/index.d.ts",
+      "default": "./dist/supabase/index.js"
+    },
+    "./shared": {
+      "types": "./dist/shared/index.d.ts",
+      "default": "./dist/shared/index.js"
+    },
+    "./sql/*": "./sql/*"
+  },
+  "files": [
+    "dist",
+    "sql",
+    "README.md"
+  ],
+  "scripts": {
+    "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\"",
+    "build": "npm run clean && tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.check.json",
+    "test": "node --test tests/*.test.ts"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "0.5.10",
+    "@supabase/supabase-js": "2.118.0"
+  },
+  "dependencies": {
+    "@simplewebauthn/server": "14.0.3",
+    "jose": "6.2.12"
+  }
+}

@@ -24,7 +24,11 @@ const abs: string[] = [
   ...DIRS.flatMap((d) => walk(join(DIST, d))),
   ...FILES.map((f) => join(DIST, f)).filter((p) => existsSync(p)),
 ];
-const files: string[] = abs.map((p) => '/' + relative(DIST, p).split(sep).join('/')).sort();
+// js/vendor/ (Auth-Bundle) nicht vorab laden: es braucht ohnehin Netz und hält die SW-Installation klein.
+const files: string[] = abs
+  .map((p) => '/' + relative(DIST, p).split(sep).join('/'))
+  .filter((f) => !f.startsWith('/js/vendor/'))
+  .sort();
 
 const hash = createHash('sha256');
 for (const f of files) {

@@ -10,7 +10,9 @@ import { detectLang, setLang, t } from '../i18n/index.ts';
 import { icon } from '../ui/charts.ts';
 import { CATEGORIES } from '../core/catalog.ts';
 import { app, h, appendChildren } from '../ui/dom.ts';
-import { rerender } from '../router.ts';
+import { rerender, addCleanup } from '../router.ts';
+import type { PasskeyInfo } from '../vendor/auth.ts';
+import * as acct from '../features/account.ts';
 
 type TabId = 'general' | 'gameplay' | 'data' | 'about';
 const TABS: ReadonlyArray<readonly [TabId, 'settings.tabGeneral' | 'settings.tabGameplay' | 'settings.tabData' | 'settings.tabAbout', string]> = [
@@ -192,6 +194,178 @@ function gameplayTab(s: Settings): HTMLElement[] {
   ];
 }
 
+// ---------- Konto (Passkey) ----------
+const NAME_MIN = 2;
+const NAME_MAX = 32;
+
+/** Führt eine Konto-Aktion aus; Button zeigt Busy-Zustand, Fehler als Toast (außer Abbruch). */
+async function runBusy(btn: HTMLButtonElement, fn: () => Promise<void>): Promise<boolean> {
+  btn.disabled = true;
+  btn.setAttribute('aria-busy', 'true');
+  try {
+    await fn();
+    return true;
+  } catch (e) {
+    const code = acct.errorCode(e);
+    if (code !== 'cancelled') toast(t(`account.err.${code}`), { kind: 'error' });
+    return false;
+  } finally {
+    btn.disabled = false;
+    btn.removeAttribute('aria-busy');
+  }
+}
+
+const acctDate = (iso: string): string => fmtIsoDate(iso.slice(0, 10));
+
+/** Inline-Formular zum Umbenennen (Name oder Passkey). */
+function inlineEdit(initial: string, label: string, validate: (v: string) => string | null, onSave: (v: string) => Promise<boolean>, onCancel: () => void): HTMLFormElement {
+  const input: HTMLInputElement = h('input', { type: 'text', value: initial, maxlength: NAME_MAX, 'aria-label': label, autocomplete: 'off' });
+  const err = h('div', { class: 'small acct-err', role: 'alert' });
+  const save: HTMLButtonElement = h('button', { type: 'submit', class: 'btn primary' }, t('account.save'));
+  const form: HTMLFormElement = h('form', { class: 'acct-edit' },
+    h('div', { class: 'acct-edit-row' }, input, save,
+      h('button', { type: 'button', class: 'btn', onclick: onCancel }, t('account.cancel'))),
+    err);
+  form.addEventListener('submit', (ev) => {
+    ev.preventDefault();
+    const v = input.value.trim();
+    const bad = validate(v);
+    err.textContent = bad ?? '';
+    if (bad) return;
+    void runBusy(save, async () => { await onSave(v); });
+  });
+  setTimeout(() => input.focus(), 0);
+  return form;
+}
+
+function accountSignedOut(box: HTMLElement): void {
+  const input: HTMLInputElement = h('input', { type: 'text', maxlength: NAME_MAX, placeholder: t('account.namePlaceholder'), autocomplete: 'username', 'aria-label': t('account.nameLabel') });
+  const err = h('div', { class: 'small acct-err', role: 'alert' });
+  const create: HTMLButtonElement = h('button', { type: 'button', class: 'btn primary' }, t('account.create'));
+  const login: HTMLButtonElement = h('button', { type: 'button', class: 'btn' }, t('account.login'));
+  const both = [create, login];
+  const busy = async (btn: HTMLButtonElement, fn: () => Promise<void>): Promise<void> => {
+    for (const b of both) b.disabled = true;
+    await runBusy(btn, fn);
+    for (const b of both) b.disabled = false;
+  };
+  create.addEventListener('click', () => {
+    const v = input.value.trim();
+    const bad = v.length < NAME_MIN || v.length > NAME_MAX;
+    err.textContent = bad ? t('account.nameInvalid') : '';
+    input.setAttribute('aria-invalid', String(bad));
+    if (bad) { input.focus(); return; }
+    void busy(create, async () => {
+      await acct.register(v);
+      toast(t('account.registered'), { kind: 'success', durationMs: 6000 });
+    });
+  });
+  login.addEventListener('click', () => { void busy(login, async () => { await acct.login(); toast(t('account.loggedIn'), { kind: 'success' }); }); });
+
+  const controls = h('div', { class: 'acct-controls' },
+    h('label', { class: 'field' }, h('span', null, t('account.nameLabel')), input), err, create,
+    h('div', { class: 'acct-divider' }, h('span', null, t('account.or'))), login);
+  const hint = h('p', { class: 'small muted' }, t('account.unsupported'));
+  appendChildren(box, [h('p', { class: 'small muted' }, t('account.intro')), controls]);
+  void acct.support().then((info) => { if (!info.webauthn && controls.isConnected) controls.replaceWith(hint); }).catch(() => { /* Button-Aktionen melden Fehler selbst */ });
+}
+
+function accountSignedIn(box: HTMLElement, username: string): void {
+  let editingName = false;
+  let editingId: string | null = null;
+  let passkeys: PasskeyInfo[] | null = null;
+  const body = h('div', { class: 'acct-body' });
+  box.append(body);
+
+  const reload = async (): Promise<void> => {
+    try { passkeys = await acct.listPasskeys(); } catch (e) { toast(t(`account.err.${acct.errorCode(e)}`), { kind: 'error' }); passkeys = passkeys ?? []; }
+    draw();
+  };
+
+  function passkeyItem(p: PasskeyInfo, last: boolean): HTMLElement {
+    const label = p.name ?? t('account.passkeyFallback', { date: acctDate(p.createdAt) });
+    if (editingId === p.id) {
+      return h('li', { class: 'acct-pk' }, inlineEdit(p.name ?? '', t('account.renameAria'),
+        (v) => (v.length < 1 || v.length > NAME_MAX ? t('account.nameInvalid') : null),
+        async (v) => { await acct.renamePasskey(p.id, v); editingId = null; await reload(); return true; },
+        () => { editingId = null; draw(); }));
+    }
+    const del: HTMLButtonElement = h('button', {
+      type: 'button', class: 'btn danger', disabled: last ? true : null, 'aria-label': `${t('account.deleteAria')}: ${label}`,
+      title: last ? t('account.lastPasskeyHint') : null,
+      onclick: () => {
+        void confirmDialog(t('account.deletePasskeyConfirm'), { title: t('account.deletePasskeyTitle'), confirmLabel: t('account.delete'), danger: true }).then((yes) => {
+          if (!yes) return;
+          void runBusy(del, async () => { await acct.deletePasskey(p.id); toast(t('account.passkeyDeleted'), { kind: 'info' }); await reload(); });
+        });
+      },
+    }, t('account.delete'));
+    return h('li', { class: 'acct-pk' },
+      h('div', { class: 'acct-pk-info' },
+        h('div', { class: 'acct-pk-name' }, h('span', null, label), p.backedUp ? h('span', { class: 'badge good' }, t('account.synced')) : null),
+        h('div', { class: 'small muted' }, t('account.created', { date: acctDate(p.createdAt) }),
+          p.lastUsedAt ? ` · ${t('account.lastUsed', { date: acctDate(p.lastUsedAt) })}` : null),
+        last ? h('div', { class: 'small muted' }, t('account.lastPasskeyHint')) : null),
+      h('div', { class: 'acct-pk-actions' },
+        h('button', { type: 'button', class: 'btn', 'aria-label': `${t('account.renameAria')}: ${label}`, onclick: () => { editingId = p.id; draw(); } }, t('account.rename')),
+        del));
+  }
+
+  function draw(): void {
+    body.replaceChildren();
+    const nameRow = editingName
+      ? inlineEdit(username, t('account.nameLabel'),
+        (v) => (v.length < NAME_MIN || v.length > NAME_MAX ? t('account.nameInvalid') : null),
+        async (v) => { await acct.renameUser(v); toast(t('account.renamed'), { kind: 'success' }); return true; },
+        () => { editingName = false; draw(); })
+      : h('div', { class: 'acct-name' },
+        h('div', null, h('div', { class: 'small muted' }, t('account.signedInAs')), h('strong', null, username)),
+        h('button', { type: 'button', class: 'btn', onclick: () => { editingName = true; draw(); } }, t('account.change')));
+    const list = passkeys
+      ? h('ul', { class: 'acct-pks' }, passkeys.map((p) => passkeyItem(p, passkeys !== null && passkeys.length <= 1)))
+      : h('p', { class: 'small muted' }, t('account.loading'));
+    const add: HTMLButtonElement = h('button', { type: 'button', class: 'btn', onclick: () => {
+      void runBusy(add, async () => { await acct.addPasskey(); toast(t('account.passkeyAdded'), { kind: 'success' }); await reload(); });
+    } }, t('account.addPasskey'));
+    const out: HTMLButtonElement = h('button', { type: 'button', class: 'btn', onclick: () => {
+      void runBusy(out, async () => { await acct.logout(); toast(t('account.loggedOut'), { kind: 'info' }); });
+    } }, t('account.logout'));
+    const del: HTMLButtonElement = h('button', { type: 'button', class: 'btn danger', onclick: () => {
+      void confirmDialog(t('account.deleteAccountConfirm'), { title: t('account.deleteAccountTitle'), confirmLabel: t('account.deleteAccount'), danger: true }).then((yes) => {
+        if (!yes) return;
+        void runBusy(del, async () => { await acct.deleteAccount(); toast(t('account.accountDeleted'), { kind: 'info' }); });
+      });
+    } }, t('account.deleteAccount'));
+    appendChildren(body, [nameRow, h('h3', { class: 'acct-sub' }, t('account.passkeys')), list,
+      h('p', { class: 'small muted' }, t('account.addPasskeyHint')),
+      h('div', { class: 'btn-row' }, add, out), h('div', { class: 'btn-row' }, del)]);
+  }
+  draw();
+  void reload();
+}
+
+/** Konto-Karte: rendert nach Zustand neu; blendet sich aus, wenn das Feature deaktiviert ist. */
+function accountCard(): HTMLElement {
+  const box = h('section', { class: 'settings-section acct' });
+  let lastKey = '';
+  const render = (): void => {
+    const st = acct.getAccountState();
+    const key = st.status === 'signed-in' ? `in:${st.user.id}:${st.user.username}` : st.status;
+    if (key === lastKey) return;
+    lastKey = key;
+    box.replaceChildren();
+    box.hidden = st.status === 'disabled';
+    if (st.status === 'disabled') return;
+    box.append(h('h2', { class: 'section-title' }, t('account.title')));
+    if (st.status === 'loading') box.append(h('p', { class: 'small muted' }, t('account.loading')));
+    else if (st.status === 'signed-out') accountSignedOut(box);
+    else accountSignedIn(box, st.user.username);
+  };
+  render();
+  addCleanup(acct.onAccountChange(render));
+  return box;
+}
+
 // ---------- Tab: Daten & Account ----------
 function dataTab(): HTMLElement[] {
   const attempts = getAttempts().length;
@@ -249,11 +423,10 @@ function dataTab(): HTMLElement[] {
         t('settings.importHint')),
       fileInput,
       row(t('settings.deleteAll'), resetBtn)),
+    accountCard(),
     section(t('settings.account'),
-      h('p', { class: 'small muted' }, t('settings.accountSoon')),
       row(t('settings.deviceId'), h('code', { class: 'id-chip', title: profile.deviceId }, short(profile.deviceId))),
-      row(t('settings.profileId'), h('code', { class: 'id-chip', title: profile.id }, short(profile.id))),
-      h('div', { class: 'btn-row' }, h('button', { type: 'button', class: 'btn', disabled: true }, t('settings.comingSoon')))),
+      row(t('settings.profileId'), h('code', { class: 'id-chip', title: profile.id }, short(profile.id)))),
   ];
 }
 

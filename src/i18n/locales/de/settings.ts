@@ -73,7 +73,7 @@ export const settings = {
   importJson: 'Import aus JSON',
   importHint: 'Ersetzt die aktuellen Daten (Export oder älterer Stand)',
   deleteAll: 'Alle Daten löschen',
-  account: 'Konto & Cloud-Sync',
+  account: 'Gerät',
   accountSoon: 'Bald verfügbar: Konto anlegen und Fortschritt auf allen Geräten synchronisieren.',
   deviceId: 'Geräte-ID',
   profileId: 'Profil-ID',
