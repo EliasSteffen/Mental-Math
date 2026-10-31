@@ -1,31 +1,10 @@
+// Methoden-Bausteine (Lösungsweg, Methode als ruhiger Block) für Training, Sheets und Lernen.
+// Optik in components.css (.method-*); Schritte und Erkenntnis kommen aus dem Kit.
 import type { Method, Task } from '../types.ts';
 import { solutionSteps } from '../core/solutions/index.ts';
 import { t } from '../i18n/index.ts';
 import { h } from './dom.ts';
-
-export type ScoreLevel = 'muted' | 'good' | 'warn' | 'bad';
-
-export function level(score: number | null | undefined): ScoreLevel {
-  if (score === null || score === undefined) return 'muted';
-  if (score >= 85) return 'good';
-  if (score >= 60) return 'warn';
-  return 'bad';
-}
-
-export function badge(score: number | null | undefined): HTMLSpanElement {
-  const lv = level(score);
-  return h('span', { class: `badge ${lv}` }, lv === 'muted' ? t('analyse.badgeNew') : String(score));
-}
-
-export function tile(value: string, label: string, lv?: string): HTMLDivElement {
-  return h('div', { class: `tile${lv ? ' ' + lv : ''}` },
-    h('div', { class: 'tile-value' }, value),
-    h('div', { class: 'tile-label' }, label));
-}
-
-export function pct(x: number | null | undefined): string {
-  return `${Math.round((x || 0) * 100)} %`;
-}
+import { button, insight, steps as kitSteps } from './kit.ts';
 
 export function safeSteps(task: Pick<Task, 'subtype' | 'params' | 'expected' | 'unit' | 'prompt'> | Task): string[] {
   try {
@@ -36,31 +15,39 @@ export function safeSteps(task: Pick<Task, 'subtype' | 'params' | 'expected' | '
   }
 }
 
+/** Nummerierte Schritte (.steps aus components.css) – Alias für kit.steps. */
 export function stepsList(steps: readonly string[]): HTMLOListElement {
-  return h('ol', { class: 'steps' }, steps.map((s) => h('li', null, s)));
+  return kitSteps(steps);
 }
 
-export function fold(
-  summaryText: string,
-  content: Node,
-  { open = false, cls = '' }: { open?: boolean; cls?: string } = {},
-): HTMLDetailsElement {
-  return h('details', { class: `fold${cls ? ' ' + cls : ''}`, open },
-    h('summary', null, summaryText),
-    h('div', { class: 'fold-body' }, content));
+/** Typische Fehler als ruhige Liste (kleine Punkte statt Aufzählungszeichen). */
+export function pitfallList(items: readonly string[]): HTMLUListElement {
+  return h('ul', { class: 'method-list' }, items.map((p) => h('li', null, p)));
 }
 
+type MethodHeading = 'h2' | 'h3' | 'h4';
+
+function methodPart(tag: MethodHeading, title: string, ...content: Node[]): HTMLElement {
+  return h('section', { class: 'method-part' }, h(tag, { class: 'method-title' }, title), ...content);
+}
+
+/**
+ * Methode als ruhiger Block (Training-Intro, Methoden-Sheet, Lernen): Idee, Vorgehen (Schritte), Trick (Erkenntnis
+ * mit Kontur – passt auf Karte, Sheet und Fold), optional typische Fehler und ein Link in den Lernbereich.
+ * Der Link öffnet im selben Tab; deshalb übergibt ihn das Training nicht (sonst bräche die Runde ab, und
+ * `target=_blank` öffnete in der installierten PWA den Browser).
+ * `heading` = Überschriften-Ebene der Abschnitte (Standard h3, unter einem Sheet-/Seitentitel h2).
+ */
 export function methodBlock(
   m: Method,
-  { pitfalls = false, link = null }: { pitfalls?: boolean; link?: string | null } = {},
+  { pitfalls = false, link = null, heading = 'h3' }: { pitfalls?: boolean; link?: string | null; heading?: MethodHeading } = {},
 ): HTMLDivElement {
-  return h('div', { class: 'method' },
-    h('p', { class: 'method-idea' }, m.idea),
-    m.steps && m.steps.length ? stepsList(m.steps) : null,
-    m.trick ? h('div', { class: 'callout' }, h('span', { class: 'callout-label' }, t('lernen.trick')), m.trick) : null,
-    pitfalls && m.pitfalls && m.pitfalls.length
-      ? h('div', null, h('h4', { class: 'method-heading' }, t('lernen.pitfalls')),
-        h('ul', { class: 'bullets' }, m.pitfalls.map((p) => h('li', null, p))))
-      : null,
-    link ? h('a', { class: 'linkbtn', href: link, target: '_blank', rel: 'noopener' }, t('lernen.openInLearn')) : null);
+  const linkEl = link ? button({ label: t('lernen.openInLearn'), kind: 'link', icon: 'book', href: link }) : null;
+  linkEl?.classList.add('method-link');
+  return h('div', { class: 'method-block' },
+    m.idea ? methodPart(heading, t('lernen.idea'), h('p', { class: 'method-text' }, m.idea)) : null,
+    m.steps && m.steps.length ? methodPart(heading, t('lernen.approach'), stepsList(m.steps)) : null,
+    m.trick ? insight({ icon: 'bulb', tone: 'accent', title: t('lernen.trick'), text: m.trick, outline: true }) : null,
+    pitfalls && m.pitfalls && m.pitfalls.length ? methodPart(heading, t('lernen.pitfalls'), pitfallList(m.pitfalls)) : null,
+    linkEl);
 }

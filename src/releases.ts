@@ -5,6 +5,17 @@ const DATE = '2026-10-30';
 
 export const RELEASES: Release[] = [
   {
+    version: '1.11.0', date: '2026-10-31',
+    title: { de: 'Ruhiger Fokus', en: 'Calm focus' },
+    highlights: [
+      { de: 'Neue, ruhige Oberfläche mit vier Tabs: Heute, Lernen, Fortschritt und Profil.', en: 'A new, calm interface with four tabs: Today, Learn, Progress and Profile.' },
+      { de: 'Themes Papier, Nacht, OLED, Aurora und Neon.', en: 'Themes Paper, Night, OLED, Aurora and Neon.' },
+      { de: 'Fokus-Training: Tastenfeld unten im Daumenbereich, Rückmeldung mit Lösungsweg im Feedback-Sheet – ohne Fehlerton.', en: 'Focus training: number pad at the bottom within thumb reach, feedback with the solution in a sheet – no error sound.' },
+      { de: 'Zeitanzeige wählbar (Ruhig, Präzise, Aus) und auf Wunsch eine Atempause vor der Runde.', en: 'Choose the time display (Calm, Precise, Off) and, if you like, a breathing pause before the round.' },
+      { de: 'Profil als eine Seite: Einstellungen wirken sofort, die Seite springt nicht mehr nach oben.', en: 'Profile on a single page: settings apply instantly and the page no longer jumps to the top.' },
+    ],
+  },
+  {
     version: '1.10.0', date: '2026-10-31',
     title: { de: 'Offline & Cloud-Sync', en: 'Offline & cloud sync' },
     highlights: [

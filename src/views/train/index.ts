@@ -1,6 +1,9 @@
-import type { Attempt, CustomRange, Evaluation, Level, Mode, Task } from '../../types.ts';
-import { unitFactor, parseAnswer } from '../../core/numbers.ts';
-import { SUBTYPES, LEVEL_NAMES } from '../../core/catalog.ts';
+// Training im Fokus-Modus (Ruhiger Fokus): Kopf mit ✕, Segmenten und Zeitlinie, Bühne mit der Aufgabe,
+// Dock mit Tastenfeld bzw. Auswahl; nach der Antwort ersetzt das Feedback-Sheet das Dock.
+// Der fachliche Ablauf (Modi, Schätzen, Auto-Submit, Auto-Fail, Ghost, Bewertung, Wiederholung) ist unverändert.
+import type { Attempt, CustomRange, Evaluation, Level, Mode, Task, TimerDisplay } from '../../types.ts';
+import { fmt, parseAnswer, unitFactor } from '../../core/numbers.ts';
+import { CATEGORIES, SUBTYPES, LEVEL_NAMES } from '../../core/catalog.ts';
 import { generate, generateForMode } from '../../core/generators/index.ts';
 import { evaluate, weaknesses, levelFor } from '../../core/scoring.ts';
 import { getMethod } from '../../core/methods.ts';
@@ -9,13 +12,19 @@ import { getAttempts, getSessions, getSettings, addAttempt, getReviews, setRevie
 import { dailyTasks } from '../../core/daily.ts';
 import { dayKey, personalBest, ghostProgress } from '../../core/progress.ts';
 import { recordResult, dueReviews } from '../../core/review.ts';
-import { feedbackFx } from '../../ui/fx.ts';
-import { app, h, appendChildren } from '../../ui/dom.ts';
-import { methodBlock, safeSteps, stepsList } from '../../ui/widgets.ts';
+import { answerFx } from '../../ui/fx.ts';
+import { app, h } from '../../ui/dom.ts';
+import { button, card, focusHead, group, largeTitle, segments, steps } from '../../ui/kit.ts';
+import { dock, tapGuard } from '../../ui/dock.ts';
+import { isSheetOpen } from '../../ui/sheet.ts';
+import { isModalOpen } from '../../ui/modal.ts';
+import { methodBlock, safeSteps } from '../../ui/widgets.ts';
 import { setCleanup } from '../../router.ts';
 import { createTimer, type TaskTimer } from './timer.ts';
 import { createAnswer } from './answer.ts';
-import { createHelp, buildFeedback } from './feedback.ts';
+import { buildFeedback, choiceOutcome, createHelp } from './feedback.ts';
+import { diagnose } from './diagnosis.ts';
+import { showBreathe } from './breathe.ts';
 import { showResult } from './result.ts';
 import { t } from '../../i18n/index.ts';
 
@@ -24,6 +33,7 @@ export interface TrainResult { task: Task; given: number | null; ev: Evaluation;
 /** Gemeinsamer Zustand einer Trainingsrunde (von index/result genutzt). */
 export interface TrainCtx {
   mode: string;
+  /** #app (Fokus-Layout: Kopf, Bühne, Dock als direkte Kinder) */
   root: HTMLElement;
   results: TrainResult[];
   points: number;
@@ -44,6 +54,9 @@ export interface TrainOptions {
   custom?: CustomRange | null;
 }
 
+/** Ab dieser Länge steht die Aufgabe als Text (20 px, max. 30ch) statt als große Zahl. */
+const LONG_PROMPT = 22;
+
 function loadRetryTasks(): Task[] | null {
   try {
     const raw = sessionStorage.getItem('mm.retry');
@@ -55,9 +68,24 @@ function loadRetryTasks(): Task[] | null {
   }
 }
 
+/** Ist die Seite höher als der Bildschirm, ans Ende scrollen: Antwortfeld bzw. Korrektur stehen dann direkt über Dock/Sheet. */
+function revealBottom(): void {
+  requestAnimationFrame(() => {
+    const doc = document.documentElement;
+    if (doc.scrollHeight > window.innerHeight + 1) window.scrollTo(0, doc.scrollHeight);
+  });
+}
+
+/** Tastatur-Shortcuts gelten nicht, solange ein Sheet oder Modal offen ist oder eine Modifikatortaste gedrückt ist. */
+function shortcutBlocked(e: KeyboardEvent): boolean {
+  return e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey || isSheetOpen() || isModalOpen();
+}
+
 export function renderTrain(modeIn: Mode, { n: nOverride = null, intro = false, estimate = false, custom = null }: TrainOptions = {}): void {
   const settings = getSettings();
   const timed = settings.timer !== false;
+  const display: TimerDisplay = settings.timerDisplay ?? 'calm';
+  const precise = display === 'precise';
   let mode: Mode = modeIn;
   let notice: string | null = null;
   const today = dayKey(Date.now());
@@ -75,7 +103,8 @@ export function renderTrain(modeIn: Mode, { n: nOverride = null, intro = false, 
   const fixedMode = mode === 'daily' || mode === 'retry' || mode === 'custom';
   const sessionLength = fixedTasks ? fixedTasks.length : mode === 'daily' ? 15 : nOverride || settings.sessionLength || 10;
   const est = (estimate || settings.estimateMode === true) && !fixedMode;
-  const best = settings.ghost && !fixedMode ? personalBest(getSessions(), mode) : null;
+  // Ghost (Bestzeit) nur bei präziser Zeitanzeige (E13)
+  const best = settings.ghost && precise && !fixedMode ? personalBest(getSessions(), mode) : null;
 
   let weakSubtypes: string[] = [];
   let genMode = mode;
@@ -98,22 +127,18 @@ export function renderTrain(modeIn: Mode, { n: nOverride = null, intro = false, 
 
   let timer: TaskTimer | null = null;
   let onKey: ((e: KeyboardEvent) => void) | null = null;
-  let ghostTimer: ReturnType<typeof setInterval> | null = null;
-  let ghostEl: HTMLElement | null = null;
   let autoFailTimer: ReturnType<typeof setInterval> | null = null;
+  let breatheStop: (() => void) | null = null;
 
   const stop = (): void => {
     if (timer) { timer.stop(); timer = null; }
     if (autoFailTimer !== null) { clearInterval(autoFailTimer); autoFailTimer = null; }
-    if (ghostTimer !== null) { clearInterval(ghostTimer); ghostTimer = null; }
     if (onKey) { document.removeEventListener('keydown', onKey); onKey = null; }
-    document.body.classList.remove('has-keypad', 'kp-scroll');
+    if (breatheStop) { breatheStop(); breatheStop = null; }
   };
   setCleanup(stop);
 
-  const root = h('div', { class: 'train play' });
-  app.append(root);
-
+  const root = app;
   const ctx: TrainCtx = {
     mode, root, results: [], points: 0, index: 0,
     sessionId: `s${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`,
@@ -124,35 +149,33 @@ export function renderTrain(modeIn: Mode, { n: nOverride = null, intro = false, 
   };
 
   const setKeyHandler = (fn: (e: KeyboardEvent) => void): void => {
+    if (onKey) document.removeEventListener('keydown', onKey);
     onKey = fn;
     document.addEventListener('keydown', fn);
   };
 
-  // Kopf: Zurück + Level/Punkte, darunter Fortschritts- und Zeitbalken mit Beschriftung rechts
-  function header(levelName: string, timerRow: HTMLElement | null): HTMLElement[] {
-    ghostEl = null;
-    if (best) {
-      ghostEl = h('span', { class: 'ghost-marker', 'aria-hidden': 'true', title: t('train.personalBest') }, h('span', { class: 'ghost-label' }, t('train.bestLabel')));
-      const g = ghostEl;
-      const tick = (): void => g.style.setProperty('--ghost', String(Math.max(0, Math.min(100, (ghostProgress(best, Date.now() - ctx.startedAt, sessionLength) ?? 0) * 100))));
-      tick();
-      ghostTimer = setInterval(tick, 200);
+  // Kopf: bleibt über alle Aufgaben stehen (Segmente animieren weich); nur die Zeitlinie wird je Aufgabe neu gesetzt
+  const seg = segments({ total: sessionLength, done: 0, current: true });
+  const ghost = best ? h('span', { class: 'train-ghost', 'aria-hidden': 'true', title: t('train.personalBest') }) : null;
+  const timeText = precise ? h('span', { class: 'train-time num', 'aria-hidden': 'true' }) : null;
+  const head = focusHead({
+    closeLabel: t('train.exit'), href: '#/',
+    children: [h('div', { class: 'train-progress' }, seg.el, ghost), timeText],
+  });
+  let line: HTMLElement | null = null;
+  const setLine = (el: HTMLElement | null): void => {
+    line?.remove();
+    line = el;
+    if (el) head.append(el);
+  };
+  // Ghost läuft ab der ersten Aufgabe – nicht schon während Atempause oder Methoden-Intro (startedAt bleibt der Sessionstart)
+  let ghostStart: number | null = null;
+  const ghostTick = ghost && best
+    ? (): void => {
+      const p = ghostProgress(best, Date.now() - (ghostStart ?? Date.now()), sessionLength) ?? 0;
+      ghost.style.setProperty('--w', String(Math.round(p * 1000) / 10));
     }
-    const fill = h('span');
-    fill.style.setProperty('--w', String((ctx.index / sessionLength) * 100));
-    return [
-      h('div', { class: 'play-head' },
-        h('div', { class: 'train-head' },
-          h('a', { class: 'back-link', href: '#/' }, t('train.backMode', { mode: modeName(mode) })),
-          h('span', { class: 'muted' }, `${levelName ? `${levelName} · ` : ''}${t('common.pointsValue', { n: ctx.points })}`)),
-        h('div', { class: 'bar-row' },
-          h('div', { class: 'progress-wrap' },
-            h('div', { class: 'progress', role: 'progressbar', 'aria-valuemin': '0', 'aria-valuemax': String(sessionLength), 'aria-valuenow': String(ctx.index) }, fill),
-            ghostEl),
-          h('span', { class: 'bar-label' }, `${ctx.index + 1}/${sessionLength}`)),
-        timerRow),
-    ];
-  }
+    : undefined;
 
   function next(): void {
     ctx.index += 1;
@@ -173,15 +196,19 @@ export function renderTrain(modeIn: Mode, { n: nOverride = null, intro = false, 
       });
     const taskEst = est && task.kind !== 'choice';
     const sub = SUBTYPES[task.subtype];
+    const cat = CATEGORIES.find((c) => c.id === task.category);
     const method = getMethod(task.subtype);
     const t0 = performance.now();
     let answered = false;
-    const question = h('div', { class: `question${task.prompt.length > 22 ? ' long' : ''}` }, task.prompt);
-    const actions = h('div', { class: 'actions', 'aria-live': 'polite' });
+    let advanced = false;
+    const advance = (): void => {
+      if (advanced) return;
+      advanced = true;
+      next();
+    };
 
     const answer = createAnswer(task, {
       keypadSetting: settings.keypad || 'auto',
-      haptics: settings.haptics !== false,
       numpadLayout: settings.numpadLayout === 'phone' ? 'phone' : 'calculator',
       autoCheck: settings.autoSubmit && task.kind !== 'choice'
         ? (v: number): boolean => evaluate(task, v, Math.round(performance.now() - t0), { assisted: help.isAssisted(), untimed: !timed, estimate: taskEst }).correct
@@ -189,12 +216,27 @@ export function renderTrain(modeIn: Mode, { n: nOverride = null, intro = false, 
       onFinish: (given) => finish(given),
     });
     const { isChoice, input } = answer;
-    const help = createHelp(method, { isAnswered: () => answered, focusInput: isChoice ? null : () => input.focus() });
-    actions.append(...answer.actionNodes);
+    const help = createHelp(sub?.tip || method?.idea || '', {
+      isAnswered: () => answered,
+      onToggle: (open) => {
+        if (open) revealBottom();
+        if (!isChoice) answer.focus();
+      },
+    });
 
-    const localTimer = timed ? createTimer(task, t0) : null;
+    // Dock: Zahlenaufgabe = Hilfe/Weiß-nicht über dem Tastenfeld; Auswahl = Raster, darunter Hilfe/Weiß-nicht
+    const skip = button({ label: t('common.dontKnow'), kind: 'quiet', onClick: () => finish(null) });
+    const dockRow = h('div', { class: 'train-dock-row' }, help.btn, skip);
+    const dockEl = isChoice ? dock(answer.dockEl, dockRow) : dock(dockRow, answer.dockEl);
+    // Zweiter Tipp eines Doppeltipps auf „Weiter“ bzw. „Los geht's“ landet sonst schon im Tastenfeld/Auswahl-Raster
+    const armDock = tapGuard(dockEl);
+
+    ghostStart ??= Date.now();
+    seg.set(ctx.index, true);
+    const localTimer = createTimer({ targetMs: task.targetMs, t0, display, text: timeText, onTick: ghostTick });
+    setLine(localTimer.line);
     timer = localTimer;
-    if (localTimer) localTimer.start();
+    localTimer.start();
 
     // Auto-Fail: bei Ablauf der Zielzeit die aktuelle Eingabe abgeben (finish ist idempotent)
     if (settings.autoFail === true && timed) {
@@ -205,15 +247,27 @@ export function renderTrain(modeIn: Mode, { n: nOverride = null, intro = false, 
       }, 100);
     }
 
+    const hint = task.hint || (!isChoice && unitFactor(task.unit) > 1 ? t('train.unitHint', { unit: task.unit }) : '');
+    const long = task.prompt.length > LONG_PROMPT;
+    // Steht schon vor der Antwort im DOM, damit Screenreader die Diagnose zuverlässig ansagen
+    const live = h('p', { class: 'sr-only', 'aria-live': 'polite' });
+    const stage = h('div', { class: 'stage train-stage' },
+      notice && ctx.index === 0 ? h('p', { class: 'train-notice' }, notice) : null,
+      h('p', { class: 'train-cat' }, `${cat ? cat.name : task.category} · ${sub ? sub.name : task.subtype}`),
+      precise ? h('p', { class: 'train-meta num' }, `${LEVEL_NAMES[task.level] ?? LEVEL_NAMES[2]} · ${t('common.pointsValue', { n: ctx.points })}`) : null,
+      h('h1', { class: long ? 'train-q is-long' : 'train-q num' }, task.prompt),
+      taskEst ? h('p', { class: 'train-pill' }, t('train.estimateHint')) : null,
+      hint ? h('p', { class: 'train-hint' }, hint) : null,
+      help.box,
+      answer.stageEl,
+      live);
+
     function finish(given: number | null, timedOut = false): void {
       if (answered) return;
       answered = true;
       const timeMs = Math.round(performance.now() - t0);
       stop();
-      if (localTimer) localTimer.freeze(timeMs);
-      answer.lock(given);
-      help.wrap.remove();
-      answer.removeKeypad();
+      localTimer.freeze(timeMs);
       const assisted = help.isAssisted();
       const ev = evaluate(task, given, timeMs, { assisted, untimed: !timed, estimate: taskEst });
       ctx.points += ev.points;
@@ -231,77 +285,98 @@ export function renderTrain(modeIn: Mode, { n: nOverride = null, intro = false, 
       setReviews(recordResult(getReviews(), {
         subtype: task.subtype, correct: ev.correct, ts: Date.now(), isReview: mode === 'review',
       }));
-      feedbackFx(ev.correct);
-      question.classList.add(ev.correct ? 'anim-pop' : 'anim-shake');
-      const fb = buildFeedback({
-        task, ev, timeMs, given, assisted, method,
-        isLast: ctx.index + 1 >= sessionLength, onNext: next, timedOut,
-      });
-      actions.replaceChildren(...fb.nodes);
-      fb.nextBtn.focus();
+      answerFx(ev.correct);
+      seg.set(ctx.index + 1, false);
+      help.box.remove();
+
+      const why = isChoice ? (safeSteps(task)[0] ?? task.hint) : '';
+      const diagnosis = diagnose({ task, given, ev, timeMs, timedOut, showPoints: precise, why });
+      answer.lock(given, diagnosis.kind, { value: isChoice ? '' : fmt(task.expected), unit: task.unit });
+      live.textContent = [diagnosis.title, diagnosis.detail].filter(Boolean).join('. ');
+      const isLast = ctx.index + 1 >= sessionLength;
+      let nextBtn: HTMLElement;
+      if (isChoice) {
+        // Auswahl: Ergebnis in der Bühne, „Weiter“ ersetzt Hilfe/Weiß-nicht im Dock
+        stage.append(choiceOutcome(diagnosis, assisted));
+        nextBtn = button({ label: isLast ? t('train.toResult') : t('train.next'), kind: 'primary', full: true, onClick: advance });
+        nextBtn.classList.add('rise');
+        dockRow.replaceWith(nextBtn);
+        armDock();
+      } else {
+        const fb = buildFeedback({ task, given, diagnosis, assisted, method, isLast, onNext: advance });
+        dockEl.replaceWith(fb.el);
+        // Doppeltipp auf „Prüfen“ (oder Tippen beim Auto-Fail) überspringt sonst das Feedback; Enter gilt sofort
+        tapGuard(fb.el);
+        nextBtn = fb.nextBtn;
+      }
+      revealBottom();
+      nextBtn.focus({ preventScroll: true });
     }
 
     setKeyHandler((e) => {
-      if (isChoice && task.kind === 'choice' && !answered && /^[1-4]$/.test(e.key) && Number(e.key) <= task.choices.length) {
+      if (shortcutBlocked(e)) return;
+      if (task.kind === 'choice' && !answered && /^[1-4]$/.test(e.key) && Number(e.key) <= task.choices.length) {
         e.preventDefault();
         finish(Number(e.key) - 1);
       } else if (e.key === 'Enter') {
         const el = e.target;
-        if (el instanceof Element && (el.closest('button, a, summary, .ai-box'))) return;
+        if (el instanceof Element && el.closest('button, a, summary, .ai-answer')) return;
         e.preventDefault();
-        if (answered) next();
-        else if (!isChoice) answer.check.click();
+        if (answered) advance();
+        else answer.submit();
       } else if (e.key === 'Escape' && !answered) {
         e.preventDefault();
         finish(null);
       }
     });
 
-    root.replaceChildren();
-    appendChildren(root, [
-      ...header(LEVEL_NAMES[task.level] || LEVEL_NAMES[2], localTimer ? h('div', { class: 'bar-row' }, localTimer.bar, localTimer.label) : null),
-      notice ? h('p', { class: 'notice' }, notice) : null,
-      h('div', { class: 'task' },
-        // Typ nur zeigen, wenn er nicht schon in der Kopfzeile steht (gemischte Runden)
-        SUBTYPES[mode] ? null : h('div', { class: 'task-type' }, sub ? sub.name : task.subtype),
-        question,
-        taskEst ? h('div', { class: 'est-hint' }, t('train.estimateHint')) : null,
-        h('div', { class: 'hint' }, task.hint || (!isChoice && unitFactor(task.unit) > 1 ? t('train.unitHint', { unit: task.unit }) : '')),
-        answer.answerRow,
-        help.wrap,
-        answer.choicesEl,
-        actions)]);
-    answer.mountKeypad(root, help.btn);
-    if (!isChoice) input.focus();
+    root.replaceChildren(head, stage, dockEl);
+    if (!isChoice) answer.focus();
+    revealBottom();
   }
 
   function showIntro(): void {
     const subId = SUBTYPES[mode] ? mode : null;
     const method = subId ? getMethod(subId) : null;
     if (!subId || !method) { showTask(); return; }
+    const sub = SUBTYPES[subId];
+    const cat = sub ? CATEGORIES.find((c) => c.id === sub.category) : undefined;
     const ex = generate(subId, Math.random, { level: levelFor(subId, getAttempts(), settings.difficulty) });
-    const steps = safeSteps(ex);
-    const start = h('button', { type: 'button', class: 'btn primary', onclick: () => showTask() }, t('common.letsGo'));
+    const exSteps = safeSteps(ex);
+    const start = button({ label: t('common.letsGo'), kind: 'primary', full: true, onClick: () => showTask() });
     setKeyHandler((e) => {
-      if (e.key !== 'Enter') return;
+      if (e.key !== 'Enter' || shortcutBlocked(e)) return;
       const el = e.target;
       if (el instanceof Element && el.closest('button, a, summary')) return;
       e.preventDefault();
       start.click();
     });
+    // Tippen auf die Atempause überspringt sie – ein Doppeltipp träfe sonst gleich „Los geht's“
+    const introDock = dock(start);
+    tapGuard(introDock);
     root.replaceChildren(
-      h('div', { class: 'train-head' }, h('a', { class: 'back-link', href: '#/' }, t('train.backMode', { mode: modeName(mode) }))),
-      h('div', { class: 'intro-card' },
-        h('h1', { class: 'page-title' }, SUBTYPES[subId]?.name),
+      focusHead({ closeLabel: t('train.exit'), href: '#/' }),
+      h('div', { class: 'stage is-start train-intro' },
+        largeTitle(sub ? sub.name : subId, cat?.name),
         methodBlock(method),
-        steps.length
-          ? h('div', null, h('h3', { class: 'fb-heading' }, t('train.example', { prompt: ex.prompt })), stepsList(steps))
-          : null,
-        start));
-    start.focus();
+        exSteps.length ? group(t('train.example', { prompt: ex.prompt }), card([steps(exSteps)])) : null),
+      introDock);
+    start.focus({ preventScroll: true });
   }
 
-  if (intro) showIntro();
-  else showTask();
-}
+  const begin = (): void => { if (intro) showIntro(); else showTask(); };
 
+  // Atempause (E19): nicht bei Daily, Wiederholung der Fehler und kurzen Review-Runden
+  const breathe = settings.breathe === true && mode !== 'daily' && mode !== 'retry' && !(mode === 'review' && sessionLength < 3);
+  if (breathe) {
+    const withIntro = intro && Boolean(SUBTYPES[mode] && getMethod(mode));
+    const tasks = sessionLength === 1 ? t('train.tasksOne') : t('train.tasksMany', { n: sessionLength });
+    breatheStop = showBreathe({
+      root,
+      after: t('train.breatheAfter', { mode: modeName(mode), what: withIntro ? t('train.breatheIntro', { n: sessionLength }) : tasks }),
+      onDone: () => { breatheStop = null; begin(); },
+    });
+  } else {
+    begin();
+  }
+}

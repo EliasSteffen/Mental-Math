@@ -1,116 +1,124 @@
-import { SUBTYPES, activeCategories } from '../core/catalog.ts';
-import { categoryStats, overall } from '../core/scoring.ts';
-import { getAttempts, getReviews, getActivity, getSettings, getDailyResults } from '../data/storage.ts';
-import { streakInfo, xpInfo, recommendation, dayKey } from '../core/progress.ts';
-import { fmt } from '../core/numbers.ts';
+// Tab „Heute“ (Ruhiger Fokus): Begrüßung, Empfehlung als Hero, Status Line, andere Übungen, Kategorie-Chips, CTA.
+// Alle Daten liegen synchron vor – kein Skeleton (E22). Texte, Zahlen und Ziele aus home-data.ts.
+import { CATEGORIES, SUBTYPES, activeCategories } from '../core/catalog.ts';
+import { categoryStats } from '../core/scoring.ts';
 import { dueReviews } from '../core/review.ts';
-import { icon, ring, progressBar } from '../ui/charts.ts';
-import { app, h, appendChildren } from '../ui/dom.ts';
-import { skeleton, deferRender } from '../ui/skeleton.ts';
-import { t } from '../i18n/index.ts';
+import { dayKey, recommendation, streakInfo } from '../core/progress.ts';
+import { fmtSeconds } from '../core/numbers.ts';
+import { getActivity, getAttempts, getDailyResults, getReviews, getSettings } from '../data/storage.ts';
+import { app, appendChildren, h } from '../ui/dom.ts';
+import { card, chip, chips, group, largeTitle, list, masteryOf, row, statusLine } from '../ui/kit.ts';
+import { setPrimaryAction } from '../ui/shell.ts';
+import { openSheet, type SheetHandle } from '../ui/sheet.ts';
+import { addCleanup } from '../router.ts';
+import { locale, t } from '../i18n/index.ts';
+import type { Recommendation } from '../types.ts';
+import { dateLine, daypart, heroPlan, timeGap, type HeroPlan, type TimeGap } from './home-data.ts';
+
+const GREETING = { morning: 'home.greetMorning', day: 'home.greetDay', evening: 'home.greetEvening' } as const;
+
+/** „Ziel {n}“ → Text mit hervorgehobener Zahl (wie die Status Line). */
+function labelled(template: string, value: string): HTMLSpanElement {
+  const [before = '', after = ''] = template.split('{n}');
+  return h('span', null, before, h('span', { class: 'num today-strong' }, value), after);
+}
+
+/** Balken Ziel vs. Dein Schnitt: ganze Breite = dein Median, Füllung und Marke = Zielzeit (E9). */
+function timeBar(gap: TimeGap): HTMLElement {
+  const bar = h('div', { class: 'today-bar', 'aria-hidden': 'true' },
+    h('span', { class: 'today-bar-lost' }),
+    h('span', { class: 'today-bar-fill' }),
+    h('span', { class: 'today-bar-mark' }));
+  bar.style.setProperty('--w', String(Math.round((gap.targetMs / gap.medianMs) * 1000) / 10));
+  return h('div', { class: 'today-insight' },
+    h('p', { class: 'today-insight-text' }, t('home.slowest')),
+    bar,
+    h('p', { class: 'today-legend' },
+      labelled(t('home.timeTarget'), fmtSeconds(gap.targetMs)),
+      labelled(t('home.timeYours'), fmtSeconds(gap.medianMs))));
+}
+
+/**
+ * Hero „Empfohlen für heute“: Titel („Kategorie · Subtyp“), Ablauf und darunter der Zeit-Balken (E9) oder der Grund
+ * als ruhiger Text. Beim Erststart (noch keine Versuche) begrüßt die Karte statt „Noch nie geübt“.
+ */
+function hero(rec: Recommendation, plan: HeroPlan, gap: TimeGap | null, fresh: boolean): HTMLElement {
+  const sub = rec.subtype ? SUBTYPES[rec.subtype] : undefined;
+  const catName = sub ? CATEGORIES.find((c) => c.id === sub.category)?.name : undefined;
+  const title = sub && catName ? `${catName} · ${rec.title}` : rec.title;
+  const planText = plan.kind === 'method' ? t('home.planMethod')
+    : plan.kind === 'review' ? t('home.planReview')
+    : t('home.planRound', { n: plan.tasks });
+  const reason = fresh && rec.kind === 'new' ? t('home.firstReason') : rec.reason;
+  return card([
+    h('div', { class: 'today-hero-head' },
+      h('p', { class: 'today-hero-label' }, t('home.recLabel')),
+      h('h2', { class: 'today-hero-title' }, title),
+      h('p', { class: 'today-hero-sub' }, planText)),
+    gap ? timeBar(gap) : h('div', { class: 'today-insight' }, h('p', { class: 'today-insight-text is-quiet' }, reason)),
+  ], { hero: true });
+}
 
 export function renderHome(): void {
   const now = Date.now();
   const attempts = getAttempts();
   const reviews = getReviews();
   const settings = getSettings();
-  const goalMs = (settings.dailyGoalMin || 15) * 60000;
-  const st = streakInfo(getActivity(), goalMs, now);
-  const xp = xpInfo(attempts);
-  const rec = recommendation(attempts, reviews, now, { enabledCategories: settings.enabledCategories });
-  const due = dueReviews(reviews, now);
-  const stats = categoryStats(attempts);
-  const counts: Record<string, number> = {};
-  for (const a of attempts) counts[a.category] = (counts[a.category] || 0) + 1;
-  const fresh = attempts.length === 0;
-
-  const streakTile = h('div', { class: `tile tile-streak${st.current >= 1 || st.todayDone ? ' is-hot' : ''}` },
-    icon('flame', { size: 28 }),
-    h('div', { class: 'big-num' }, String(st.current)),
-    h('div', { class: 'label' }, st.current === 1 ? t('home.streakDay') : t('home.streakDays')),
-    h('div', { class: 'sub' }, t('home.record', { n: st.best })));
-
-  const scoreTile = h('div', { class: 'tile tile-score' },
-    h('span', { class: 'level-badge' }, t('common.levelN', { n: xp.level })),
-    h('div', { class: 'big-num' }, String(xp.xp)),
-    h('div', { class: 'label' }, t('home.xp')),
-    progressBar(xp.needed ? (xp.into / xp.needed) * 100 : 0),
-    h('div', { class: 'sub' }, t('home.xpToNext', { into: xp.into, needed: xp.needed, next: xp.level + 1 })));
-
-  const todayMin = Math.floor(st.todayMs / 60000);
   const goalMin = settings.dailyGoalMin || 15;
-  const goalTile = h('div', { class: 'tile tile-goal span-2' },
-    ring(Math.min(1, st.todayMs / goalMs), { size: 'md', text: `${todayMin}` }),
-    h('div', null,
-      h('div', { class: 'label' }, t('home.dailyGoal')),
-      h('div', { class: 'big-num' }, t('home.goalProgress', { done: todayMin, goal: goalMin })),
-      h('div', { class: 'sub' }, st.todayDone ? t('home.goalDone') : t('home.goalLeft', { n: Math.max(1, goalMin - todayMin) }))));
-
-  let heroHref = '#/train/all';
-  let heroBtn = t('common.letsGo');
-  let heroTitle = t('home.heroTitleDefault');
-  let heroReason = t('home.heroReasonDefault');
-  if (!fresh || rec.kind !== 'new') {
-    heroTitle = rec.kind === 'review' ? t('home.heroTitleReview') : t('home.heroTitleRec', { title: rec.title });
-    heroReason = rec.reason;
-    if (rec.kind === 'review') {
-      heroHref = '#/train/review';
-      heroBtn = t(due.length === 1 ? 'home.reviewStartOne' : 'home.reviewStartOther', { n: due.length });
-    } else if (rec.subtype && SUBTYPES[rec.subtype]) {
-      heroHref = `#/train/${rec.subtype}?n=5&intro=1`;
-      heroBtn = t('home.methodAnd5');
-    } else {
-      heroHref = `#/train/${rec.mode}`;
-      heroBtn = t('home.startTraining');
-    }
-  } else if (rec.subtype) {
-    heroTitle = t('home.welcome', { title: rec.title });
-    heroReason = t('home.firstReason');
-    heroHref = `#/train/${rec.subtype}?n=5&intro=1`;
-    heroBtn = t('home.methodAnd5');
-  }
-  const heroTile = h('div', { class: 'tile tile-hero span-2' },
-    h('div', { class: 'label' }, t('home.recommendation')),
-    h('div', { class: 'card-title' }, heroTitle),
-    h('div', { class: 'sub' }, heroReason),
-    h('a', { class: 'btn primary', href: heroHref }, heroBtn));
-
-  const allTile = h('a', { class: 'tile span-2', href: '#/train/all' },
-    h('div', { class: 'label' }, t('home.quickStart')),
-    h('div', { class: 'card-title' }, t('home.allCategories')),
-    h('div', { class: 'sub' }, t('home.mixedCount', { n: attempts.length })));
-
+  const st = streakInfo(getActivity(), goalMin * 60000, now);
+  const rec = recommendation(attempts, reviews, now, { enabledCategories: settings.enabledCategories });
+  const plan = heroPlan(rec, {
+    sessionLength: settings.sessionLength || 10,
+    reviewSubtypes: dueReviews(reviews, now).map((r) => r.subtype),
+    enabledCategories: settings.enabledCategories,
+  });
+  const fresh = attempts.length === 0;
+  const gap = timeGap(attempts, rec.subtype);
+  const stats = categoryStats(attempts);
   const daily = getDailyResults()[dayKey(now)];
-  const dailyTile = h('a', { class: `tile tile-daily span-2${daily ? ' is-done' : ''}`, href: '#/train/daily' },
-    h('div', { class: 'label' }, t('home.dailyChallenge')),
-    h('div', { class: 'card-title' }, daily ? t('home.dailyDone') : t('home.dailyToday')),
-    daily
-      ? h('div', { class: 'daily-result' }, t('home.dailyResult', { correct: daily.correct, n: daily.n, points: fmt(daily.points) }))
-      : h('div', { class: 'sub' }, t('home.dailySame'))) ;
 
-  const quick = h('div', { class: 'quick-grid' },
-    h('a', { class: 'tile', href: '#/chain' }, h('div', { class: 'card-title' }, t('home.chainTitle')), h('div', { class: 'sub' }, t('home.chainSub'))),
-    h('a', { class: 'tile', href: '#/parallel' }, h('div', { class: 'card-title' }, t('home.parallelTitle')), h('div', { class: 'sub' }, t('home.parallelSub'))),
-    h('a', { class: 'tile', href: '#/train/all?est=1' }, h('div', { class: 'card-title' }, t('home.estimateTitle')), h('div', { class: 'sub' }, t('home.estimateSub'))),
-    h('a', { class: 'tile', href: '#/custom' }, h('div', { class: 'card-title' }, t('home.customTitle')), h('div', { class: 'sub' }, t('home.customSub'))));
+  // „Weitere Modi“ als Bottom Sheet (E7): Tippen auf eine Zeile schließt das Sheet, der Link navigiert danach
+  let sheet: SheetHandle | null = null;
+  const modeRow = (label: string, sub: string, href: string): HTMLElement =>
+    row({ label, sub, href, onClick: () => sheet?.close() });
+  const openModes = (): void => {
+    if (sheet) return;
+    sheet = openSheet({
+      title: t('home.moreModes'),
+      children: [list([
+        modeRow(t('home.chainTitle'), t('home.chainSub'), '#/chain'),
+        modeRow(t('home.parallelTitle'), t('home.parallelSub'), '#/parallel'),
+        modeRow(t('home.estimateTitle'), t('home.estimateSub'), '#/train/all?est=1'),
+        modeRow(t('home.customTitle'), t('home.customSub'), '#/custom'),
+      ])],
+      onClose: () => { sheet = null; },
+    });
+  };
+  addCleanup(() => sheet?.close());
 
-  const grid = h('div', { class: 'cat-grid' });
-  for (const c of activeCategories(settings.enabledCategories)) {
-    const sc = stats[c.id]?.score ?? null;
-    grid.append(h('a', { class: 'cat-card', href: `#/train/${c.id}` },
-      ring((sc || 0) / 100, { size: 'sm', text: sc === null ? '–' : String(sc) }),
-      h('div', { class: 'cat-name' }, c.name),
-      h('div', { class: 'cat-meta' }, t('home.tasksShort', { n: counts[c.id] || 0 }))));
-  }
+  const moreRow = row({
+    icon: 'link', label: t('home.moreModes'), sub: t('home.moreModesSub'), onClick: openModes, chevron: true,
+    attrs: { 'aria-haspopup': 'dialog' },
+  });
 
-  const overallScore = overall(attempts).score;
-  const bentoSk = skeleton('tiles', 4);
-  deferRender(bentoSk, () => h('div', { class: 'bento' }, heroTile, streakTile, scoreTile, goalTile, dailyTile, allTile));
+  // Ab 768 px umbrechen statt horizontal scrollen
+  const catChips = chips(activeCategories(settings.enabledCategories).map((c) =>
+    chip({ label: c.name, href: `#/train/${c.id}`, mastery: masteryOf(stats[c.id]?.score) })), { wrap: true });
+
   appendChildren(app, [
-    bentoSk,
-    quick,
-    h('h2', { class: 'section-title' }, t('home.categories')),
-    grid,
-    fresh ? null : h('p', { class: 'small muted' }, overallScore === null ? '' : t('home.overallSkill', { n: overallScore })),
+    largeTitle(t(GREETING[daypart(new Date(now).getHours())]), dateLine(now, locale())),
+    hero(rec, plan, gap, fresh),
+    statusLine({ todayMin: Math.floor(st.todayMs / 60000), goalMin, streak: st.current }),
+    group(t('home.otherTitle'), list([
+      row({
+        icon: 'calendar', label: t('home.dailyChallenge'), href: '#/train/daily',
+        value: daily ? `${daily.correct}/${daily.n}` : t('home.dailyOpen'), valueTone: daily ? 'muted' : 'accent',
+      }),
+      row({ icon: 'grid', label: t('home.allMixed'), href: '#/train/all' }),
+      moreRow,
+    ])),
+    group(t('home.categories'), catChips),
   ]);
+
+  setPrimaryAction({ label: t('home.ctaPractice'), meta: t('home.ctaMinutes', { n: plan.minutes }), href: plan.href });
 }

@@ -1,0 +1,43 @@
+/* View „Lernen“ (src/views/lernen.ts). Nur View-spezifische Regeln; Bausteine (Zeilen mit Meisterungs-Punkt,
+   Zurück-Link, Methoden-Block, KI) kommen aus components.css. */
+@layer views {
+  /* ---------- Liste: Gruppen mit „Skill N“, Zeilen mit Meisterungs-Punkt und Tipp in einer Zeile ---------- */
+  .learn-group .group-meta { font-family:var(--font-num); font-variant-numeric:tabular-nums; }
+  .learn-row .row-sub {
+    font-family:var(--font-num); font-variant-numeric:tabular-nums;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
+
+  .learn-empty {
+    margin:0; padding:var(--space-5) var(--space-4);
+    font-size:var(--text-sm); line-height:1.45; color:var(--muted); text-align:center; overflow-wrap:anywhere;
+  }
+  .learn-empty:empty { padding:0; }
+
+  /* ---------- Detail: Titel und dezente Statuszeile (der Zurück-Link steht davor) ---------- */
+  .learn-head { display:flex; flex-direction:column; gap:var(--space-2); min-width:0; }
+  /* Punkt bleibt neben der ersten Zeile, auch wenn der Text bei 320 px umbricht */
+  .learn-status {
+    display:flex; align-items:flex-start; gap:var(--space-2);
+    margin:0; font-size:var(--text-sm); line-height:1.4; color:var(--muted); font-variant-numeric:tabular-nums;
+  }
+  .learn-status > .mastery-mark { height:1.4em; }
+  .learn-status > :last-child { min-width:0; }
+
+  /* Beispielaufgabe in der Karte */
+  .learn-prompt {
+    margin:0; font-size:var(--text-lg); font-weight:var(--weight-semibold); line-height:1.3;
+    font-variant-numeric:tabular-nums; overflow-wrap:anywhere;
+  }
+  .learn-example-rest { display:flex; flex-direction:column; gap:var(--space-3); min-width:0; }
+  .learn-choices {
+    display:flex; flex-wrap:wrap; gap:var(--space-2); margin:0; padding:0; list-style:none;
+  }
+  .learn-choices > li {
+    min-width:0; padding:6px var(--space-3); border-radius:var(--radius-sm);
+    background:var(--surface-2); font-size:var(--text-sm); line-height:1.35; overflow-wrap:anywhere;
+  }
+  .learn-note { margin:0; font-size:var(--text-xs); line-height:1.45; color:var(--muted); }
+  .learn-answer { margin:0; font-size:var(--text-sm); }
+  .learn-again { align-self:flex-start; margin-left:calc(-1 * var(--space-1)); }
+}

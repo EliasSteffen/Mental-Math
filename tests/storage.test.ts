@@ -50,7 +50,7 @@ test('Defaults, alte Daten werden ergänzt (In-Memory)', () => {
   assert.deepEqual(getSettings(), {
     sessionLength: 10, dailyGoalMin: 15, theme: 'system', difficulty: 'auto', timer: true, sound: false, haptics: true, celebrated: '', keypad: 'auto', enabledCategories: null,
     autoSubmit: false, numpadLayout: 'calculator', estimateMode: false, ghost: true, autoFail: false,
-    lang: 'auto', lastSeenVersion: '',
+    lang: 'auto', lastSeenVersion: '', timerDisplay: 'calm', breathe: false, confetti: false,
   });
   assert.deepEqual(getReviews(), {});
   assert.deepEqual(getActivity(), {});
@@ -123,6 +123,10 @@ test('Migration v1 → v2: Daten bleiben, neue Felder und Defaults kommen dazu',
     assert.equal(s.settings.theme, 'neon');
     assert.equal(s.settings.difficulty, 2);
     assert.equal(s.settings.timer, false);
+    // Ruhiger Fokus: Zeitanzeige folgt dem alten timer, neue Schalter aus
+    assert.equal(s.settings.timerDisplay, 'off');
+    assert.equal(s.settings.breathe, false);
+    assert.equal(s.settings.confetti, false);
     assert.deepEqual(s.settings.enabledCategories, ['mult']);
     assert.equal(s.attempts[0]?.ts, 42);
     assert.equal(s.sessions.length, 1);
@@ -187,7 +191,7 @@ test('Cache: Write-Through bei Mutationen, ohne erneutes Lesen', () => {
     getProfile(); // liest auch die Geräte-ID
     const reads = fs.reads;
     const writes = fs.writes;
-    setSettings({ theme: 'pastel' });
+    setSettings({ theme: 'paper' });
     assert.ok(fs.writes > writes);
     addAttempt(att({ ts: 7 }));
     addSession({ id: 'x', ts: 1, mode: 'all', n: 1, correct: 1, points: 1, avgTimeMs: 1 } satisfies Session);
@@ -197,7 +201,7 @@ test('Cache: Write-Through bei Mutationen, ohne erneutes Lesen', () => {
     setChainBest(2, 6);
     assert.equal(fs.reads, reads, 'Mutationen lesen nicht erneut');
     const doc = (n: string): Record<string, unknown> => JSON.parse(fs.raw.get(V3 + n) ?? '{}') as Record<string, unknown>;
-    assert.equal(doc('doc:settings').theme, 'pastel');
+    assert.equal(doc('doc:settings').theme, 'paper');
     assert.equal((JSON.parse(fs.raw.get(V3 + 'col:results') ?? '[]') as Attempt[])[0]?.ts, 7);
     assert.equal((JSON.parse(fs.raw.get(V3 + 'col:sessions') ?? '[]') as unknown[]).length, 1);
     assert.deepEqual(doc('doc:chainBest'), { 2: 6 });

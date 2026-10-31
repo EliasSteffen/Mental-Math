@@ -13,6 +13,7 @@ import { renderSettings } from './views/settings.ts';
 import { onLangChange, t } from './i18n/index.ts';
 import { setTitle } from './ui/title.ts';
 import { modeName } from './core/modes.ts';
+import { initShell, setPrimaryAction, setShell, type TabId } from './ui/shell.ts';
 
 /* ---------- Cleanup-Hook (aktuelle View räumt Timer/Listener auf) ---------- */
 
@@ -29,7 +30,13 @@ export function runCleanup(): void {
 
 /* ---------- Navigation ---------- */
 
-export function rerender(): void { render(); }
+export interface RenderOptions {
+  /** Scroll-Position der aktuellen Seite behalten (z. B. nach einer Änderung, Sprachwechsel); sonst oben bzw. gemerkte Position */
+  keepScroll?: boolean;
+}
+
+/** Aktuelle Route neu zeichnen. */
+export function rerender({ keepScroll = false }: RenderOptions = {}): void { render({ keepScroll }); }
 
 export function go(hash: string): void {
   if (location.hash === hash) rerender();
@@ -39,14 +46,17 @@ export function go(hash: string): void {
 /* ---------- Routing ---------- */
 
 type Route =
-  | { name: 'home' }
-  | { name: 'analyse' }
-  | { name: 'settings' }
-  | { name: 'lernen'; id: string | null }
+  | { name: 'today' }
+  | { name: 'progress' }
+  | { name: 'profile' }
+  | { name: 'learn'; id: string | null }
   | { name: 'chain' }
   | { name: 'parallel' }
   | { name: 'custom' }
   | { name: 'train'; mode: string; n: number | null; intro: boolean; estimate: boolean; custom: CustomRange | null };
+
+/** Alte Pfade (Lesezeichen, PWA-Start) → neue; die Query (z. B. ?tab=) bleibt erhalten (E6). */
+const ALIASES: Readonly<Record<string, string>> = { analyse: 'fortschritt', settings: 'profil' };
 
 function parseRange(raw: string | null): [number, number] | null {
   const m = /^(\d{1,3})-(\d{1,3})$/.exec(raw ?? '');
@@ -70,16 +80,32 @@ function parseCustom(query: URLSearchParams): CustomRange | null {
   return null;
 }
 
-function parseRoute(): Route {
+function splitHash(): { parts: string[]; queryPart: string } {
   const raw = location.hash.replace(/^#\/?/, '');
   const [pathPart = '', queryPart = ''] = raw.split('?');
-  const parts = pathPart.split('/').filter(Boolean);
+  return { parts: pathPart.split('/').filter(Boolean), queryPart };
+}
+
+/** Alias in der Adresszeile durch den kanonischen Pfad ersetzen (ohne hashchange, ohne neuen Verlaufseintrag). */
+function canonicalize(): void {
+  const { parts, queryPart } = splitHash();
+  const target = parts[0] && Object.hasOwn(ALIASES, parts[0]) ? ALIASES[parts[0]] : undefined;
+  if (!target) return;
+  const hash = `#/${[target, ...parts.slice(1)].join('/')}${queryPart ? `?${queryPart}` : ''}`;
+  try {
+    history.replaceState(history.state, '', hash);
+  } catch { /* z. B. in Sandboxes ohne History-API: Alias bleibt sichtbar, Route stimmt trotzdem */ }
+}
+
+function parseRoute(): Route {
+  const { parts, queryPart } = splitHash();
   const query = new URLSearchParams(queryPart);
-  const p0 = parts[0];
+  // Object.hasOwn: „#/constructor“ o. ä. trifft sonst Object.prototype
+  const p0 = parts[0] && Object.hasOwn(ALIASES, parts[0]) ? ALIASES[parts[0]] : parts[0];
   const p1 = parts[1];
-  if (p0 === 'analyse') return { name: 'analyse' };
-  if (p0 === 'settings') return { name: 'settings' };
-  if (p0 === 'lernen') return { name: 'lernen', id: p1 && SUBTYPES[p1] ? p1 : null };
+  if (p0 === 'fortschritt') return { name: 'progress' };
+  if (p0 === 'profil') return { name: 'profile' };
+  if (p0 === 'lernen') return { name: 'learn', id: p1 && Object.hasOwn(SUBTYPES, p1) ? p1 : null };
   if (p0 === 'chain') return { name: 'chain' };
   if (p0 === 'parallel') return { name: 'parallel' };
   if (p0 === 'custom') return { name: 'custom' };
@@ -92,16 +118,31 @@ function parseRoute(): Route {
       estimate: query.get('est') === '1', custom,
     };
   }
-  return { name: 'home' };
+  return { name: 'today' };
 }
 
-const NAV_TOPS: readonly string[] = ['analyse', 'lernen', 'settings'];
+/** Tab einer Route; null = Fokus-Modus (Training, Ketten, Parallel). „Eigenes“ (Einstellungen) gehört zu Heute. */
+function tabOf(route: Route): TabId | null {
+  switch (route.name) {
+    case 'today': case 'custom': return 'today';
+    case 'learn': return 'learn';
+    case 'progress': return 'progress';
+    case 'profile': return 'profile';
+    default: return null;
+  }
+}
+
+/** Schlüssel für die gemerkte Scroll-Position (nur Tab-Seiten; Lernen-Liste und -Detail getrennt). */
+function scrollKey(route: Route): string | null {
+  if (route.name === 'learn') return route.id ? `learn/${route.id}` : 'learn';
+  return tabOf(route) ? route.name : null;
+}
 
 function routeTitle(route: Route): string | null {
   switch (route.name) {
-    case 'analyse': return t('analyse.title');
-    case 'settings': return t('settings.title');
-    case 'lernen': return t('lernen.title');
+    case 'progress': return t('analyse.title');
+    case 'profile': return t('settings.title');
+    case 'learn': return t('lernen.title');
     case 'chain': return t('settings.routeChain');
     case 'parallel': return t('settings.routeParallel');
     case 'custom': return t('settings.routeCustom');
@@ -110,25 +151,10 @@ function routeTitle(route: Route): string | null {
   }
 }
 
-export function render(): void {
-  runCleanup();
-  const route = parseRoute();
-  setTitle(routeTitle(route));
-  const seg = route.name === 'train' ? '' : route.name;
-  const navHref = NAV_TOPS.includes(seg) ? `#/${seg}` : '#/';
-  document.querySelectorAll('nav a, [data-nav]').forEach((a) => {
-    const active = a.getAttribute('href') === navHref;
-    a.classList.toggle('active', active);
-    if (active) a.setAttribute('aria-current', 'page');
-    else a.removeAttribute('aria-current');
-  });
-  app.replaceChildren();
-  window.scrollTo(0, 0);
-  // Fokus-Modus: im Training keine Tab-Leiste, damit sie keine Buttons verdeckt
-  document.body.classList.toggle('in-play', route.name === 'train' || route.name === 'chain' || route.name === 'parallel');
-  if (route.name === 'analyse') renderAnalyse();
-  else if (route.name === 'lernen') renderLernen(route.id);
-  else if (route.name === 'settings') renderSettings();
+function draw(route: Route): void {
+  if (route.name === 'progress') renderAnalyse();
+  else if (route.name === 'learn') renderLernen(route.id);
+  else if (route.name === 'profile') renderSettings();
   else if (route.name === 'chain') renderChain();
   else if (route.name === 'parallel') renderParallel();
   else if (route.name === 'custom') renderCustom();
@@ -136,10 +162,86 @@ export function render(): void {
   else renderHome();
 }
 
-let langBound = false;
+/** Gemerkte Scroll-Positionen je Tab-Seite (Zurückwechseln stellt sie wieder her). */
+const scrollByKey = new Map<string, number>();
+let shownKey: string | null = null;
+let shownTab: TabId | null | undefined;
+
+function reducedMotion(): boolean {
+  return typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+
+interface ViewTransitionLike { ready?: Promise<unknown>; finished?: Promise<unknown>; updateCallbackDone?: Promise<unknown> }
+type StartViewTransition = (update: () => void) => ViewTransitionLike | undefined;
+
+/** Abgebrochene oder übersprungene View Transition (kein Fehler der App). */
+function isTransitionAbort(e: unknown): boolean {
+  return e instanceof DOMException && (e.name === 'AbortError' || e.name === 'InvalidStateError');
+}
+
+/** View Transition (Cross-Fade) nur beim Wechsel zwischen zwei Tabs, nie im Fokus-Modus oder bei Reduced Motion. */
+function withTransition(from: TabId | null | undefined, to: TabId | null, update: () => void): void {
+  const start = (document as Document & { startViewTransition?: StartViewTransition }).startViewTransition;
+  if (typeof start !== 'function' || !from || !to || from === to || reducedMotion()) {
+    update();
+    return;
+  }
+  try {
+    const vt = start.call(document, update);
+    // Abgebrochene bzw. übersprungene Übergänge (AbortError, InvalidStateError – z. B. schneller Tab-Wechsel, verstecktes
+    // Dokument) sind kein Fehler: der Inhalt steht trotzdem. Alles andere – vor allem Fehler beim Zeichnen selbst – bleibt
+    // sichtbar, und zwar einmal (ein Fehler im Update lehnt alle drei Promises mit demselben Grund ab).
+    const seen = new Set<unknown>();
+    const report = (e: unknown): void => {
+      if (isTransitionAbort(e) || seen.has(e)) return;
+      seen.add(e);
+      console.error(e);
+    };
+    vt?.ready?.catch(report);
+    vt?.finished?.catch(report);
+    vt?.updateCallbackDone?.catch(report);
+  } catch {
+    update();
+  }
+}
+
+export function render({ keepScroll = false }: RenderOptions = {}): void {
+  canonicalize();
+  const route = parseRoute();
+  const tab = tabOf(route);
+  const key = scrollKey(route);
+  const prevKey = shownKey;
+  // Position der verlassenen Tab-Seite merken
+  if (prevKey !== null && prevKey !== key) scrollByKey.set(prevKey, window.scrollY);
+  const keepY = keepScroll ? window.scrollY : null;
+
+  withTransition(shownTab, tab, () => {
+    runCleanup();
+    setTitle(routeTitle(route));
+    setShell(tab);
+    setPrimaryAction(null);
+    app.replaceChildren();
+    shownKey = key;
+    shownTab = tab;
+    draw(route);
+    const y = keepY ?? (key !== null && key !== prevKey ? (scrollByKey.get(key) ?? 0) : 0);
+    window.scrollTo(0, y);
+    // Inhalte, die erst im nächsten Frame erscheinen, verkürzen sonst die Seite
+    if (y > 0) requestAnimationFrame(() => { if (shownKey === key && window.scrollY < y) window.scrollTo(0, y); });
+  });
+}
+
+let started = false;
 
 export function startRouter(): void {
-  window.addEventListener('hashchange', render);
-  if (!langBound) { langBound = true; onLangChange(() => rerender()); }
+  if (started) {
+    render();
+    return;
+  }
+  started = true;
+  if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
+  initShell();
+  window.addEventListener('hashchange', () => render());
+  onLangChange(() => rerender({ keepScroll: true }));
   render();
 }

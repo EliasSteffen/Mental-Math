@@ -1,99 +1,74 @@
+// Parallel · Eingabe (Fokus-Modus): je Kette ein Feld in einer Liste, nacheinander ausfüllen; Weiter/Prüfen im Dock.
 import type { ParallelState } from '../../types.ts';
 import { submitAnswer } from '../../core/parallel.ts';
 import { fmt } from '../../core/numbers.ts';
-import { getSettings } from '../../data/storage.ts';
-import { createKeypad, useKeypad } from '../../ui/keypad.ts';
 import { app, h, appendChildren } from '../../ui/dom.ts';
+import { focusHead } from '../../ui/kit.ts';
+import { answerDock, answerInput, parseNumber } from '../play-ui.ts';
 import { t } from '../../i18n/index.ts';
-
-function parseNumber(raw: string): number | null {
-  const s = raw.trim().replace(/[−–]/g, '-').replace(/\s/g, '').replace(',', '.');
-  if (!/^-?\d+(\.\d+)?$/.test(s)) return null;
-  const n = Number(s);
-  return Number.isFinite(n) ? n : null;
-}
 
 export function renderInput(initial: ParallelState, onDone: (state: ParallelState) => void): () => void {
   let state = initial;
-  let keypadEl: HTMLElement | null = null;
-  const settings = getSettings();
+  const input = answerInput(t('parallel.chainResultAria', { id: initial.chains[0]?.id ?? '' }), { compact: true });
+  const fields = h('ol', { class: 'list play-fields' });
+  const live = h('p', { class: 'sr-only', 'aria-live': 'polite' });
 
-  const progress = h('div', { class: 'pl-progress', 'aria-live': 'polite' });
-  const grid = h('div', { class: 'pl-grid' });
-  const prompt = h('div', { class: 'label pl-prompt' });
-  const input: HTMLInputElement = h('input', {
-    type: 'text', inputmode: 'none', autocomplete: 'off', 'aria-label': t('parallel.chainResultAria'), placeholder: '?',
-  });
-
-  const update = (): void => {
-    const idx = state.inputIndex;
-    const marks = state.chains.map((c, i) => {
-      const a = state.answers[i];
-      const mark = i === idx ? '?' : i > idx ? '·' : a === null || a === undefined ? '–' : '✓';
-      return `${c.id} ${mark}`;
-    });
-    progress.textContent = marks.join(' · ');
-    grid.replaceChildren(...state.chains.map((c, i) => {
-      const a = state.answers[i];
-      const text = i === idx ? '?' : i > idx ? '·' : a === null || a === undefined ? '–' : fmt(a);
-      const cls = i === idx ? 'pl-card is-active' : i < idx ? 'pl-card is-answered' : 'pl-card';
-      return h('article', { class: cls, 'aria-current': i === idx ? 'step' : null },
-        h('div', { class: 'pl-card-head' }, h('span', { class: 'pl-id' }, t('parallel.chain', { id: c.id }))),
-        h('div', { class: 'pl-main is-answer' }, text));
-    }));
-    const current = state.chains[idx];
-    prompt.textContent = current ? t('parallel.chainPrompt', { id: current.id }) : '';
-    input.value = '';
-  };
-
-  const commit = (value: number | null): void => {
+  function commit(value: number | null): void {
     state = submitAnswer(state, value);
     if (state.phase === 'result') { onDone(state); return; }
     update();
-    if (!keypadEl) input.focus();
-  };
-
-  const submit = (): void => {
+    focusField();
+  }
+  function submit(): void {
     const given = parseNumber(input.value);
-    if (given === null) return;
-    commit(given);
-  };
-  const skip = (): void => commit(null);
+    if (given !== null) commit(given);
+  }
+  function skip(): void { commit(null); }
 
-  input.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') { e.preventDefault(); submit(); }
-  });
+  const answer = answerDock({ input, submitLabel: t('parallel.next'), onSubmit: submit, onSkip: skip });
 
-  const kp = useKeypad(settings.keypad);
-  const actions = kp
-    ? null
-    : h('div', { class: 'btn-row' },
-      h('button', { type: 'button', class: 'btn primary', onclick: submit }, t('common.nextEnter')),
-      h('button', { type: 'button', class: 'btn', onclick: skip }, t('common.dontKnow')));
-
-  app.replaceChildren();
-  appendChildren(app, [h('div', { class: 'parallel' },
-    h('h1', { class: 'page-title' }, t('parallel.question')),
-    progress, grid,
-    h('div', { class: 'pl-answer' }, prompt, h('div', { class: 'answer' }, input)),
-    actions)]);
-  update();
-
-  if (kp) {
-    input.readOnly = true;
-    keypadEl = createKeypad({
-      input, onSubmit: submit, onSkip: skip, haptics: settings.haptics, layout: settings.numpadLayout,
-    });
-    document.body.append(keypadEl);
-    document.body.classList.add('has-keypad');
-  } else {
-    input.inputMode = 'decimal';
-    input.removeAttribute('readonly');
-    input.focus();
+  /**
+   * Fokus ins aktive Feld (Tastatur tippt direkt; mit Tastenfeld gilt inputmode="none", keine Bildschirmtastatur).
+   * Auf kleinen Bildschirmen so weit scrollen, dass das Dock das Feld nicht verdeckt (scroll-margin = Dock-Höhe).
+   */
+  function focusField(): void {
+    input.focus({ preventScroll: true });
+    input.scrollIntoView({ block: 'nearest' });
   }
 
-  return (): void => {
-    if (keypadEl) { keypadEl.remove(); keypadEl = null; }
-    document.body.classList.remove('has-keypad');
-  };
+  /** Liste neu zeichnen: erledigte Ketten mit Wert (– = übersprungen), die aktive mit dem Feld, offene mit „·“. */
+  function update(): void {
+    const idx = state.inputIndex;
+    fields.replaceChildren(...state.chains.map((c, i) => {
+      const a = state.answers[i];
+      const active = i === idx;
+      const cls = active ? 'play-field is-active' : i < idx ? 'play-field is-done' : 'play-field';
+      const value = active
+        ? input
+        : h('span', { class: 'play-field-value num' }, i > idx ? '·' : a === null || a === undefined ? '–' : fmt(a));
+      return h('li', { class: cls, 'aria-current': active ? 'step' : null },
+        h('span', { class: 'play-field-label' }, t('parallel.chain', { id: c.id })), value);
+    }));
+    const current = state.chains[idx];
+    if (current) {
+      input.setAttribute('aria-label', t('parallel.chainResultAria', { id: current.id }));
+      live.textContent = t('parallel.chainPrompt', { id: current.id });
+    }
+    input.value = '';
+    input.dispatchEvent(new Event('input'));
+    answer.setSubmitLabel(idx >= state.chains.length - 1 ? t('common.check') : t('parallel.next'));
+  }
+
+  app.replaceChildren();
+  appendChildren(app, [
+    focusHead({ title: t('parallel.title'), shortTitle: t('parallel.titleShort') }),
+    h('div', { class: 'stage' }, h('p', { class: 'play-caption' }, t('parallel.question')), fields, live),
+    answer.el,
+  ]);
+  update();
+  fields.style.setProperty('--play-dock-h', `${answer.el.offsetHeight}px`);
+  focusField();
+
+  // Keine eigenen Timer oder Listener: das Tastenfeld liegt im Dock und verschwindet mit dem Inhalt
+  return (): void => undefined;
 }

@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Training · Auswahlaufgabe</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+*,*::before,*::after{box-sizing:border-box}
+.app{
+--bg:#F6F4EF;--surface:#FFFFFF;--surface-2:#EEEBE4;--border:#E2DDD3;
+--text:#1E2227;--muted:#5C636D;
+--accent:#3A5A8A;--accent-text:#2E4B75;--on-accent:#FFFFFF;
+--good:#3D7A59;--bad:#A9533A;--warn:#94600F;--streak:#B5652E;
+--shadow-1:0 1px 2px rgb(30 34 39 / .05);
+--shadow-2:0 8px 24px rgb(30 34 39 / .08);
+--shadow-dock:0 -1px 0 var(--border),0 -12px 32px rgb(30 34 39 / .06);
+--scrim:rgb(30 34 39 / .32);
+--font:system-ui,-apple-system,"SF Pro Text","Segoe UI",Roboto,sans-serif;
+--font-num:ui-rounded,"SF Pro Rounded",system-ui,-apple-system,sans-serif;
+-webkit-font-smoothing:antialiased;
+}
+.app[data-theme="night"]{
+--bg:#141619;--surface:#1B1E22;--surface-2:#23272C;--border:#2D3237;
+--text:#E9E7E2;--muted:#9DA3AA;
+--accent:#8EA8D4;--accent-text:#A8BEE2;--on-accent:#0F1620;
+--good:#83B89D;--bad:#E1937D;--warn:#D7B263;--streak:#E0A36F;
+--shadow-1:none;--shadow-2:0 8px 24px rgb(0 0 0 / .35);--shadow-dock:0 -1px 0 var(--border);--scrim:rgb(0 0 0 / .55);
+}
+.app[data-theme="oled"]{
+--bg:#000000;--surface:#101214;--surface-2:#181B1F;--border:#24282D;
+--text:#E9E7E2;--muted:#9DA3AA;
+--accent:#8EA8D4;--accent-text:#A8BEE2;--on-accent:#0F1620;
+--good:#83B89D;--bad:#E1937D;--warn:#D7B263;--streak:#E0A36F;
+--shadow-1:none;--shadow-2:none;--shadow-dock:0 -1px 0 var(--border);--scrim:rgb(0 0 0 / .7);
+}
+.app[data-theme="aurora"]{
+--bg:#0B0A14;--surface:rgba(255,255,255,.06);--surface-2:rgba(255,255,255,.08);--border:rgba(255,255,255,.12);
+--text:#F5F3FF;--muted:#A9A6C4;
+--accent:#A78BFA;--accent-text:#C4B5FD;--on-accent:#0B0A14;
+--good:#5EEAD4;--bad:#FDA4AF;--warn:#FCD34D;--streak:#FDBA74;
+--shadow-1:inset 0 0 0 1px rgba(255,255,255,.08),inset 0 1px 0 rgba(255,255,255,.10);
+--shadow-2:0 12px 40px rgba(0,0,0,.45);--shadow-dock:inset 0 1px 0 rgba(255,255,255,.12);--scrim:rgb(0 0 0 / .6);
+--bg-fill:radial-gradient(110% 55% at 0% 0%,rgba(124,92,255,.42),transparent 62%),radial-gradient(80% 45% at 100% 8%,rgba(34,211,238,.26),transparent 60%),radial-gradient(90% 40% at 60% 105%,rgba(236,72,153,.18),transparent 65%),#0B0A14;
+--cta-bg:linear-gradient(135deg,#DDD6FE 0%,#A78BFA 38%,#67E8F9 100%);
+--cta-shadow:inset 0 0 0 1px rgba(255,255,255,.35),0 8px 32px rgba(139,92,246,.5),0 0 56px rgba(103,232,249,.28);
+--cta-gloss:linear-gradient(180deg,rgba(255,255,255,.5),rgba(255,255,255,0) 52%);
+--cta-sheen:sheen 1.4s cubic-bezier(.22,1,.36,1) .5s 1 both;
+--hero-bg:linear-gradient(155deg,rgba(167,139,250,.30) 0%,rgba(103,232,249,.10) 55%,rgba(255,255,255,.04) 100%);
+--hero-shadow:inset 0 0 0 1px rgba(196,181,253,.30),inset 0 1px 0 rgba(255,255,255,.20),0 16px 48px rgba(124,92,255,.28);
+--glow-good:0 0 0 4px rgba(94,234,212,.12),0 0 36px rgba(94,234,212,.42);
+--glow-icon:drop-shadow(0 0 6px currentColor);
+--text-glow:0 0 28px rgba(167,139,250,.5);
+--pill-glow:0 0 18px rgba(167,139,250,.55),inset 0 0 0 1px rgba(196,181,253,.4);
+}
+.app[data-theme="neon"]{
+--bg:#08090A;--surface:#121314;--surface-2:#1B1D1F;--border:#2A2D30;
+--text:#F2F4F0;--muted:#9BA19A;
+--accent:#D4FF3A;--accent-text:#D4FF3A;--on-accent:#0A0B05;
+--good:#3DFFB4;--bad:#FF7A59;--warn:#FFC53D;--streak:#FF4FD8;
+--shadow-1:inset 0 0 0 1px #24272A;--shadow-2:0 12px 40px rgba(0,0,0,.6);--shadow-dock:inset 0 1px 0 #2A2D30;--scrim:rgb(0 0 0 / .7);
+--bg-fill:radial-gradient(120% 45% at 50% -12%,rgba(212,255,58,.16),transparent 58%),radial-gradient(rgba(255,255,255,.07) 1px,transparent 1.3px) 0 0/22px 22px,#08090A;
+--cta-bg:linear-gradient(180deg,#E6FF85 0%,#D4FF3A 55%,#B8EE1C 100%);
+--cta-shadow:inset 0 0 0 1px rgba(255,255,255,.45),0 0 28px rgba(212,255,58,.5),0 0 80px rgba(212,255,58,.2);
+--cta-gloss:linear-gradient(180deg,rgba(255,255,255,.55),rgba(255,255,255,0) 50%);
+--cta-sheen:sheen 1.4s cubic-bezier(.22,1,.36,1) .5s 1 both;
+--hero-bg:linear-gradient(160deg,rgba(212,255,58,.12) 0%,rgba(18,19,20,1) 58%);
+--hero-shadow:inset 0 0 0 1px rgba(212,255,58,.38),0 0 36px rgba(212,255,58,.14);
+--glow-good:0 0 0 4px rgba(61,255,180,.12),0 0 36px rgba(61,255,180,.45);
+--glow-icon:drop-shadow(0 0 6px currentColor);
+--text-glow:0 0 24px rgba(212,255,58,.35);
+--pill-glow:0 0 18px rgba(212,255,58,.45),inset 0 0 0 1px rgba(212,255,58,.55);
+}
+.app{
+--bg-fill:var(--bg);--cta-bg:var(--accent);--cta-shadow:var(--shadow-2);--cta-gloss:none;--cta-sheen:none;
+--hero-bg:var(--surface);--hero-shadow:var(--shadow-1);--glow-good:none;--glow-icon:none;--text-glow:none;--pill-glow:none;
+--accent-soft:color-mix(in srgb,var(--accent) 14%,transparent);
+--good-soft:color-mix(in srgb,var(--good) 14%,transparent);
+--bad-soft:color-mix(in srgb,var(--bad) 14%,transparent);
+--warn-soft:color-mix(in srgb,var(--warn) 14%,transparent);
+--glass:color-mix(in srgb,var(--surface) 82%,transparent);
+--press:color-mix(in srgb,var(--text) 6%,transparent);
+}
+.app h1,.app h2,.app h3,.app p{margin:0}
+.app ol,.app ul{margin:0;padding:0;list-style:none}
+.app button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.app a{color:var(--accent-text)}
+.app a:hover{color:var(--accent)}
+.app :focus-visible{outline:none;box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 40%,transparent)}
+.press{transition:transform 100ms cubic-bezier(.22,1,.36,1),filter 200ms cubic-bezier(.22,1,.36,1)}
+.press:active{transform:scale(.97);filter:brightness(.94)}
+.cta{position:relative;overflow:hidden;isolation:isolate}
+.cta::before{content:"";position:absolute;inset:0;border-radius:inherit;background:var(--cta-gloss);pointer-events:none;z-index:-1}
+.cta::after{content:"";position:absolute;top:0;bottom:0;left:-60%;width:40%;background:linear-gradient(100deg,transparent,rgba(255,255,255,.6),transparent);transform:skewX(-20deg);opacity:0;pointer-events:none;animation:var(--cta-sheen)}
+@keyframes sheen{0%{left:-60%;opacity:1}100%{left:140%;opacity:1}}
+.num{font-family:var(--font-num);font-variant-numeric:tabular-nums}
+.scroll{scrollbar-width:none}
+.scroll::-webkit-scrollbar{display:none}
+.rise{animation:rise-in 320ms cubic-bezier(.22,1,.36,1) both}
+.sheet{animation:sheet-in 320ms cubic-bezier(.22,1,.36,1) both}
+.draw path{stroke-dasharray:24;stroke-dashoffset:24;animation:draw 280ms cubic-bezier(.22,1,.36,1) 80ms forwards}
+@keyframes rise-in{from{opacity:0;transform:translateY(8px)}}
+@keyframes sheet-in{from{opacity:0;transform:translateY(32px)}}
+@keyframes draw{to{stroke-dashoffset:0}}
+@media (prefers-reduced-motion: reduce){
+.rise,.sheet{animation:fade-in 150ms linear both}
+.draw path{animation:none;stroke-dashoffset:0}
+.cta::after{animation:none}
+}
+@keyframes fade-in{from{opacity:0}}
+</style>
+</helmet>
+<div class="app" data-theme="{{theme}}" style="position: relative; width: 390px; height: 844px; overflow: hidden; background: var(--bg-fill); color: var(--text); font-family: var(--font); display: flex; flex-direction: column">
+
+<header style="flex: none; padding: 52px 16px 0; display: flex; flex-direction: column; gap: 6px">
+<div style="display: flex; align-items: center; gap: 12px; min-height: 44px">
+<a href="Main.dc.html" aria-label="Training beenden" class="press" style="display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; margin-left: -10px; border-radius: 999px; color: var(--text)"><svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6L6 18"/></svg></a>
+<div role="img" aria-label="Aufgabe {{num}} von 10" style="flex: 1; display: grid; grid-template-columns: repeat(10, minmax(0, 1fr)); gap: 4px">
+<sc-for list="{{segs}}" as="s" hint-placeholder-count="10"><span style="height: 4px; border-radius: 2px; background: {{s.bg}}; transition: background-color 600ms cubic-bezier(.22,1,.36,1)"></span></sc-for>
+</div>
+</div>
+<div aria-hidden="true" style="height: 2px; border-radius: 1px; background: var(--surface-2); overflow: hidden"><div style="height: 100%; width: {{lineW}}; background: {{lineColor}}; transition: width 250ms linear, background-color 600ms cubic-bezier(.22,1,.36,1)"></div></div>
+</header>
+
+<main style="flex: 1; min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; padding: 16px 24px; text-align: center">
+<p style="font-size: 15px; color: var(--muted)">{{q.cat}} · {{q.sub}}</p>
+<sc-if value="{{q.short}}" hint-placeholder-val="{{ true }}">
+<h1 class="num" style="font-size: 48px; font-weight: 600; line-height: 1.1; letter-spacing: -0.02em; text-shadow: var(--text-glow)">{{q.text}}</h1>
+</sc-if>
+<sc-if value="{{q.long}}" hint-placeholder-val="{{ false }}">
+<h1 style="max-width: 30ch; font-size: 20px; font-weight: 600; line-height: 1.4">{{q.text}}</h1>
+</sc-if>
+<sc-if value="{{hint}}" hint-placeholder-val="{{ false }}">
+<p class="rise" style="display: flex; align-items: flex-start; gap: 8px; max-width: 320px; padding: 10px 12px; border-radius: 12px; background: var(--accent-soft); font-size: 15px; line-height: 1.45; text-align: left"><span style="display: flex; flex: none; color: var(--accent-text)"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3Z"/></svg></span>{{q.tip}}</p>
+</sc-if>
+<sc-if value="{{answered}}" hint-placeholder-val="{{ false }}">
+<div class="rise" aria-live="polite" style="display: flex; flex-direction: column; align-items: center; gap: 4px; margin-top: 8px">
+<p style="display: flex; align-items: center; gap: 8px; font-size: 17px; font-weight: 600; color: {{resColor}}"><sc-if value="{{good}}" hint-placeholder-val="{{ true }}"><span class="draw" style="display: flex"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span></sc-if>{{resTitle}}</p>
+<p class="num" style="font-size: 15px; color: var(--muted)">{{resDetail}}</p>
+</div>
+</sc-if>
+</main>
+
+<div style="flex: none; padding: 12px 16px 34px; display: flex; flex-direction: column; gap: 8px; background: var(--glass); -webkit-backdrop-filter: blur(20px) saturate(1.3); backdrop-filter: blur(20px) saturate(1.3); box-shadow: var(--shadow-dock); border-radius: 24px 24px 0 0">
+<div role="group" aria-label="Antworten" style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px">
+<sc-for list="{{choices}}" as="c" hint-placeholder-count="4">
+<button type="button" onClick="{{c.pick}}" aria-pressed="{{c.picked}}" class="press num" style="display: flex; align-items: center; justify-content: center; gap: 8px; height: 64px; border-radius: 16px; border: 2px solid {{c.border}}; background: {{c.bg}}; box-shadow: {{c.shadow}}; opacity: {{c.opacity}}; font-size: 20px; font-weight: 600; transition: border-color 200ms cubic-bezier(.22,1,.36,1), background-color 200ms cubic-bezier(.22,1,.36,1), opacity 200ms cubic-bezier(.22,1,.36,1)"><span aria-hidden="true" style="font-size: 13px; font-weight: 500; color: var(--muted)">{{c.key}}</span>{{c.label}}</button>
+</sc-for>
+</div>
+<sc-if value="{{asking}}" hint-placeholder-val="{{ true }}">
+<div style="display: flex; align-items: center; justify-content: space-between; min-height: 44px">
+<button type="button" onClick="{{toggleHint}}" aria-pressed="{{hint}}" class="press" style="display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 4px; font-size: 15px; font-weight: 600; color: var(--accent-text)"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3Z"/></svg>Wie geht das?</button>
+<button type="button" onClick="{{skip}}" class="press" style="min-height: 44px; padding: 0 4px; font-size: 15px; color: var(--muted)">Weiß nicht</button>
+</div>
+</sc-if>
+<sc-if value="{{answered}}" hint-placeholder-val="{{ false }}">
+<button type="button" onClick="{{next}}" class="press rise cta" style="height: 56px; border-radius: 16px; background: var(--cta-bg); color: var(--on-accent); font-size: 17px; font-weight: 600; box-shadow: var(--cta-shadow)">Weiter</button>
+</sc-if>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["paper","night","oled","aurora","neon"],"default":"paper","section":"Darstellung"},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.qs = [
+      { cat: 'Brüche', sub: 'Bruch → Prozent', text: '1/8 in %', long: false, target: 5, correct: 0,
+        options: ['12,5 %', '11,1 %', '14,3 %', '16,7 %'],
+        tip: 'Auswendig: 1/6 = 16,7 %, 1/7 ≈ 14,3 %, 1/8 = 12,5 %, 1/9 ≈ 11,1 %',
+        why: '1/8 = 1/4 ÷ 2 = 25 % ÷ 2' },
+      { cat: 'Wachstum', sub: 'Verdopplungszeit', long: true, target: 8, correct: 2,
+        text: 'Ein Markt wächst 6 % pro Jahr. Nach wie vielen Jahren hat er sich ungefähr verdoppelt?',
+        options: ['8 Jahre', '10 Jahre', '12 Jahre', '14 Jahre'],
+        tip: '72er-Regel: 72 ÷ Wachstumsrate',
+        why: '72 ÷ 6 = 12' }
+    ];
+    this.t0 = Date.now();
+    this.state = { i: 0, picked: null, skipped: false, hint: false, t: 0 };
+  }
+
+  componentDidMount() {
+    this.iv = setInterval(() => {
+      if (this.state.picked === null && !this.state.skipped) this.setState({ t: Date.now() - this.t0 });
+    }, 250);
+  }
+
+  componentWillUnmount() {
+    clearInterval(this.iv);
+  }
+
+  pick(j) {
+    if (this.state.picked !== null || this.state.skipped) return;
+    this.setState({ picked: j, t: Date.now() - this.t0 });
+  }
+
+  next() {
+    this.t0 = Date.now();
+    this.setState({ i: (this.state.i + 1) % this.qs.length, picked: null, skipped: false, hint: false, t: 0 });
+  }
+
+  renderVals() {
+    var st = this.state;
+    var q = this.qs[st.i];
+    var answered = st.picked !== null || st.skipped;
+    var good = st.picked === q.correct;
+    var targetMs = q.target * 1000;
+    var done = 6 + st.i;
+    var segs = [];
+    for (var n = 0; n < 10; n++) {
+      var bg = 'var(--border)';
+      if (n < done || (n === done && answered)) bg = 'var(--accent)';
+      else if (n === done) bg = 'color-mix(in srgb, var(--accent) 40%, transparent)';
+      segs.push({ bg: bg });
+    }
+    var choices = q.options.map((label, j) => {
+      var border = 'var(--border)';
+      var bg = 'var(--surface)';
+      var opacity = '1';
+      if (answered) {
+        if (j === q.correct) { border = 'var(--good)'; bg = 'var(--good-soft)'; }
+        else if (j === st.picked) { border = 'var(--bad)'; bg = 'var(--bad-soft)'; }
+        else opacity = '0.5';
+      }
+      return { label: label, key: String(j + 1), picked: st.picked === j, shadow: answered && j === q.correct && st.picked === q.correct ? 'var(--glow-good)' : 'none', border: border, bg: bg, opacity: opacity, pick: () => this.pick(j) };
+    });
+    var sec = (st.t / 1000).toFixed(1).replace('.', ',');
+    return {
+      theme: this.props.theme ?? 'paper',
+      q: Object.assign({}, q, { short: !q.long }),
+      num: done + 1,
+      segs: segs,
+      lineW: (Math.min(1, st.t / targetMs) * 100).toFixed(1) + '%',
+      lineColor: st.t >= targetMs ? 'var(--warn)' : 'var(--accent)',
+      choices: choices,
+      hint: st.hint,
+      asking: !answered,
+      answered: answered,
+      good: good,
+      resColor: good ? 'var(--good)' : 'var(--text)',
+      resTitle: good ? 'Richtig' : (st.skipped ? 'Kein Problem. Richtig ist ' : 'Richtig ist ') + q.options[q.correct],
+      resDetail: good ? sec + ' s · Ziel ' + q.target + ' s' : q.why,
+      toggleHint: () => this.setState({ hint: !this.state.hint }),
+      skip: () => { if (!answered) this.setState({ skipped: true, t: Date.now() - this.t0 }); },
+      next: () => this.next()
+    };
+  }
+}
+</script>
+</body>
+</html>

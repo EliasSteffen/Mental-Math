@@ -1,0 +1,214 @@
+/* View „Training, Feedback, Ergebnis, Atempause“ (src/views/train/*). Nur View-spezifische Regeln; Bausteine
+   (Tastenfeld, Feedback-Kopf, Ergebniszeile, Segmente) kommen aus components.css.
+   Maße aus den Artboards Training, Auswahl, Feedback, Richtig, Ergebnis, Atempause. */
+@layer views {
+  /* ---------- Kopf: Segmente mit Ghost-Marke, Zeit (präzise) ---------- */
+  .train-progress { position:relative; flex:1; min-width:0; display:flex; align-items:center; }
+  /* Ghost (Bestzeit, E13): kleine Marke über den Segmenten, nur bei „präzise“ */
+  .train-ghost {
+    position:absolute; top:50%; left:calc(var(--w, 0) * 1%);
+    width:2px; height:12px; margin:-6px 0 0 -1px; border-radius:1px;
+    background:var(--warn); opacity:.9; pointer-events:none;
+    transition:left 250ms linear;
+  }
+  .train-time {
+    flex:none; min-width:76px; text-align:end;
+    font-size:var(--text-sm); color:var(--muted); white-space:nowrap;
+    transition:color var(--dur-progress) var(--ease-out);
+  }
+  .train-time.is-over { color:var(--warn); }
+
+  /* ---------- Bühne ---------- */
+  .train-stage { min-height:auto; }
+  .train-notice { max-width:36ch; font-size:var(--text-xs); line-height:1.45; color:var(--muted); }
+  .train-cat { font-size:var(--text-sm); color:var(--muted); overflow-wrap:anywhere; }
+  .train-meta { margin-top:calc(-1 * var(--space-3)); font-size:var(--text-xs); color:var(--muted); }
+  .train-q {
+    max-width:100%;
+    font-size:min(var(--text-display), 56px); font-weight:var(--weight-semibold); line-height:1.1; letter-spacing:-0.02em;
+    text-shadow:var(--text-glow); overflow-wrap:anywhere;
+  }
+  /* Lange Textaufgaben: 20 px, höchstens 30 Zeichen breit */
+  .train-q.is-long { max-width:30ch; font-size:var(--text-lg); line-height:1.4; letter-spacing:0; text-shadow:none; }
+  .train-pill {
+    padding:3px var(--space-3); border-radius:var(--radius-pill);
+    background:var(--accent-soft); color:var(--accent-text);
+    font-size:var(--text-xs); font-weight:var(--weight-semibold);
+  }
+  .train-hint { max-width:36ch; font-size:var(--text-sm); line-height:1.45; color:var(--muted); }
+
+  /* Hinweisbox („Wie geht das?“) */
+  .train-tip {
+    display:flex; align-items:flex-start; gap:var(--space-2);
+    max-width:320px; padding:10px var(--space-3); border-radius:var(--radius-key);
+    background:var(--accent-soft); font-size:var(--text-sm); line-height:1.45; text-align:start;
+  }
+  .train-tip-icon { display:flex; flex:none; color:var(--accent-text); }
+  .train-tip-text { min-width:0; overflow-wrap:anywhere; }
+  .train-tip-note { display:block; margin-top:var(--space-1); font-size:var(--text-xs); color:var(--muted); }
+
+  /* ---------- Antwortfeld: Eingabe, richtig (Haken + Glow), Korrektur, übersprungen ---------- */
+  .train-answer-block { display:flex; flex-direction:column; align-items:center; gap:var(--space-2); width:100%; min-width:0; }
+  .train-answer { display:flex; align-items:center; justify-content:center; gap:10px; max-width:100%; min-width:0; margin-top:var(--space-1); }
+  .train-field {
+    display:flex; align-items:center; justify-content:flex-end; gap:var(--space-2);
+    flex:0 1 220px; min-width:140px; height:64px; padding:0 18px;
+    border:2px solid var(--accent); border-radius:var(--radius-md); background:var(--surface);
+    font-size:32px; font-weight:var(--weight-semibold); color:var(--text);
+    transition:border-color var(--dur-state) var(--ease-out), background-color var(--dur-state) var(--ease-out),
+      box-shadow var(--dur-state) var(--ease-out);
+  }
+  .train-field.is-long { font-size:24px; }
+  .train-field.is-longer { font-size:20px; }
+  .train-field.is-good { border-color:var(--good); background:var(--good-soft); box-shadow:var(--glow-good); }
+  .train-field.is-bad { border-color:var(--bad); background:var(--bad-soft); }
+  .train-field.is-skip { border-color:var(--border); color:var(--muted); }
+  .train-input {
+    flex:1 1 auto; width:100%; min-width:0; height:100%; margin:0; padding:0;
+    border:0; outline:none; background:transparent; box-shadow:none;
+    color:inherit; font:inherit; text-align:end; caret-color:var(--accent);
+    -webkit-appearance:none; appearance:none;
+  }
+  .train-input:focus-visible { outline:none; }
+  .train-input::placeholder { color:transparent; }
+  .train-input:disabled {
+    flex:0 1 auto; width:auto; field-sizing:content;
+    opacity:1; color:inherit; -webkit-text-fill-color:currentColor; cursor:default;
+  }
+  /* Mit Tastenfeld: statischer Cursor statt Blinken, nur solange das Feld leer ist (wie im Artboard) */
+  .train-field.is-kp .train-input { caret-color:transparent; }
+  .train-caret { display:none; flex:none; width:2px; height:1em; border-radius:1px; background:var(--accent); }
+  .train-field.is-kp .train-input:placeholder-shown:not(:disabled) + .train-caret { display:block; }
+  .train-field-check { display:flex; flex:none; color:var(--good); }
+  .train-field-check svg { stroke-width:2.5; }
+  .train-unit { flex:none; font-size:var(--text-md); color:var(--muted); white-space:nowrap; }
+  .train-sign {
+    display:flex; align-items:center; justify-content:center; flex:none;
+    width:var(--hit-min); height:var(--hit-min); border-radius:var(--radius-pill); color:var(--muted);
+  }
+  .train-sign:hover { color:var(--text); background:var(--press); }
+  .train-error { max-width:36ch; font-size:var(--text-xs); line-height:1.45; color:var(--muted); }
+  .train-error:empty { display:none; }
+  .train-correction { display:flex; flex-wrap:wrap; align-items:baseline; justify-content:center; gap:var(--space-2); }
+  .train-correction-label { font-size:var(--text-sm); color:var(--muted); }
+  .train-correction-value { font-size:32px; font-weight:var(--weight-semibold); overflow-wrap:anywhere; }
+
+  /* ---------- Dock: Hilfe / Weiß nicht, Tastenfeld bzw. Auswahl ---------- */
+  .train-dock-row { display:flex; align-items:center; justify-content:space-between; gap:var(--space-2); min-height:var(--hit-min); }
+  .train-dock-row > :last-child { margin-left:auto; }
+
+  /* Auswahl 2 × 2 (64 px), Tastenziffer klein davor */
+  .train-choices { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:var(--space-2); }
+  .train-choice {
+    display:flex; align-items:center; justify-content:center; gap:var(--space-2);
+    min-width:0; min-height:64px; padding:var(--space-1) var(--space-3);
+    border:2px solid var(--border); border-radius:var(--radius-md); background:var(--surface); color:var(--text);
+    font-size:var(--text-lg); font-weight:var(--weight-semibold); line-height:1.2; text-align:center; overflow-wrap:anywhere;
+    cursor:pointer;
+    transition:var(--press-transition), border-color var(--dur-state) var(--ease-out),
+      background-color var(--dur-state) var(--ease-out), opacity var(--dur-state) var(--ease-out);
+  }
+  .train-choice:disabled { color:var(--text); cursor:default; }
+  .train-choice:disabled:active { transform:none; filter:none; }
+  .train-choice-key { flex:none; font-size:var(--text-xs); font-weight:500; color:var(--muted); }
+  .train-choice-text { min-width:0; }
+  .train-choice.is-correct { border-color:var(--good); background:var(--good-soft); }
+  .train-choice.is-glow { box-shadow:var(--glow-good); }
+  .train-choice.is-wrong { border-color:var(--bad); background:var(--bad-soft); }
+  .train-choice.is-dim { opacity:.5; }
+
+  /* Ergebnis der Auswahlaufgabe in der Bühne */
+  .train-outcome { display:flex; flex-direction:column; align-items:center; gap:var(--space-1); margin-top:var(--space-2); }
+  .train-outcome-title {
+    display:flex; align-items:center; justify-content:center; gap:var(--space-2);
+    font-size:var(--text-md); font-weight:var(--weight-semibold); line-height:1.35;
+  }
+  .train-outcome-title.is-good { color:var(--good); }
+  .train-outcome-check { display:flex; flex:none; }
+  .train-outcome-detail { max-width:36ch; font-size:var(--text-sm); line-height:1.45; color:var(--muted); }
+
+  /* ---------- Feedback-Sheet (ersetzt das Dock; Kopf = kit.feedbackHead) ---------- */
+  .train-fb-actions { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:var(--space-2); }
+  .train-fb-actions.is-single { grid-template-columns:minmax(0, 1fr); }
+  .train-fb-actions .btn { width:100%; min-height:var(--hit-min); border-radius:var(--radius-key); font-size:var(--text-sm); color:var(--text); }
+  /* KI (aiControl): Button im Raster neben „Methode“, Antwort in voller Breite darunter (E17) */
+  .train-fb-ai { display:contents; }
+  .train-fb-ai .ai-out { grid-column:1 / -1; }
+
+  /* ---------- Rundenergebnis ---------- */
+  .train-result { padding-top:max(48px, calc(env(safe-area-inset-top, 0px) + 24px)); }
+  .train-result-head { display:flex; flex-direction:column; gap:var(--space-1); min-width:0; }
+  .train-result-sub { font-size:var(--text-sm); color:var(--muted); overflow-wrap:anywhere; }
+  .train-result-title {
+    font-size:var(--text-num); font-weight:var(--weight-bold); line-height:1.15; letter-spacing:-0.02em;
+    text-shadow:var(--text-glow);
+  }
+  /* Programmatischer Fokus für Screenreader – die Überschrift ist kein Bedienelement */
+  .train-result-title:focus, .train-result-title:focus-visible { outline:none; }
+  .train-result-avg { font-size:var(--text-md); color:var(--muted); }
+  /* „N richtige anzeigen“ in der Aufgabenliste (Trennlinie kommt von .list) */
+  .train-more {
+    display:flex; align-items:center; justify-content:space-between; gap:var(--space-3);
+    width:100%; min-height:52px; padding:0 var(--space-4);
+    background:transparent; color:var(--accent-text);
+    font:inherit; font-size:var(--text-sm); font-weight:var(--weight-semibold); text-align:start; cursor:pointer;
+  }
+  .train-more-chevron { display:flex; flex:none; transition:transform var(--dur-state) var(--ease-out); }
+  .train-more[aria-expanded="true"] .train-more-chevron { transform:rotate(180deg); }
+  .train-sheet-empty { font-size:var(--text-sm); color:var(--muted); }
+  .train-result-actions { display:flex; flex-wrap:wrap; gap:var(--space-2); }
+  .train-result-actions > .btn { flex:1 1 calc(50% - var(--space-1)); min-height:var(--hit-min); border-radius:var(--radius-key); }
+
+  /* ---------- Methoden-Intro ---------- */
+  .train-intro { padding-top:var(--space-2); }
+
+  /* ---------- Atempause (E19): Kreis 260 px, zwei atmende Flächen, genau ein Zyklus von 8 s ---------- */
+  .train-breathe-head .focus-title { text-align:center; font-size:var(--text-sm); font-weight:var(--weight-regular); color:var(--muted); }
+  .train-breathe-spacer { flex:none; width:34px; }
+  .train-breathe {
+    flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:40px;
+    width:100%; min-height:0; padding:0; border:0; background:transparent; color:var(--text); cursor:pointer;
+  }
+  .train-breathe-circle { position:relative; flex:none; width:min(260px, 70vw); aspect-ratio:1; }
+  .train-breathe-track, .train-breathe-ring { position:absolute; inset:0; border-radius:var(--radius-pill); }
+  .train-breathe-track { border:1px solid var(--border); }
+  .train-breathe-ring { background:var(--accent-soft); animation:train-breathe 8s cubic-bezier(.65,0,.35,1) both; }
+  .train-breathe-ring.is-inner { inset:27%; background:color-mix(in srgb, var(--accent) 22%, transparent); }
+  .train-breathe-dot {
+    position:absolute; left:50%; top:50%; width:12px; height:12px; margin:-6px 0 0 -6px;
+    border-radius:var(--radius-pill); background:var(--accent);
+  }
+  .train-breathe-words { position:relative; width:220px; height:32px; text-align:center; }
+  .train-breathe-in, .train-breathe-out {
+    position:absolute; inset:0; font-size:24px; font-weight:var(--weight-semibold); line-height:32px;
+  }
+  .train-breathe-in { animation:train-inhale 8s linear both; }
+  .train-breathe-out { animation:train-exhale 8s linear both; }
+  .train-breathe-foot {
+    flex:none; display:flex; flex-direction:column; align-items:center; gap:var(--space-2);
+    padding:var(--space-4) var(--gutter) max(var(--space-6), calc(env(safe-area-inset-bottom, 0px) + var(--space-4)));
+    text-align:center;
+  }
+  .train-breathe-after { font-size:var(--text-sm); color:var(--muted); }
+  @keyframes train-breathe { 0%, 100% { transform:scale(.6); } 50% { transform:scale(1); } }
+  @keyframes train-inhale { 0%, 44% { opacity:1; } 52%, 100% { opacity:0; } }
+  @keyframes train-exhale { 0%, 44% { opacity:0; } 52%, 100% { opacity:1; } }
+
+  /* ---------- Kleine Bildschirme: Tastenfeld und Bühne kompakter, damit das Antwortfeld sichtbar bleibt ---------- */
+  @media (max-height: 640px) {
+    .train-stage { gap:10px; padding-top:var(--space-3); padding-bottom:var(--space-3); }
+    .train-q { font-size:clamp(32px, 10vw, 40px); }
+    .train-field { height:56px; }
+    .train-choice { min-height:56px; }
+    .train-breathe { gap:var(--space-5); }
+    .train-breathe-circle { width:min(200px, 60vw); }
+  }
+
+  /* Reduced Motion: statischer Kreis, „Einatmen …“ steht still (Start nach 3 s, breathe.ts) */
+  @media (prefers-reduced-motion: reduce) {
+    .train-breathe-ring { animation:none; transform:scale(.8); }
+    .train-breathe-in { animation:none; opacity:1; }
+    .train-breathe-out { animation:none; opacity:0; }
+    .train-ghost { transition:none; }
+  }
+}

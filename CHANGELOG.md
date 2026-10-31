@@ -4,6 +4,16 @@ Alle nennenswerten Änderungen an Mental Math. Format nach [Keep a Changelog](ht
 
 <!-- Automatisch erzeugt mit `npm run changelog` aus src/releases.ts – nicht von Hand bearbeiten. -->
 
+## [1.11.0] - 2026-10-31
+
+### Ruhiger Fokus
+
+- Neue, ruhige Oberfläche mit vier Tabs: Heute, Lernen, Fortschritt und Profil.
+- Themes Papier, Nacht, OLED, Aurora und Neon.
+- Fokus-Training: Tastenfeld unten im Daumenbereich, Rückmeldung mit Lösungsweg im Feedback-Sheet – ohne Fehlerton.
+- Zeitanzeige wählbar (Ruhig, Präzise, Aus) und auf Wunsch eine Atempause vor der Runde.
+- Profil als eine Seite: Einstellungen wirken sofort, die Seite springt nicht mehr nach oben.
+
 ## [1.10.0] - 2026-10-31
 
 ### Offline & Cloud-Sync

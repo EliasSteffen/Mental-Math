@@ -1,57 +1,77 @@
-import type { Task } from '../../types.ts';
+// Zeitanzeige einer Aufgabe (E3): Gemessen wird immer, angezeigt je nach settings.timerDisplay.
+// calm = nur die Zeitlinie, precise = Linie + „x,x s / y s“ im Kopf, off = nichts. Takt 250 ms,
+// ab der Zielzeit wechselt die Linie einmal weich nach Ocker (kein Puls). Der Tab-Titel bleibt ruhig.
+import type { TimerDisplay } from '../../types.ts';
 import { fmtSeconds } from '../../core/numbers.ts';
-import { h } from '../../ui/dom.ts';
-import { setTitle } from '../../ui/title.ts';
-import { t } from '../../i18n/index.ts';
+import { locale } from '../../i18n/index.ts';
+import { timeLine } from '../../ui/kit.ts';
+
+export const TICK_MS = 250;
 
 export interface TaskTimer {
-  /** Text „x,x s / Ziel“ (Zeile unter dem Balken) */
-  label: HTMLElement;
-  /** Zeitbalken (aria-hidden) */
-  bar: HTMLElement;
-  /** Startet das 100-ms-Intervall und zeichnet sofort. */
+  /** Zeitlinie für den Kopf (null bei 'off') */
+  line: HTMLElement | null;
+  /** Startet den Takt und zeichnet sofort. */
   start(): void;
-  /** Stoppt das Intervall (idempotent). */
+  /** Stoppt den Takt (idempotent). */
   stop(): void;
   /** Friert die Anzeige auf die endgültige Zeit ein. */
   freeze(timeMs: number): void;
 }
 
-/** Zeit- und Druckanzeige für eine Aufgabe; t0 = performance.now() beim Aufgabenstart. */
-export function createTimer(task: Task, t0: number): TaskTimer {
-  const label = h('div', { class: 'timer' }, '');
-  const fill = h('span', { class: 'timerbar-fill' });
-  const bar = h('div', { class: 'timerbar', 'aria-hidden': 'true' }, fill);
-  let timerId: ReturnType<typeof setInterval> | null = null;
-  let lastSec = -1;
+export interface TimerOptions {
+  targetMs: number;
+  /** performance.now() beim Aufgabenstart */
+  t0: number;
+  display: TimerDisplay;
+  /** Text „x,x s / y s“ im Kopf (nur bei 'precise') */
+  text?: HTMLElement | null;
+  /** Läuft bei jedem Takt mit (z. B. Ghost-Marke) */
+  onTick?: () => void;
+}
 
+const secFormat = new Map<string, Intl.NumberFormat>();
+
+/** Laufende Zeit immer mit einer Nachkommastelle („0,0 s“), damit der Text nicht springt. */
+export function runningSeconds(ms: number): string {
+  const loc = locale();
+  let f = secFormat.get(loc);
+  if (!f) {
+    f = new Intl.NumberFormat(loc, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+    secFormat.set(loc, f);
+  }
+  return `${f.format(Math.max(0, ms) / 1000)} s`;
+}
+
+export function createTimer({ targetMs, t0, display, text = null, onTick }: TimerOptions): TaskTimer {
+  const tl = display === 'off' ? null : timeLine();
+  const target = fmtSeconds(targetMs);
+  let timerId: ReturnType<typeof setInterval> | null = null;
+
+  const paint = (elapsed: number): void => {
+    const over = elapsed >= targetMs;
+    tl?.set(targetMs > 0 ? elapsed / targetMs : 1, over);
+    if (text) {
+      text.textContent = `${runningSeconds(elapsed)} / ${target}`;
+      text.classList.toggle('is-over', over);
+    }
+  };
   const update = (): void => {
-    const el = performance.now() - t0;
-    const sec = Math.floor(el / 1000);
-    if (sec !== lastSec) { lastSec = sec; setTitle(t('common.secCompact', { n: sec })); }
-    label.textContent = `${fmtSeconds(el)} / ${fmtSeconds(task.targetMs)}`;
-    fill.style.setProperty('--w', String(Math.min(100, (el / task.targetMs) * 100)));
-    // Druck sichtbar machen: über Zielzeit orange, über doppelter Zielzeit rot
-    const warn = el > task.targetMs;
-    const over = el > 2 * task.targetMs;
-    label.classList.toggle('is-warn', warn && !over);
-    label.classList.toggle('is-over', over);
-    bar.classList.toggle('is-warn', warn && !over);
-    bar.classList.toggle('is-over', over);
+    paint(performance.now() - t0);
+    onTick?.();
   };
 
   return {
-    label,
-    bar,
+    line: tl ? tl.el : null,
     start() {
       update();
-      timerId = setInterval(update, 100);
+      if (timerId === null && (tl || text || onTick)) timerId = setInterval(update, TICK_MS);
     },
     stop() {
       if (timerId !== null) { clearInterval(timerId); timerId = null; }
     },
     freeze(timeMs: number) {
-      label.textContent = `${fmtSeconds(timeMs)} / ${fmtSeconds(task.targetMs)}`;
+      paint(timeMs);
     },
   };
 }

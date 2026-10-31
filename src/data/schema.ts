@@ -1,5 +1,7 @@
 // Defaults und Normalisierung der Anwendungsdaten (State v2-Sicht). Keine Abhängigkeit zu Adaptern/Repository.
-import type { Activity, Attempt, DailyResult, Level, ParallelStats, Reviews, Session, Settings, State } from '../types.ts';
+import type {
+  Activity, Attempt, DailyResult, Level, ParallelStats, Reviews, Session, Settings, State, ThemeSetting, TimerDisplay,
+} from '../types.ts';
 
 export const DEFAULT_SETTINGS: Settings = {
   sessionLength: 10, dailyGoalMin: 15, theme: 'system', difficulty: 'auto',
@@ -9,11 +11,40 @@ export const DEFAULT_SETTINGS: Settings = {
   autoFail: false,
   lang: 'auto',
   lastSeenVersion: '',
+  timerDisplay: 'calm', breathe: false, confetti: false,
 };
 
 export const DEFAULT_PARALLEL_STATS: ParallelStats = { nextStart: 2, bestChains: 0, bestCorrectStreak: 0, rounds: 0 };
 
 export const isObj = (x: unknown): x is Record<string, unknown> => x !== null && typeof x === 'object' && !Array.isArray(x);
+
+/** Gültige Theme-Einstellungen (Reihenfolge wie im Profil). */
+export const THEME_SETTINGS: readonly ThemeSetting[] = ['system', 'paper', 'night', 'oled', 'aurora', 'neon'];
+const TIMER_DISPLAYS: readonly TimerDisplay[] = ['calm', 'precise', 'off'];
+
+/** Theme-Migration (E1): 'pastel' → 'paper', 'neon'/'oled' bleiben, Unbekanntes → 'system'. */
+export function normalizeTheme(v: unknown): ThemeSetting {
+  if (v === 'pastel') return 'paper';
+  return THEME_SETTINGS.find((x) => x === v) ?? 'system';
+}
+
+/**
+ * Beliebige gespeicherte/importierte/synchronisierte Einstellungen → gültige Settings.
+ * Fehlende Felder kommen aus den Defaults; Theme wird migriert; fehlende `timerDisplay` folgt dem alten
+ * `timer` (false → 'off', sonst 'calm', E3); `breathe`/`confetti` nur als Boolean.
+ */
+export function normalizeSettings(raw: unknown): Settings {
+  const s: Record<string, unknown> = isObj(raw) ? raw : {};
+  const td = TIMER_DISPLAYS.find((x) => x === s.timerDisplay);
+  return {
+    ...DEFAULT_SETTINGS,
+    ...(s as Partial<Settings>),
+    theme: normalizeTheme(s.theme ?? DEFAULT_SETTINGS.theme),
+    timerDisplay: td ?? (s.timer === false ? 'off' : 'calm'),
+    breathe: typeof s.breathe === 'boolean' ? s.breathe : DEFAULT_SETTINGS.breathe,
+    confetti: typeof s.confetti === 'boolean' ? s.confetti : DEFAULT_SETTINGS.confetti,
+  };
+}
 
 export const defaults = (): State => ({
   version: 2, attempts: [], sessions: [], settings: { ...DEFAULT_SETTINGS }, reviews: {}, activity: {},
@@ -37,7 +68,7 @@ export function normalize(s: unknown): State {
     version: 2,
     attempts: Array.isArray(s.attempts) ? (s.attempts as Attempt[]) : d.attempts,
     sessions: Array.isArray(s.sessions) ? (s.sessions as Session[]) : d.sessions,
-    settings: { ...d.settings, ...(isObj(s.settings) ? (s.settings as Partial<Settings>) : {}) },
+    settings: normalizeSettings(s.settings),
     reviews: isObj(s.reviews) ? (s.reviews as Reviews) : d.reviews,
     activity: isObj(s.activity) ? (s.activity as Activity) : d.activity,
     dailyResults: isObj(s.dailyResults) ? (s.dailyResults as Record<string, DailyResult>) : d.dailyResults,

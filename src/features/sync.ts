@@ -2,10 +2,11 @@
 import type { RemoteSyncProvider, SyncStatus } from 'offline-sync';
 import { SyncEngine, SyncManager, browserSyncEnv } from '../vendor/storage.ts';
 import { APP_SYNC_SCHEMA } from '../data/sync-schema.ts';
-import { emitDataChange, getAttempts, getProfile, getRepository, getSessions, onChange, resetAll, updateProfile } from '../data/storage.ts';
+import { emitDataChange, getAttempts, getProfile, getRepository, getSessions, getSettings, onChange, resetAll, updateProfile } from '../data/storage.ts';
 import { createSyncProvider, getAccountState, logout, onAccountChange } from './account.ts';
 import type { AccountState } from './account.ts';
-import { t } from '../i18n/index.ts';
+import { applyTheme } from '../ui/theme.ts';
+import { detectLang, getLang, setLang, t } from '../i18n/index.ts';
 
 export type LinkDecision = 'first' | 'same' | 'other';
 export interface StatusEntry { key: `account.${string}`; params?: Record<string, string | number> }
@@ -116,15 +117,44 @@ async function applyAccount(st: AccountState): Promise<void> {
 
 let rerenderTimer: ReturnType<typeof setTimeout> | null = null;
 const RUNNING = ['#/train', '#/parallel', '#/chain', '#/custom'];
+/** Erneute Prüfung, solange eine Runde läuft oder ein Sheet/Dialog offen ist (ms). */
+const RETRY_MS = 500;
 
-/** Nach fremden Änderungen neu rendern, aber nicht mitten im Training. */
+/** Nach fremden Änderungen (Pull, Löschung von einem anderen Gerät, anderer Tab) übernehmen und neu zeichnen. */
 function scheduleRerender(): void {
   if (rerenderTimer !== null) clearTimeout(rerenderTimer);
   rerenderTimer = setTimeout(() => {
     rerenderTimer = null;
-    if (RUNNING.some((p) => location.hash.startsWith(p))) return;
-    void import('../router.ts').then((r) => r.rerender()); // lazy: Router zieht alle Views mit
+    void applyRemoteChange(true);
   }, 300);
+}
+
+/**
+ * Theme sofort übernehmen; Sprache und Neuzeichnen (Scroll-Position bleibt) erst, wenn keine Runde läuft und kein
+ * Sheet/Dialog offen ist – sonst gingen Runde bzw. Eingaben verloren. Nach einer Runde hat der Routenwechsel die
+ * Seite schon mit frischen Daten gezeichnet (`redraw` = false); dann fehlt höchstens noch die Sprache.
+ */
+async function applyRemoteChange(redraw: boolean): Promise<void> {
+  const settings = getSettings();
+  applyTheme(settings.theme);
+  // lazy: brauchen das DOM bzw. ziehen alle Views mit
+  const [{ isSheetOpen }, { isModalOpen }, { rerender }] = await Promise.all([
+    import('../ui/sheet.ts'), import('../ui/modal.ts'), import('../router.ts'),
+  ]);
+  const running = RUNNING.some((p) => location.hash.startsWith(p));
+  if (running || isSheetOpen() || isModalOpen()) {
+    // Eine neuere Änderung hat schon einen eigenen Lauf geplant
+    if (rerenderTimer === null) {
+      rerenderTimer = setTimeout(() => {
+        rerenderTimer = null;
+        void applyRemoteChange(redraw && !running);
+      }, RETRY_MS);
+    }
+    return;
+  }
+  const lang = detectLang(getSettings().lang);
+  if (lang !== getLang()) setLang(lang); // onLangChange zeichnet ohnehin neu (kein zweites rerender)
+  else if (redraw) rerender({ keepScroll: true });
 }
 
 /** Startet Engine + Manager (idempotent). Nach `await initStorage()` aufrufen. */
@@ -136,7 +166,7 @@ export function startSync(): void {
     deviceId: () => getRepository().deviceId,
     onRemoteWipe: () => {
       resetAll();
-      emitDataChange('remote');
+      emitDataChange('remote'); // → scheduleRerender: Theme und Sprache fallen auf die Standardwerte zurück
       void import('../ui/toast.ts').then((m) => m.toast(t('account.sync.remoteWiped'))); // lazy: braucht das DOM
     },
   });

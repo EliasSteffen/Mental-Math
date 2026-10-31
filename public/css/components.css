@@ -1,0 +1,543 @@
+/* Ruhiger Fokus – generische Bausteine (Katalog §4). DOM dazu erzeugen src/ui/kit.ts, ui/keypad.ts, ui/charts.ts,
+   ui/widgets.ts, ui/modal.ts, ui/toast.ts und features/ai-view.ts.
+   Dynamische Werte nur über CSS-Variablen (--w Breite 0–100, --n Anzahl), nie über style-Attribute.
+   Training-spezifisches (Antwortfeld, Auswahl, Ergebnis, Atempause) liegt in views/train.css. */
+@layer components {
+  .icon { flex:none; vertical-align:middle; }
+
+  /* ---------- Gruppe: Titel + Inhalt ---------- */
+  .group { display:flex; flex-direction:column; gap:var(--space-2); min-width:0; }
+  .group-head { display:flex; align-items:baseline; justify-content:space-between; gap:var(--space-3); min-width:0; }
+  .group-title { font-size:var(--text-sm); font-weight:var(--weight-semibold); line-height:1.3; color:var(--muted); }
+  .group-meta { flex:none; font-size:var(--text-xs); color:var(--muted); }
+
+  /* ---------- Zurück-Link (Detailseiten; Lage am Seitenanfang regelt layout.css) ---------- */
+  .back-link {
+    display:inline-flex; align-items:center; gap:2px; align-self:flex-start;
+    min-height:var(--hit-min); margin-left:-10px; padding:0 var(--space-3) 0 6px;
+    border-radius:var(--radius-pill);
+    color:var(--accent-text); font-size:var(--text-md); text-decoration:none;
+    transition:var(--press-transition), background-color var(--dur-state) var(--ease-out);
+  }
+
+  /* ---------- Liste: Karte mit Zeilen und Trennlinien ---------- */
+  .list {
+    display:flex; flex-direction:column; min-width:0;
+    margin:0; padding:0; list-style:none;
+    border:0; border-radius:var(--radius-md); overflow:hidden;
+    background:var(--surface); box-shadow:var(--shadow-1);
+  }
+  /* Trennlinie nur zwischen sichtbaren Kindern (ausgeblendete Zeilen der Suche, Switches nur bei Nacht);
+     die Spezifität liegt bewusst über .row & Co., damit keine Zeile die Linie zurücksetzt */
+  .list > :not([hidden]) ~ :not([hidden]) { border-top:1px solid var(--border); }
+
+  .row {
+    display:flex; align-items:center; gap:var(--space-3);
+    width:100%; min-width:0; min-height:52px; margin:0; padding:var(--space-2) var(--space-4);
+    border-radius:0; background:transparent;
+    color:var(--text); font:inherit; font-size:var(--text-md); line-height:1.3; text-align:start; text-decoration:none;
+    transition:var(--press-transition), background-color var(--dur-state) var(--ease-out);
+  }
+  .row.has-sub { min-height:60px; }
+  :is(a, button).row { cursor:pointer; }
+  .row-icon { display:flex; flex:none; color:var(--accent-text); }
+  .row-lead { display:flex; flex:none; align-items:center; }
+  .row-text { flex:1; min-width:0; display:flex; flex-direction:column; gap:2px; }
+  .row-label { overflow-wrap:anywhere; }
+  .row-sub { font-size:var(--text-xs); line-height:1.35; color:var(--muted); }
+  .row-note { font-size:var(--text-xs); line-height:1.45; color:var(--muted); overflow-wrap:anywhere; }
+  .row-value { flex:none; max-width:50%; font-size:var(--text-sm); color:var(--muted); text-align:end; overflow-wrap:anywhere; }
+  .row-value.is-accent { color:var(--accent-text); font-weight:var(--weight-semibold); }
+  .row-chevron { display:flex; flex:none; color:var(--muted); }
+  .row.is-danger, .row.is-danger .row-icon { color:var(--bad); }
+
+  /* Ergebniszeile: Status-Punkt (8 px), Aufgabe, deine/richtige Antwort */
+  .row.is-result { min-height:64px; padding-block:10px; }
+  .status-dot-wrap { display:flex; align-items:center; }
+  .status-dot { display:block; width:8px; height:8px; border-radius:var(--radius-pill); }
+  .status-dot.is-good { background:var(--good); }
+  .status-dot.is-bad { background:var(--bad); }
+
+  /* ---------- Karte und Hero ---------- */
+  .card {
+    display:flex; flex-direction:column; gap:var(--space-3); min-width:0;
+    padding:var(--space-4); border:0; border-radius:var(--radius-md);
+    background:var(--surface); box-shadow:var(--shadow-1); color:var(--text);
+  }
+  .card.hero { gap:var(--space-4); padding:20px; background:var(--hero-bg); box-shadow:var(--hero-shadow); }
+  .card-head { display:flex; align-items:baseline; justify-content:space-between; gap:var(--space-3); min-width:0; }
+  .card-title { min-width:0; font-size:var(--text-sm); font-weight:var(--weight-semibold); line-height:1.3; }
+  .card-meta { flex:none; max-width:60%; font-size:var(--text-xs); line-height:1.3; color:var(--muted); text-align:end; }
+
+  /* ---------- Insight: Icon im Soft-Kreis, Titel, Text ---------- */
+  .insight {
+    display:flex; align-items:flex-start; gap:var(--space-3); min-width:0;
+    padding:var(--space-4); border-radius:var(--radius-md);
+    background:var(--surface); box-shadow:var(--shadow-1);
+  }
+  /* Kontur-Variante: ohne eigene Fläche, passt auf Karte, Sheet und Fold */
+  .insight.is-outline { background:transparent; box-shadow:inset 0 0 0 1px var(--border); }
+  .insight-icon {
+    display:flex; align-items:center; justify-content:center; flex:none;
+    width:36px; height:36px; border-radius:var(--radius-pill);
+    background:var(--accent-soft); color:var(--accent-text);
+  }
+  .insight-icon.is-warn { background:var(--warn-soft); color:var(--warn); }
+  .insight-icon.is-good { background:var(--good-soft); color:var(--good); }
+  .insight-icon.is-bad { background:var(--bad-soft); color:var(--bad); }
+  .insight-body { display:flex; flex-direction:column; gap:var(--space-1); min-width:0; }
+  .insight-title { font-size:var(--text-md); font-weight:var(--weight-semibold); line-height:1.35; }
+  .insight-text { font-size:var(--text-sm); line-height:1.5; color:var(--muted); }
+
+  /* ---------- KPI-Zeile (dl mit Werten über den Labels) ---------- */
+  .kpis { display:grid; grid-template-columns:repeat(var(--n, 3), minmax(0, 1fr)); gap:var(--space-2); margin:0; }
+  .kpis > div { display:flex; flex-direction:column-reverse; gap:2px; min-width:0; }
+  .kpis dt { font-size:var(--text-xs); color:var(--muted); }
+  .kpis dd {
+    margin:0; font-family:var(--font-num); font-variant-numeric:tabular-nums;
+    font-size:var(--text-num); font-weight:var(--weight-semibold); line-height:1.1; overflow-wrap:anywhere;
+  }
+
+  /* ---------- Status Line: Mini-Ring, Tagesminuten, Serie/XP ---------- */
+  .status-line {
+    display:flex; flex-wrap:wrap; align-items:center; gap:var(--space-2);
+    font-size:var(--text-sm); line-height:1.4; color:var(--muted);
+  }
+  .status-strong { color:var(--text); font-weight:var(--weight-semibold); }
+  .status-streak { display:inline-flex; color:var(--streak); filter:var(--glow-icon); }
+  .mini-ring { flex:none; transform:rotate(-90deg); color:var(--accent); filter:var(--glow-icon); }
+  .mini-ring-track { fill:none; stroke:var(--border); }
+  .mini-ring-value { fill:none; stroke:var(--accent); transition:stroke-dashoffset var(--dur-progress) var(--ease-out); }
+
+  /* ---------- Chips mit Meisterungs-Punkt ---------- */
+  /* position: relative hält die .sr-only-Texte der Chips im Scroller – sonst verbreitern sie die Seite (320 px) */
+  .chips {
+    position:relative; display:flex; gap:var(--space-2); min-width:0;
+    margin:0 calc(-1 * var(--gutter)); padding:0 var(--gutter) 2px;
+    overflow-x:auto; overscroll-behavior-x:contain; scroll-padding-inline:var(--gutter);
+    scrollbar-width:none;
+  }
+  .chips::-webkit-scrollbar { display:none; }
+  /* Ab 768 px umbrechen statt horizontal scrollen (genug Breite für alle Chips) */
+  @media (min-width: 768px) {
+    .chips.is-wrap { flex-wrap:wrap; overflow-x:visible; margin-inline:0; padding-inline:0; }
+  }
+  .chip {
+    position:relative; display:inline-flex; align-items:center; gap:var(--space-2); flex:none;
+    min-height:32px; padding:0 var(--space-3); border-radius:var(--radius-pill);
+    border:1px solid var(--border); background:var(--surface); color:var(--text);
+    font-size:var(--text-xs); font-weight:var(--weight-regular); line-height:1.2; white-space:nowrap; text-decoration:none;
+    cursor:default;
+  }
+  :is(a, button).chip {
+    min-height:var(--hit-min); padding:0 var(--space-4); font-size:var(--text-sm); cursor:pointer;
+    transition:var(--press-transition), border-color var(--dur-state) var(--ease-out);
+  }
+  .mastery { flex:none; color:var(--accent); }
+  .mastery-mark { display:inline-flex; flex:none; align-items:center; }
+
+  /* ---------- Bedienelemente: gemeinsame Zeile (Label, Hilfe, Control) ---------- */
+  .control { display:flex; flex-direction:column; gap:10px; min-width:0; }
+  .control.is-inline { flex-direction:row; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:var(--space-2) var(--space-3); }
+  /* Basis 0, Mindestbreite = längstes Wort: Control bleibt in der Zeile, bricht erst um, wenn es nicht passt (320 px) */
+  .control-text { flex:1 1 0; display:flex; flex-direction:column; gap:2px; }
+  .control.is-inline > .control-label { flex:1 1 0; }
+  .control-label { font-size:var(--text-md); line-height:1.3; }
+  .control-help { font-size:var(--text-xs); line-height:1.45; color:var(--muted); }
+  .list > .control { padding:14px var(--space-4); }
+  .list > .control.is-inline { min-height:60px; padding:var(--space-2) var(--space-4); }
+  .list > .control.has-help { min-height:64px; padding:10px var(--space-4); }
+
+  /* ---------- Segment-Control (aria-pressed, lokal aktualisiert) ---------- */
+  .segmented {
+    display:grid; grid-template-columns:repeat(var(--n, 1), minmax(0, 1fr)); gap:2px;
+    width:100%; max-width:100%; min-width:0; padding:3px;
+    border:0; border-radius:var(--radius-key); background:var(--surface-2);
+  }
+  .control.is-inline > .segmented {
+    width:auto; margin-left:auto;
+    grid-template-columns:repeat(var(--n, 1), minmax(var(--hit-min), max-content));
+  }
+  /* Inline mit gleich breiten Feldern (Rundenlänge, Tastenfeld) */
+  .control.is-inline.is-even > .segmented { grid-template-columns:repeat(var(--n, 1), minmax(var(--hit-min), 1fr)); }
+  .segmented > button {
+    min-width:0; min-height:var(--hit-min); margin:0; padding:0 var(--space-2);
+    border:0; border-radius:9px; background:transparent; box-shadow:none;
+    color:var(--muted); font:inherit; font-size:var(--text-sm); font-weight:500; line-height:1.15;
+    white-space:normal; overflow-wrap:break-word; hyphens:auto; text-align:center;
+    cursor:pointer;
+    transition:var(--press-transition), background-color var(--dur-state) var(--ease-out), color var(--dur-state) var(--ease-out);
+  }
+  .segmented.num > button { font-family:var(--font-num); font-variant-numeric:tabular-nums; }
+  .control.is-inline > .segmented > button { padding:0 var(--space-3); }
+  .segmented > button[aria-pressed="true"] {
+    background:var(--surface); color:var(--text); font-weight:var(--weight-semibold); box-shadow:var(--shadow-1);
+  }
+  .segmented > button:disabled { opacity:.45; cursor:default; }
+  .segmented > button:disabled:active { transform:none; filter:none; }
+  /* Ab 4 Optionen: gleich breit, solange es passt, sonst nach Inhalt – Wörter werden nie getrennt */
+  .segmented.is-dense { grid-template-columns:repeat(var(--n, 4), minmax(min-content, 1fr)); }
+  .segmented.is-dense > button { padding:0 var(--space-1); font-size:14px; hyphens:manual; overflow-wrap:normal; }
+  @media (max-width: 359px) {
+    .segmented > button { padding-inline:var(--space-1); }
+    .control.is-inline > .segmented > button { padding-inline:var(--space-2); }
+    .segmented.is-dense > button { padding-inline:2px; font-size:var(--text-xs); letter-spacing:-0.01em; }
+  }
+
+  /* ---------- Switch 51 × 31 (role=switch, aria-checked) ---------- */
+  .switch[role="switch"] {
+    position:relative; flex:none; width:51px; height:31px; margin:0; padding:0;
+    border:0; border-radius:var(--radius-pill); background:var(--border);
+    cursor:pointer;
+    transition:background-color var(--dur-state) var(--ease-out), opacity var(--dur-state) var(--ease-out);
+  }
+  .switch[role="switch"]::before { content:""; position:absolute; inset:-7px -2px; } /* Trefferfläche ≥ 44 px */
+  .switch[role="switch"][aria-checked="true"] { background:var(--accent); }
+  .switch[role="switch"]:disabled { opacity:.45; cursor:default; }
+  .switch-knob {
+    position:absolute; top:2px; left:2px; width:27px; height:27px; border-radius:var(--radius-pill);
+    background:#FFFFFF; box-shadow:0 1px 3px rgb(0 0 0 / .2);
+    transition:transform var(--dur-state) var(--ease-out);
+  }
+  .switch[role="switch"][aria-checked="true"] .switch-knob { transform:translateX(20px); }
+
+  /* ---------- Stepper (− / Wert / +) ---------- */
+  .stepper { display:flex; align-items:center; gap:var(--space-1); flex:none; margin-left:auto; }
+  .stepper-btn {
+    display:flex; align-items:center; justify-content:center; flex:none;
+    width:var(--hit-min); height:var(--hit-min); border:0; border-radius:var(--radius-key);
+    background:var(--surface-2); color:var(--text); font:inherit; font-size:var(--text-lg); line-height:1;
+    cursor:pointer;
+    transition:var(--press-transition), opacity var(--dur-state) var(--ease-out);
+  }
+  .stepper-btn[aria-disabled="true"] { opacity:.4; cursor:default; }
+  .stepper-btn[aria-disabled="true"]:active { transform:none; filter:none; }
+  .stepper-value { min-width:56px; text-align:center; font-size:var(--text-md); font-weight:var(--weight-semibold); }
+
+  /* ---------- Listen auf einer Sheet-Fläche (--surface): abgesetzt auf --surface-2 ---------- */
+  .sheet .list { background:var(--surface-2); box-shadow:none; }
+  .sheet .list .segmented { background:var(--surface); }
+  .sheet .list .switch[role="switch"]:not([aria-checked="true"]) { background:color-mix(in srgb, var(--muted) 35%, transparent); }
+
+  /* ---------- Suchfeld ---------- */
+  .search {
+    display:flex; align-items:center; gap:var(--space-2); min-width:0;
+    height:var(--hit-min); padding:0 var(--space-3); border-radius:var(--radius-key);
+    background:var(--surface-2); color:var(--muted); cursor:text;
+  }
+  .search:focus-within { outline:3px solid color-mix(in srgb, var(--accent) 40%, transparent); }
+  .search input {
+    flex:1; min-width:0; height:100%; margin:0; padding:0;
+    border:0; outline:none; background:transparent; color:var(--text);
+    font:inherit; font-size:var(--text-md);
+    -webkit-appearance:none; appearance:none;
+  }
+  .search input:focus-visible { outline:none; }
+
+  /* ---------- Fold (aufklappbarer Abschnitt) und nummerierte Schritte ---------- */
+  .fold { min-width:0; border:0; border-radius:var(--radius-md); background:var(--surface-2); overflow:hidden; text-align:start; }
+  .fold-head {
+    display:flex; align-items:center; justify-content:space-between; gap:var(--space-3);
+    width:100%; min-height:var(--hit-min); margin:0; padding:0 14px;
+    border:0; background:transparent; color:var(--text);
+    font:inherit; font-size:var(--text-sm); font-weight:var(--weight-semibold); text-align:start;
+    cursor:pointer;
+    transition:var(--press-transition);
+  }
+  .fold-chevron { display:flex; flex:none; color:var(--muted); transition:transform var(--dur-state) var(--ease-out); }
+  .fold-head[aria-expanded="true"] .fold-chevron { transform:rotate(180deg); }
+  .fold-body { padding:0 14px 14px; }
+
+  .steps {
+    display:flex; flex-direction:column; gap:var(--space-2);
+    margin:0; padding:0; list-style:none; counter-reset:step;
+    font-size:var(--text-sm); line-height:1.45; text-align:start;
+  }
+  .steps > li {
+    position:relative; min-height:22px; margin:0; padding:1px 0 0 32px;
+    font-variant-numeric:tabular-nums; overflow-wrap:anywhere; counter-increment:step;
+  }
+  /* Nummern-Kreis mit 8 % Text: sichtbar auf jeder Fläche (Seite, Karte, Sheet, Fold) */
+  .steps > li::before {
+    content:counter(step);
+    position:absolute; left:0; top:0;
+    display:flex; align-items:center; justify-content:center; width:22px; height:22px;
+    border-radius:var(--radius-pill); background:color-mix(in srgb, var(--text) 8%, transparent); color:var(--muted);
+    font-family:var(--font-num); font-size:var(--text-xs); font-weight:var(--weight-semibold); line-height:1;
+  }
+
+  /* ---------- Methoden-Block (ui/widgets.methodBlock): Training-Intro, Methoden-Sheet ---------- */
+  .method-block { display:flex; flex-direction:column; gap:var(--space-4); min-width:0; text-align:start; }
+  .method-part { display:flex; flex-direction:column; gap:var(--space-2); min-width:0; }
+  .method-title { margin:0; font-size:var(--text-sm); font-weight:var(--weight-semibold); line-height:1.3; color:var(--muted); }
+  .method-text { margin:0; font-size:var(--text-md); line-height:1.5; overflow-wrap:anywhere; }
+  .method-link { align-self:flex-start; margin-left:calc(-1 * var(--space-1)); }
+  /* Typische Fehler (und Listen der KI): ruhige Liste mit kleinen Punkten */
+  .method-list {
+    display:flex; flex-direction:column; gap:var(--space-2); min-width:0;
+    margin:0; padding:0; list-style:none;
+    font-size:var(--text-sm); line-height:1.45;
+  }
+  .method-list > li { position:relative; padding-left:20px; overflow-wrap:anywhere; }
+  .method-list > li::before {
+    content:""; position:absolute; left:6px; top:calc(0.725em - 2.5px);
+    width:5px; height:5px; border-radius:var(--radius-pill); background:var(--muted);
+  }
+
+  /* ---------- KI-Erklärung (features/ai-view.ts): Button, ruhige Antwortkarte ---------- */
+  .ai { display:flex; flex-direction:column; align-items:flex-start; gap:var(--space-3); min-width:0; }
+  .ai-out { width:100%; min-width:0; }
+  .ai-out:empty { display:none; }
+  .ai-answer {
+    display:flex; flex-direction:column; gap:var(--space-2); min-width:0;
+    padding:var(--space-4); border-radius:var(--radius-md);
+    background:var(--surface); box-shadow:var(--shadow-1);
+    font-size:var(--text-md); line-height:1.5; text-align:start; overflow-wrap:anywhere;
+  }
+  .ai-answer:focus-visible { outline-offset:2px; }
+  .sheet .ai-answer { background:var(--surface-2); box-shadow:none; }
+  .ai-label { font-size:var(--text-xs); font-weight:var(--weight-semibold); color:var(--muted); }
+  .ai-note { font-size:var(--text-sm); line-height:1.45; color:var(--muted); }
+
+  /* ---------- Rückmeldung: Kopf des Feedback-Sheets (Training, Kettenrechnen) ---------- */
+  .fb-head { display:flex; align-items:center; gap:var(--space-3); min-width:0; }
+  .fb-icon {
+    display:flex; align-items:center; justify-content:center; flex:none;
+    width:40px; height:40px; border-radius:var(--radius-pill);
+    background:var(--accent-soft); color:var(--accent-text);
+  }
+  .fb-icon.is-good { background:var(--good-soft); color:var(--good); filter:var(--glow-icon); }
+  .fb-icon.is-bad { background:var(--bad-soft); color:var(--bad); }
+  .fb-icon.is-bad svg, .fb-icon.is-skip svg { stroke-width:2; }
+  .fb-text { display:flex; flex-direction:column; gap:2px; min-width:0; }
+  .fb-title { font-size:var(--text-md); font-weight:var(--weight-semibold); line-height:1.3; overflow-wrap:anywhere; }
+  .fb-detail { font-size:var(--text-sm); line-height:1.4; color:var(--muted); overflow-wrap:anywhere; }
+  .fb-note { font-size:var(--text-xs); line-height:1.4; color:var(--muted); }
+
+  /* ---------- Segment-Fortschritt (Training) und Ergebnis-Segmente ---------- */
+  .segments {
+    display:grid; grid-template-columns:repeat(var(--n, 10), minmax(0, 1fr)); gap:4px;
+    flex:1; min-width:0;
+  }
+  .seg { height:4px; border-radius:2px; background:var(--border); transition:background-color var(--dur-progress) var(--ease-out); }
+  .seg.is-done { background:var(--accent); }
+  .seg.is-current { background:color-mix(in srgb, var(--accent) 40%, transparent); }
+  /* Über 20 Aufgaben: durchgehender Balken statt Segmente (E12) */
+  .segments.is-bar { display:block; height:4px; border-radius:2px; background:var(--border); overflow:hidden; }
+  .seg-fill {
+    display:block; height:100%; width:100%; background:var(--accent);
+    transform-origin:left center; transform:scaleX(calc(var(--w, 0) / 100));
+    transition:transform var(--dur-progress) var(--ease-out);
+  }
+  .segments.is-result { flex:none; }
+  .segments.is-result > .seg { height:8px; border-radius:4px; }
+  .segments.is-result.is-many { gap:2px; }
+  .seg.is-good { background:var(--good); }
+  .seg.is-bad { background:var(--bad); }
+
+  /* ---------- Zeitlinie: füllt sich bis zur Zielzeit, danach einmal weich nach Ocker ---------- */
+  .timeline { height:2px; border-radius:1px; background:var(--surface-2); overflow:hidden; }
+  .timeline-fill {
+    display:block; height:100%; width:100%; background:var(--accent);
+    transform-origin:left center; transform:scaleX(calc(var(--w, 0) / 100));
+    transition:transform 250ms linear, background-color var(--dur-progress) var(--ease-out);
+  }
+  .timeline.is-over .timeline-fill { background:var(--warn); }
+
+  /* ---------- Tastenfeld (ui/keypad.ts numpad; Training und Spielmodi): 4 Spalten, Tasten 52 px, „Prüfen“ über 2 Zeilen ---------- */
+  .numpad {
+    display:grid; grid-template-columns:repeat(4, minmax(0, 1fr)); grid-auto-rows:52px; gap:var(--space-2);
+    -webkit-user-select:none; user-select:none;
+  }
+  .numpad-key {
+    display:flex; align-items:center; justify-content:center; min-width:0;
+    border:0; border-radius:var(--radius-key); background:var(--surface-2); color:var(--text);
+    font-size:24px; font-weight:500; line-height:1; cursor:pointer;
+  }
+  .numpad-key.is-aux { color:var(--muted); }
+  .numpad-key.is-zeros { font-size:var(--text-lg); }
+  .numpad-check {
+    grid-row:span 2;
+    background:var(--cta-bg); color:var(--on-accent); box-shadow:var(--cta-shadow);
+    font-size:var(--text-md); font-weight:var(--weight-semibold);
+    transition:var(--press-transition), opacity var(--dur-state) var(--ease-out);
+  }
+  .numpad-check:disabled { opacity:.45; cursor:default; }
+  .numpad-check:disabled:active { transform:none; filter:none; }
+  /* Kleine Bildschirme: kompakter, damit das Antwortfeld über dem Dock sichtbar bleibt */
+  @media (max-height: 640px) {
+    .numpad { grid-auto-rows:46px; gap:6px; }
+  }
+
+  /* ---------- Balkenliste (genau ein Muster, Fix T1) ---------- */
+  .bar-list { display:flex; flex-direction:column; gap:var(--space-3); min-width:0; margin:0; padding:0; list-style:none; }
+  .bar-list > li {
+    display:grid; grid-template-columns:minmax(0, 40%) minmax(40px, 1fr) minmax(2ch, auto);
+    align-items:center; gap:var(--space-3); min-height:24px;
+  }
+  .bar-list-label { font-size:var(--text-sm); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .bar-list-track { height:6px; border-radius:var(--radius-pill); background:var(--surface-2); overflow:hidden; }
+  .bar-list-fill {
+    display:block; height:100%; width:calc(var(--w, 0) * 1%); border-radius:var(--radius-pill); background:var(--accent);
+    transition:width var(--dur-progress) var(--ease-out);
+  }
+  .bar-list-value {
+    font-family:var(--font-num); font-variant-numeric:tabular-nums;
+    font-size:var(--text-sm); font-weight:var(--weight-semibold); text-align:end; white-space:nowrap;
+  }
+  .bar-list > li.is-warn .bar-list-fill { background:var(--warn); }
+  .bar-list > li.is-warn .bar-list-value { color:var(--warn); }
+  .bar-list > li.is-bad .bar-list-fill { background:var(--bad); }
+
+  /* ---------- Diagramme (ui/charts.ts): Heatmap, Lernkurve, Fortschrittsbalken ---------- */
+  /* Heatmap: Spalten = Wochen, 18 px Zellen (schrumpfen bei 320 px), 4 Stufen bis --accent */
+  .heatmap {
+    display:grid; grid-template-rows:repeat(7, auto); grid-auto-flow:column; grid-auto-columns:minmax(0, 18px);
+    gap:4px; justify-content:space-between; min-width:0; max-width:100%; overflow:visible;
+  }
+  .hm-cell {
+    display:block; width:100%; height:auto; aspect-ratio:1; border-radius:4px;
+    background:var(--surface-2); box-shadow:none;
+  }
+  .hm-cell[data-level="1"] { background:color-mix(in srgb, var(--accent) 30%, var(--surface-2)); }
+  .hm-cell[data-level="2"] { background:color-mix(in srgb, var(--accent) 60%, var(--surface-2)); }
+  .hm-cell[data-level="3"], .hm-cell[data-level="4"] { background:var(--accent); }
+  .hm-cell.is-future { background:transparent; }
+  .hm-cell.is-legend { flex:none; width:12px; height:12px; aspect-ratio:auto; border-radius:3px; }
+
+  /* Lernkurve: Fläche --accent-soft, Linie --accent 2 px (bleibt beim Strecken 2 px) */
+  .spark { display:block; width:100%; height:auto; overflow:visible; background:none; border:0; }
+  .spark .line {
+    fill:none; stroke:var(--accent); stroke-width:2; stroke-linejoin:round; stroke-linecap:round;
+    vector-effect:non-scaling-stroke;
+  }
+  .spark .area { fill:var(--accent-soft); stroke:none; }
+  .spark .dot { fill:var(--accent); }
+
+  /* Fortschrittsbalken 4 px */
+  .progress { display:block; height:4px; border-radius:var(--radius-pill); background:var(--surface-2); overflow:hidden; }
+  .progress > .progress-bar {
+    display:block; height:100%; width:calc(var(--w, 0) * 1%); border-radius:var(--radius-pill);
+    background:var(--accent); transition:width var(--dur-progress) var(--ease-out);
+  }
+
+  /* ---------- Buttons ---------- */
+  /* Ohne Art-Klasse wie .outline */
+  .btn {
+    display:inline-flex; align-items:center; justify-content:center; gap:6px;
+    min-width:0; min-height:var(--hit-min); margin:0; padding:0 var(--space-4);
+    border:1px solid var(--border); border-radius:var(--radius-key);
+    background:transparent; color:var(--text); box-shadow:none; filter:none;
+    font:inherit; font-size:var(--text-sm); font-weight:var(--weight-regular); line-height:1.2;
+    text-align:center; text-decoration:none;
+    cursor:pointer;
+    transition:var(--press-transition), background-color var(--dur-state) var(--ease-out),
+      border-color var(--dur-state) var(--ease-out), opacity var(--dur-state) var(--ease-out);
+  }
+  .btn:disabled, .btn[aria-disabled="true"] { opacity:.45; cursor:default; }
+  .btn:disabled:active, .btn[aria-disabled="true"]:active { transform:none; filter:none; }
+  .btn.is-full { display:flex; width:100%; }
+  .btn-label { min-width:0; overflow-wrap:anywhere; }
+  .btn-meta { font-weight:var(--weight-regular); opacity:.85; }
+
+  .btn.primary {
+    min-height:var(--hit-primary); padding:0 var(--space-5);
+    border:0; border-radius:var(--radius-md);
+    background:var(--cta-bg); color:var(--on-accent); box-shadow:var(--cta-shadow);
+    font-size:var(--text-md); font-weight:var(--weight-semibold);
+  }
+  .btn.soft { border-color:transparent; background:var(--accent-soft); color:var(--accent-text); font-weight:var(--weight-semibold); }
+  .btn.link { padding:0 var(--space-1); border-color:transparent; color:var(--accent-text); font-weight:var(--weight-semibold); }
+  .btn.quiet { padding:0 var(--space-1); border-color:transparent; color:var(--muted); }
+  .btn.danger { color:var(--bad); }
+  .btn.soft.danger { background:var(--bad-soft); }
+
+  /* ---------- Dialog (ui/modal.ts): <dialog> im Top-Layer, auch über offenen Sheets ---------- */
+  dialog.modal {
+    display:flex; flex-direction:column; gap:var(--space-3);
+    width:min(calc(100% - 2 * var(--gutter)), 420px); max-width:none; max-height:min(85dvh, 640px);
+    margin:auto; padding:20px; border:0; border-radius:var(--radius-lg);
+    overflow:hidden; /* Titel und Aktionen bleiben stehen, nur der Inhalt scrollt */
+    /* Opak auch in Aurora (durchscheinende --surface über --bg) */
+    background:linear-gradient(var(--surface), var(--surface)), var(--bg); color:var(--text);
+    box-shadow:var(--shadow-2);
+    animation:rise-in var(--dur-enter) var(--ease-out) both;
+  }
+  dialog.modal:not([open]) { display:none; }
+  dialog.modal.is-closing { animation:fade-out var(--dur-exit) var(--ease-out) forwards; }
+  dialog.modal::backdrop {
+    background:rgb(0 0 0 / .45); /* Fallback, falls ::backdrop die Variablen nicht erbt */
+    background:var(--scrim, rgb(0 0 0 / .45));
+    animation:fade-in var(--dur-enter) var(--ease-out);
+  }
+  dialog.modal.is-closing::backdrop { animation:fade-out var(--dur-exit) var(--ease-out) forwards; }
+  .modal-title { font-size:var(--text-lg); font-weight:var(--weight-bold); line-height:1.25; }
+  .modal-body {
+    flex:1 1 auto; min-height:0; overflow-y:auto; overscroll-behavior:contain;
+    display:flex; flex-direction:column; gap:var(--space-3); min-width:0;
+    font-size:var(--text-sm); line-height:1.5; overflow-wrap:anywhere;
+  }
+  .modal-actions { flex:none; display:flex; flex-wrap:wrap; justify-content:flex-end; gap:var(--space-2); margin-top:var(--space-1); }
+  .modal-actions > .btn.primary { min-height:var(--hit-min); padding:0 var(--space-5); border-radius:var(--radius-key); font-size:var(--text-sm); }
+
+  /* „Was ist neu?“ (features/whats-new.ts) im Dialog */
+  .releases { display:flex; flex-direction:column; gap:var(--space-5); }
+  .release { display:flex; flex-direction:column; gap:var(--space-2); }
+  .release > h3 { font-size:var(--text-xs); font-weight:var(--weight-semibold); color:var(--muted); }
+  .release-title { font-size:var(--text-md); font-weight:var(--weight-semibold); line-height:1.3; }
+  .release > ul { display:flex; flex-direction:column; gap:var(--space-2); }
+  .release > ul > li { position:relative; padding-left:20px; }
+  .release > ul > li::before {
+    content:""; position:absolute; left:6px; top:calc(0.75em - 2.5px);
+    width:5px; height:5px; border-radius:var(--radius-pill); background:var(--muted);
+  }
+
+  /* ---------- Toasts (ui/toast.ts): Stapel im Top-Layer (popover), über Tab-Leiste/CTA bzw. Dock ---------- */
+  .toast-stack {
+    position:fixed; z-index:95; /* nur ohne Popover-API wirksam */
+    inset:auto 0 var(--toast-bottom, calc(var(--tabbar-bottom) + var(--tabbar-h) + var(--space-3))) 0;
+    width:min(calc(100% - 2 * var(--gutter)), 420px); height:auto; margin:0 auto; padding:0;
+    display:flex; flex-direction:column; align-items:center; gap:var(--space-2);
+    border:0; background:transparent; color:var(--text); overflow:visible;
+    pointer-events:none;
+  }
+  .toast-stack:empty { display:none; }
+  .toast {
+    max-width:100%; padding:12px var(--space-4);
+    border:1px solid var(--border); border-radius:var(--radius-md);
+    background:linear-gradient(var(--surface), var(--surface)), var(--bg); color:var(--text); box-shadow:var(--shadow-2);
+    font-size:var(--text-sm); font-weight:500; line-height:1.4; text-align:center; overflow-wrap:anywhere;
+    pointer-events:auto;
+    animation:rise-in var(--dur-enter) var(--ease-out) both;
+  }
+  .toast.is-success { border-color:color-mix(in srgb, var(--good) 55%, var(--border)); }
+  .toast.is-error { border-color:color-mix(in srgb, var(--bad) 55%, var(--border)); }
+  .toast.is-leaving { animation:fade-out var(--dur-exit) var(--ease-out) forwards; }
+
+  /* ---------- Feiern (charts.confetti, nur mit Einstellung „Feiern“): einmalig, kein Loop ---------- */
+  .confetti { position:fixed; inset:0; z-index:70; pointer-events:none; overflow:hidden; }
+  .confetti-piece {
+    position:absolute; top:0; left:calc(var(--x, 50) * 1%); width:8px; height:14px; border-radius:2px;
+    background:var(--accent); opacity:0;
+    animation:confetti-fall 2.4s ease-in var(--d, 0s) forwards;
+  }
+  .confetti-piece:nth-child(5n+1) { background:var(--accent-text); }
+  .confetti-piece:nth-child(5n+2) { background:var(--streak); --drift:40px; }
+  .confetti-piece:nth-child(5n+3) { background:var(--good); --drift:-40px; }
+  .confetti-piece:nth-child(5n+4) { background:var(--warn); --drift:24px; }
+  .confetti-piece:nth-child(5n) { background:var(--bad); --drift:-24px; }
+  @keyframes confetti-fall {
+    0% { transform:translate3d(0, -10vh, 0) rotate(0); opacity:1; }
+    100% { transform:translate3d(var(--drift, 0px), 105vh, 0) rotate(var(--r, 360deg)); opacity:0; }
+  }
+
+  @media (hover: hover) {
+    a.row:hover, button.row:hover { background-color:var(--press); }
+    .back-link:hover { color:var(--accent-text); background-color:var(--press); }
+    .btn:not(.primary, .soft, .link, .quiet):not(:disabled):hover { border-color:color-mix(in srgb, var(--accent) 45%, var(--border)); }
+    .btn.link:hover { color:var(--accent); }
+    .btn.quiet:hover { color:var(--text); }
+    .btn.danger:hover { color:var(--bad); }
+    :is(a, button).chip:hover { border-color:color-mix(in srgb, var(--accent) 45%, var(--border)); }
+  }
+}

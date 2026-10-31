@@ -1,8 +1,7 @@
 // Activity tracker: counts active time in 5 s ticks.
 import { addActivityMs, getActivity, getSettings, setSettings } from '../data/storage.ts';
 import { dayKey } from '../core/progress.ts';
-import { t } from '../i18n/index.ts';
-import { confetti, toast } from '../ui/charts.ts';
+import { confetti } from '../ui/charts.ts';
 
 const TICK = 5000;
 const IDLE = 60000;
@@ -19,9 +18,9 @@ export function startActivityTracker(): void {
     const s = getSettings();
     const goal = (s.dailyGoalMin || 15) * 60000;
     if (before < goal && before + TICK >= goal && s.celebrated !== dayKey(now)) {
+      // Tagesziel erreicht: einmal pro Tag merken; Konfetti nur mit „Feiern“ (settings.confetti, E4), kein Toast (E21)
       setSettings({ celebrated: dayKey(now) });
-      confetti();
-      toast(t('analyse.goalReached'));
+      if (s.confetti === true) confetti();
     }
   }, TICK);
 }

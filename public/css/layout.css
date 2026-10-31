@@ -1,0 +1,224 @@
+/* Ruhiger Fokus – Layout: Tab-Seite (.screen), Large Title, schwebende Tab-Leiste und CTA, Fokus-Modus
+   (.focus mit Kopf, Bühne, Dock), Sheets. Ab 768 px Seitenleiste links und zentrierter Inhalt (E23).
+   `#app` bekommt die Klasse `screen` bzw. `focus` von shell.ts (setShell). */
+@layer layout {
+  /* ---------- Tab-Seite ---------- */
+  .screen {
+    display:flex; flex-direction:column; gap:var(--space-5);
+    width:100%; min-width:0;
+    padding:max(60px, calc(env(safe-area-inset-top, 0px) + 16px)) var(--gutter)
+      calc(var(--tabbar-bottom) + var(--tabbar-h) + var(--space-7));
+  }
+  /* Mit schwebender CTA: Platz für Tab-Leiste + CTA (im Artboard 200 px) */
+  body.has-cta .screen {
+    padding-bottom:calc(var(--tabbar-bottom) + var(--tabbar-h) + var(--space-3) + var(--hit-primary) + 34px);
+  }
+
+  /* Zurück-Link als erstes Kind rückt in den oberen Rand (bleibt unter der Safe Area) und steht 8 px über dem Titel */
+  .screen > .back-link:first-child {
+    margin-top:calc(max(36px, env(safe-area-inset-top, 0px) + 4px) - max(60px, env(safe-area-inset-top, 0px) + 16px));
+    margin-bottom:calc(-1 * var(--space-4));
+  }
+
+  /* ---------- Large Title ---------- */
+  .large-title { display:flex; flex-direction:column; gap:2px; min-width:0; }
+  .large-title h1 {
+    font-size:var(--text-xl); font-weight:var(--weight-bold); line-height:1.15; letter-spacing:-0.02em;
+    overflow-wrap:anywhere;
+  }
+  .large-title-sub { font-size:var(--text-sm); color:var(--muted); }
+
+  /* ---------- Tab-Leiste: schwebendes Glas, aktiver Tab als Pill ---------- */
+  .tabbar {
+    position:fixed; z-index:40;
+    left:var(--gutter); right:var(--gutter); bottom:var(--tabbar-bottom);
+    max-width:calc(var(--content-max) - 2 * var(--gutter)); margin-inline:auto;
+    height:var(--tabbar-h); padding:6px;
+    display:grid; grid-template-columns:repeat(4, minmax(0, 1fr)); gap:4px;
+    border-radius:var(--radius-lg); border:1px solid var(--border);
+    background:var(--glass);
+    -webkit-backdrop-filter:blur(20px) saturate(1.3); backdrop-filter:blur(20px) saturate(1.3);
+    box-shadow:var(--shadow-2);
+    view-transition-name:tabbar;
+  }
+  .tab {
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px;
+    min-width:0; min-height:var(--hit-min); border-radius:18px;
+    color:var(--muted); font-size:var(--text-tab); font-weight:500; line-height:1.2; text-decoration:none;
+    transition:var(--press-transition), color var(--dur-state) var(--ease-out);
+  }
+  .tab:hover { color:var(--text); }
+  .tab-pill {
+    display:flex; align-items:center; justify-content:center; flex:none;
+    width:52px; height:28px; border-radius:var(--radius-pill);
+    background:transparent; box-shadow:none;
+    transition:background-color var(--dur-state) var(--ease-out), box-shadow var(--dur-state) var(--ease-out);
+  }
+  .tab-pill svg { width:22px; height:22px; }
+  .tab-label { max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .tab[aria-current="page"] { color:var(--accent-text); font-weight:var(--weight-semibold); }
+  .tab[aria-current="page"] .tab-pill { background:var(--accent-soft); box-shadow:var(--pill-glow); }
+
+  /* ---------- Floating CTA: genau ein Primärbutton pro Tab, schwebt über der Tab-Leiste ---------- */
+  .cta-float {
+    position:fixed; z-index:30;
+    left:0; right:0; bottom:calc(var(--tabbar-bottom) + var(--tabbar-h) + var(--space-3));
+    max-width:var(--content-max); margin-inline:auto;
+    padding:0 var(--gutter);
+    pointer-events:none;
+  }
+  .cta-float > * { pointer-events:auto; }
+
+  /* ---------- Fokus-Modus (Training, Ketten, Parallel): keine Tab-Leiste, keine CTA ---------- */
+  body.is-focus .tabbar,
+  body.is-focus .cta-float { display:none; }
+
+  .focus { display:flex; flex-direction:column; width:100%; min-width:0; min-height:100dvh; }
+
+  /* Kopf: ✕ links, daneben Segmente/Titel; darunter optional die Zeitlinie */
+  .focus-head {
+    flex:none; display:flex; flex-direction:column; gap:6px;
+    padding:max(16px, calc(env(safe-area-inset-top, 0px) + 4px)) var(--gutter) 0;
+  }
+  .focus-bar { display:flex; align-items:center; gap:var(--space-3); min-height:var(--hit-min); min-width:0; }
+  .focus-bar > :not(.focus-close) { min-width:0; }
+  .focus-close {
+    display:flex; align-items:center; justify-content:center; flex:none;
+    width:var(--hit-min); height:var(--hit-min); margin-left:-10px; border-radius:var(--radius-pill);
+    color:var(--text); text-decoration:none;
+  }
+  .focus-close:hover { color:var(--text); background:var(--press); }
+  .focus-title {
+    flex:1; font-size:var(--text-md); font-weight:var(--weight-semibold); line-height:1.25;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  }
+  /* Kurztitel (focusHead shortTitle) unter 360 px; der volle Titel bleibt für Screenreader im Baum */
+  .focus-title-short { display:none; }
+  @media (max-width: 359px) {
+    .focus-title.has-short > .focus-title-full {
+      position:absolute; width:1px; height:1px; margin:-1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap;
+    }
+    .focus-title.has-short > .focus-title-short { display:inline; }
+  }
+
+  /* Bühne: Aufgabe mittig im freien Raum zwischen Kopf und Dock */
+  .stage {
+    flex:1; min-height:0; min-width:0;
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:var(--space-4);
+    padding:var(--space-4) var(--space-5); text-align:center;
+  }
+  /* Variante für Inhalte, die oben beginnen und scrollen (Ergebnis, Setup) */
+  .stage.is-start {
+    align-items:stretch; justify-content:flex-start; gap:var(--space-5);
+    padding:var(--space-4) var(--gutter) var(--space-5); text-align:start;
+  }
+
+  /* Dock: Glas, oben gerundet, bleibt unten im Daumenbereich */
+  .dock {
+    position:sticky; bottom:0; z-index:20; flex:none;
+    display:flex; flex-direction:column; gap:var(--space-2);
+    padding:var(--space-2) var(--gutter) max(16px, env(safe-area-inset-bottom, 0px));
+    border-radius:var(--radius-lg) var(--radius-lg) 0 0;
+    background:var(--glass);
+    -webkit-backdrop-filter:blur(20px) saturate(1.3); backdrop-filter:blur(20px) saturate(1.3);
+    box-shadow:var(--shadow-dock);
+  }
+
+  /* ---------- Sheet (inline: ersetzt das Dock an Ort und Stelle) ---------- */
+  .sheet {
+    position:sticky; bottom:0; z-index:20; flex:none;
+    display:flex; flex-direction:column; gap:var(--space-3);
+    max-height:calc(100dvh - 64px); overflow-y:auto; overscroll-behavior:contain;
+    padding:var(--space-2) var(--gutter) max(16px, env(safe-area-inset-bottom, 0px));
+    border-radius:var(--radius-lg) var(--radius-lg) 0 0;
+    background:var(--surface); color:var(--text);
+    -webkit-backdrop-filter:blur(20px) saturate(1.3); backdrop-filter:blur(20px) saturate(1.3);
+    box-shadow:var(--shadow-dock);
+    animation:sheet-in var(--dur-enter) var(--ease-out) backwards;
+  }
+  .sheet-grip {
+    flex:none; align-self:center; width:36px; height:5px;
+    border-radius:var(--radius-pill); background:var(--border);
+  }
+  .sheet-head { display:flex; flex-direction:column; gap:var(--space-1); }
+  .sheet-bar { display:flex; align-items:center; gap:var(--space-3); min-height:var(--hit-min); }
+  .sheet-title { flex:1; min-width:0; font-size:var(--text-md); font-weight:var(--weight-semibold); line-height:1.3; }
+  .sheet-close {
+    display:flex; align-items:center; justify-content:center; flex:none;
+    width:var(--hit-min); height:var(--hit-min); margin-right:-10px; border-radius:var(--radius-pill);
+    color:var(--muted);
+  }
+  .sheet-close:hover { color:var(--text); background:var(--press); }
+  .sheet-body { display:flex; flex-direction:column; gap:var(--space-3); min-width:0; }
+
+  /* ---------- Modales Bottom Sheet (<dialog>.showModal) ---------- */
+  dialog.sheet.is-modal {
+    position:fixed; inset:auto 0 0 0; z-index:90;
+    width:100%; max-width:none; max-height:min(92dvh, calc(100dvh - 24px));
+    margin:0; border:0;
+    /* Opak auch in Aurora (durchscheinende --surface über --bg) */
+    background:linear-gradient(var(--surface), var(--surface)), var(--bg);
+    -webkit-backdrop-filter:none; backdrop-filter:none;
+    box-shadow:var(--shadow-2);
+    transform:translateY(var(--drag, 0px));
+  }
+  dialog.sheet.is-modal:not([open]) { display:none; }
+  dialog.sheet.is-modal.is-dragging { transition:none; }
+  dialog.sheet.is-modal:not(.is-dragging) { transition:transform var(--dur-state) var(--ease-out); }
+  dialog.sheet.is-modal.is-closing { animation:sheet-out var(--dur-exit) var(--ease-out) forwards; }
+  /* Nach dem Wischen gleitet das Sheet über die transform-Transition ganz hinaus (--drag: 100%) */
+  dialog.sheet.is-modal.is-closing.is-swiped { animation:none; }
+  dialog.sheet.is-modal::backdrop {
+    background:rgb(0 0 0 / .45); /* Fallback, falls ::backdrop die Variablen nicht erbt */
+    background:var(--scrim, rgb(0 0 0 / .45));
+    animation:fade-in var(--dur-enter) var(--ease-out);
+  }
+  dialog.sheet.is-modal.is-closing::backdrop { animation:fade-out var(--dur-exit) var(--ease-out) forwards; }
+  /* Griff + Titelzeile ziehen das Sheet nach unten (Pointer-Events, kein Browser-Scroll) */
+  dialog.sheet.is-modal .sheet-head { touch-action:none; cursor:grab; }
+  html.is-sheet-locked { overflow:hidden; }
+
+  /* ---------- View Transitions beim Tab-Wechsel: ruhiger Cross-Fade ---------- */
+  ::view-transition-old(root),
+  ::view-transition-new(root) { animation-duration:var(--dur-state); }
+
+  /* ---------- Ab 768 px: Seitenleiste links, Inhalt zentriert (E23) ---------- */
+  @media (min-width: 768px) {
+    body:not(.is-focus) { padding-left:var(--sidebar-w); }
+
+    .tabbar {
+      top:0; bottom:0; left:0; right:auto;
+      width:var(--sidebar-w); height:auto; max-width:none; margin:0;
+      padding:max(var(--space-5), env(safe-area-inset-top, 0px)) 6px var(--space-5);
+      display:flex; flex-direction:column; justify-content:flex-start; gap:var(--space-2);
+      border-width:0 1px 0 0; border-radius:0;
+      box-shadow:none;
+    }
+    .tab { flex:none; min-height:60px; padding:6px 0; }
+
+    .screen {
+      max-width:var(--content-max); margin-inline:auto;
+      padding-top:var(--space-7); padding-bottom:var(--space-5);
+    }
+    .screen > .back-link:first-child { margin-top:calc(-1 * var(--space-5)); }
+    body.has-cta .screen { padding-bottom:var(--space-5); }
+
+    /* CTA sitzt am Ende des Inhalts statt schwebend (#cta folgt im DOM auf #app) */
+    .cta-float {
+      position:static; z-index:auto;
+      max-width:var(--content-max); margin:0 auto; padding:0 var(--gutter) var(--space-7);
+      pointer-events:auto;
+    }
+
+    /* Fokus-Modus: schmale Spalte, Dock schließt bündig darunter an */
+    .focus { max-width:var(--focus-max); margin-inline:auto; }
+
+    /* Modales Sheet wird ein zentrierter Dialog */
+    dialog.sheet.is-modal {
+      inset:0; margin:auto;
+      width:min(var(--focus-max), calc(100% - 32px)); max-height:min(80dvh, 720px);
+      border-radius:var(--radius-lg);
+      padding-bottom:var(--space-4);
+    }
+  }
+}

@@ -1,34 +1,32 @@
+// Antwort einer Aufgabe: Antwortfeld (echtes <input>, Zustände Eingabe/richtig/Korrektur/übersprungen) mit
+// Tastenfeld oder Prüfen-Button im Dock, bzw. Auswahl-Raster 2 × 2 im Dock bei Auswahlaufgaben.
 import type { Task } from '../../types.ts';
 import { parseAnswer } from '../../core/numbers.ts';
-import { icon } from '../../ui/charts.ts';
 import { h } from '../../ui/dom.ts';
-import { useKeypad, createKeypad } from '../../ui/keypad.ts';
+import { button, icon } from '../../ui/kit.ts';
+import { numpad, useKeypad } from '../../ui/keypad.ts';
 import { t } from '../../i18n/index.ts';
+
+export type AnswerState = 'good' | 'bad' | 'skip';
 
 export interface AnswerControls {
   isChoice: boolean;
-  /** Bildschirm-Tastatur aktiv (nur bei Zahlenaufgaben) */
+  /** Bildschirm-Tastenfeld aktiv (nur Zahlenaufgaben) */
   kp: boolean;
   input: HTMLInputElement;
-  /** „Prüfen“-Button (nur bei Zahlenaufgaben sichtbar im DOM, wenn !kp) */
-  check: HTMLButtonElement;
-  /** Anfangsinhalt der Aktionszeile (Fehlerhinweis, Prüfen/Weiß nicht) */
-  actionNodes: Node[];
-  /** Eingabezeile (Vorzeichen, Input, Einheit) – null bei Auswahlaufgaben */
-  answerRow: HTMLElement | null;
-  /** Auswahl-Buttons – null bei Zahlenaufgaben */
-  choicesEl: HTMLElement | null;
-  /** Hängt das Tastenfeld an root; hilfeBtn wandert in dessen Kopfzeile. */
-  mountKeypad(root: HTMLElement, helpBtn: HTMLElement | null): void;
-  /** Sperrt Eingabe/Buttons nach der Antwort und markiert richtig/falsch. */
-  lock(given: number | null): void;
-  /** Entfernt das Tastenfeld (falls vorhanden). */
-  removeKeypad(): void;
+  /** Bühne: Antwortfeld mit Einheit und Fehlermeldung – null bei Auswahlaufgaben */
+  stageEl: HTMLElement | null;
+  /** Dock: Tastenfeld, Prüfen-Button (Desktop) oder Auswahl-Raster */
+  dockEl: HTMLElement;
+  /** Prüfen (Enter); leere Eingabe tut nichts, ungültige zeigt einen Hinweis. */
+  submit(): void;
+  /** Sperrt die Eingabe und zeigt den Zustand; bei Zahlenaufgaben (falsch/übersprungen) „Richtig ist …“. */
+  lock(given: number | null, state: AnswerState, right: { value: string; unit: string }): void;
+  focus(): void;
 }
 
 export interface AnswerOptions {
   keypadSetting: 'auto' | 'on' | 'off';
-  haptics: boolean;
   numpadLayout?: 'calculator' | 'phone';
   /** Auto-Submit: liefert true, wenn der Zwischenstand schon korrekt ist. */
   autoCheck?: ((value: number) => boolean) | null;
@@ -36,31 +34,35 @@ export interface AnswerOptions {
   onFinish(given: number | null): void;
 }
 
-export function createAnswer(task: Task, { keypadSetting, haptics, numpadLayout = 'calculator', autoCheck = null, onFinish }: AnswerOptions): AnswerControls {
+/** Ab dieser Länge wird die Schrift im Antwortfeld kleiner, damit große Zahlen hineinpassen. */
+const LONG = 8;
+const LONGER = 11;
+
+export function createAnswer(task: Task, { keypadSetting, numpadLayout = 'calculator', autoCheck = null, onFinish }: AnswerOptions): AnswerControls {
   const choices = task.kind === 'choice' && Array.isArray(task.choices) ? task.choices : null;
-  const isChoice = choices !== null;
-  const kp = isChoice ? false : useKeypad(keypadSetting);
-  const choiceBtns: HTMLButtonElement[] = [];
-  let keypadEl: HTMLElement | null = null;
+  return choices ? choiceAnswer(task, choices, onFinish) : numberAnswer(task, { keypadSetting, numpadLayout, autoCheck, onFinish });
+}
 
+/* ---------- Zahlenaufgabe ---------- */
+
+function numberAnswer(task: Task, { keypadSetting, numpadLayout = 'calculator', autoCheck = null, onFinish }: AnswerOptions): AnswerControls {
+  const kp = useKeypad(keypadSetting);
   const input = h('input', {
-    type: 'text', inputmode: kp ? 'none' : 'decimal', autocomplete: 'off', enterkeyhint: 'done',
-    'aria-label': t('common.answer'), spellcheck: 'false', autocapitalize: 'off',
+    type: 'text', class: 'train-input num', inputmode: kp ? 'none' : 'decimal', autocomplete: 'off', enterkeyhint: 'done',
+    'aria-label': t('common.answer'), spellcheck: 'false', autocapitalize: 'off', placeholder: ' ',
   });
+  const field = h('div', { class: `train-field num${kp ? ' is-kp' : ''}` }, input, h('span', { class: 'train-caret', 'aria-hidden': 'true' }));
+  const error = h('p', { class: 'train-error', role: 'alert' });
 
-  const signBtn = h('button', {
-    type: 'button', class: 'sign-toggle', 'aria-label': t('common.keySign'),
-    onmousedown: (e: Event) => e.preventDefault(),
-    onpointerdown: (e: Event) => e.preventDefault(),
-    onclick: () => {
-      const v = input.value.replace(/^\s+/, '');
-      input.value = /^[-−–]/.test(v) ? v.replace(/^[-−–]\s*/, '') : `-${v}`;
-      input.focus();
-      const end = input.value.length;
-      try { input.setSelectionRange(end, end); } catch { /* ignore */ }
-    },
-  }, icon('plus-minus', { size: 20 }));
-
+  const fit = (): void => {
+    const n = input.value.length;
+    field.classList.toggle('is-long', n >= LONG && n < LONGER);
+    field.classList.toggle('is-longer', n >= LONGER);
+  };
+  input.addEventListener('input', () => {
+    fit();
+    if (error.textContent) error.textContent = '';
+  });
   if (autoCheck) {
     input.addEventListener('input', () => {
       if (input.disabled || input.value.trim() === '') return;
@@ -69,71 +71,92 @@ export function createAnswer(task: Task, { keypadSetting, haptics, numpadLayout 
     });
   }
 
-  const inputError = h('div', { class: 'hint', role: 'alert' });
-  const check = h('button', {
-    type: 'button', class: 'btn primary',
+  const submit = (): void => {
+    if (input.disabled) return;
+    if (input.value.trim() === '') { input.focus(); return; }
+    const v = parseAnswer(input.value);
+    if (v === null) {
+      error.textContent = t('train.inputError');
+      input.focus();
+      if (!kp) input.select();
+      return;
+    }
+    onFinish(v);
+  };
+
+  // Ohne Tastenfeld (Desktop, Tastenfeld aus): Vorzeichen-Taste, weil Dezimal-Tastaturen oft kein Minus haben
+  const sign = kp ? null : h('button', {
+    type: 'button', class: 'train-sign press', 'aria-label': t('common.keySign'),
+    onmousedown: (e: Event) => e.preventDefault(),
+    onpointerdown: (e: Event) => e.preventDefault(),
     onclick: () => {
-      const v = parseAnswer(input.value);
-      if (input.value.trim() === '') { input.focus(); return; }
-      if (v === null) {
-        inputError.textContent = t('train.inputError');
-        input.focus();
-        input.select();
-        return;
-      }
-      onFinish(v);
+      if (input.disabled) return;
+      const v = input.value.trim();
+      input.value = /^[-−–]/.test(v) ? v.replace(/^[-−–]\s*/, '') : `−${v}`;
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      input.focus();
     },
-  }, t('common.checkEnter'));
-  const skip = h('button', { type: 'button', class: 'btn', onclick: () => onFinish(null) }, t('common.dontKnow'));
+  }, icon('plus-minus', 22));
 
-  const actionNodes: Node[] = [];
-  if (isChoice) actionNodes.push(h('div', { class: 'btn-row' }, skip));
-  else if (kp) actionNodes.push(inputError);
-  else actionNodes.push(inputError, h('div', { class: 'btn-row' }, check, skip));
+  const row = h('div', { class: 'train-answer' }, sign, field, task.unit ? h('span', { class: 'train-unit' }, task.unit) : null);
+  const stageEl = h('div', { class: 'train-answer-block' }, row, error);
 
-  const choicesEl = choices
-    ? h('div', { class: 'choices', role: 'group', 'aria-label': t('train.choices') },
-      choices.map((c, i) => {
-        const b = h('button', { type: 'button', class: 'choice', onclick: () => onFinish(i) },
-          h('span', { class: 'choice-text' }, c));
-        choiceBtns.push(b);
-        return b;
-      }))
-    : null;
-
-  const answerRow = isChoice
-    ? null
-    : h('div', { class: 'answer' }, kp ? null : signBtn, input, task.unit ? h('span', { class: 'unit' }, task.unit) : null);
+  let dockEl: HTMLElement;
+  if (kp) {
+    dockEl = numpad({ input, layout: numpadLayout, onSubmit: submit }).el;
+  } else {
+    const check = button({ label: t('common.check'), kind: 'primary', full: true, onClick: submit });
+    const sync = (): void => { check.disabled = input.disabled || input.value.trim() === ''; };
+    input.addEventListener('input', sync);
+    sync();
+    dockEl = check;
+  }
 
   return {
-    isChoice, kp, input, check, actionNodes, answerRow, choicesEl,
-    mountKeypad(root, helpBtn) {
-      if (!kp) return;
-      const pad = createKeypad({
-        input, haptics, layout: numpadLayout,
-        onSubmit: () => check.click(), onSkip: () => onFinish(null),
-      });
-      keypadEl = pad;
-      // „Wie geht das?“ wandert in die Kopfzeile des Tastenfelds, damit es nicht verdeckt wird
-      if (helpBtn) {
-        helpBtn.classList.add('keypad-help');
-        pad.querySelector('.keypad-top')?.prepend(helpBtn);
-      }
-      root.append(pad);
-      document.body.classList.add('has-keypad');
-    },
-    lock(given) {
+    isChoice: false, kp, input, stageEl, dockEl, submit,
+    lock(_given, state, right) {
       input.disabled = true;
-      if (isChoice) {
-        choiceBtns.forEach((b, i) => {
-          b.disabled = true;
-          if (i === task.expected) b.classList.add('is-correct');
-          else if (i === given) b.classList.add('is-wrong');
-        });
+      error.textContent = '';
+      field.classList.add(`is-${state}`);
+      if (state === 'skip') {
+        input.value = '–';
+        fit();
+      }
+      // Gesperrt nur so breit wie der Inhalt, damit der Haken direkt vor der Zahl steht (Fallback zu field-sizing)
+      input.size = input.value.length + 1;
+      if (state === 'good') {
+        field.prepend(h('span', { class: 'train-field-check draw', 'aria-hidden': 'true' }, icon('check', 26)));
+      } else {
+        stageEl.append(h('p', { class: 'train-correction rise' },
+          h('span', { class: 'train-correction-label' }, t('train.correctIs')),
+          h('span', { class: 'train-correction-value num' }, right.value),
+          right.unit ? h('span', { class: 'train-unit' }, right.unit) : null));
       }
     },
-    removeKeypad() {
-      if (keypadEl) { keypadEl.remove(); keypadEl = null; }
+    focus() { input.focus({ preventScroll: true }); },
+  };
+}
+
+/* ---------- Auswahlaufgabe ---------- */
+
+function choiceAnswer(task: Task, choices: readonly string[], onFinish: (given: number | null) => void): AnswerControls {
+  const input = h('input', { type: 'hidden' });
+  const buttons = choices.map((c, i) => h('button', {
+    type: 'button', class: 'train-choice press num', 'aria-pressed': 'false', onclick: () => onFinish(i),
+  }, h('span', { class: 'train-choice-key', 'aria-hidden': 'true' }, String(i + 1)), h('span', { class: 'train-choice-text' }, c)));
+  const dockEl = h('div', { class: 'train-choices', role: 'group', 'aria-label': t('train.choices') }, buttons);
+  return {
+    isChoice: true, kp: false, input, stageEl: null, dockEl,
+    submit() { /* Auswahl: Antwort per Tipp oder Taste 1–4 */ },
+    lock(given) {
+      buttons.forEach((b, i) => {
+        b.disabled = true;
+        b.setAttribute('aria-pressed', String(i === given));
+        if (i === task.expected) b.classList.add('is-correct', ...(given === task.expected ? ['is-glow'] : []));
+        else if (i === given) b.classList.add('is-wrong');
+        else b.classList.add('is-dim');
+      });
     },
+    focus() { buttons[0]?.focus({ preventScroll: true }); },
   };
 }

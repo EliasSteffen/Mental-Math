@@ -6,50 +6,48 @@
   <title>Mental Math</title>
   <meta name="description" content="Kopfrechnen fürs Case Interview: Multiplikation, Prozente, große Zahlen und Business-Mathe trainieren.">
   <meta name="color-scheme" content="light dark">
-  <meta name="theme-color" content="#121214">
+  <meta name="theme-color" content="#F6F4EF" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#141619" media="(prefers-color-scheme: dark)">
+  <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="apple-touch-icon" href="/icons/apple-touch-icon-180.png">
   <link rel="icon" type="image/svg+xml" href="/favicon.svg">
   <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png">
-  <link rel="stylesheet" href="css/style.css">
-  <link rel="stylesheet" href="css/train.css">
-  <link rel="stylesheet" href="css/parallel.css">
-  <link rel="stylesheet" href="css/fab.css">
-  <link rel="stylesheet" href="css/ui.css">
+  <link rel="stylesheet" href="css/tokens.css">
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/layout.css">
+  <link rel="stylesheet" href="css/components.css">
+  <link rel="stylesheet" href="css/views/today.css">
+  <link rel="stylesheet" href="css/views/train.css">
+  <link rel="stylesheet" href="css/views/progress.css">
+  <link rel="stylesheet" href="css/views/learn.css">
+  <link rel="stylesheet" href="css/views/profile.css">
+  <link rel="stylesheet" href="css/views/play.css">
   <script type="module" src="js/app.js"></script>
 </head>
 <body>
-  <header class="topbar">
-    <div class="topbar-inner">
-      <a class="brand" href="#/">
-        <img class="brand-logo" src="/icons/icon.svg" width="28" height="28" alt="">
-        <span class="brand-name">Mental Math</span>
-      </a>
-      <a class="icon-btn" href="#/settings" aria-label="Einstellungen" data-nav="settings">
-        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
-          <circle cx="12" cy="12" r="3"/>
-          <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>
-        </svg>
-      </a>
-    </div>
-  </header>
-  <main id="app" class="container"></main>
+  <main id="app" class="screen"></main>
+  <div id="cta" class="cta-float" hidden></div>
   <nav class="tabbar" aria-label="Hauptnavigation">
-    <a class="tab" href="#/lernen" data-nav="lernen">
-      <svg class="tab-icon" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5z"/><path d="M4 20.5A2.5 2.5 0 0 0 6.5 23H20v-5"/><path d="M9 8h6"/></svg>
+    <a class="tab press" href="#/" data-tab="today">
+      <span class="tab-pill"><svg aria-hidden="true" focusable="false" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M4.6 4.6L6 6M18 18l1.4 1.4M2.5 12h2M19.5 12h2M4.6 19.4L6 18M18 6l1.4-1.4"/></svg></span>
+      <span class="tab-label">Heute</span>
+    </a>
+    <a class="tab press" href="#/lernen" data-tab="learn">
+      <span class="tab-pill"><svg aria-hidden="true" focusable="false" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 6.5C10.5 5.3 8.4 4.75 4 4.75v13.5c4.4 0 6.5.55 8 1.75 1.5-1.2 3.6-1.75 8-1.75V4.75c-4.4 0-6.5.55-8 1.75Z"/><path d="M12 6.5V20"/></svg></span>
       <span class="tab-label">Lernen</span>
     </a>
-    <a class="tab" href="#/" data-nav="home">
-      <svg class="tab-icon" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M7 4.5v15l12-7.5z"/></svg>
-      <span class="tab-label">Training</span>
+    <a class="tab press" href="#/fortschritt" data-tab="progress">
+      <span class="tab-pill"><svg aria-hidden="true" focusable="false" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M5 19V11M12 19V5M19 19v-6"/></svg></span>
+      <span class="tab-label">Fortschritt</span>
     </a>
-    <a class="tab" href="#/analyse" data-nav="analyse">
-      <svg class="tab-icon" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 20V10"/><path d="M10 20V4"/><path d="M16 20v-7"/><path d="M22 20H2"/></svg>
-      <span class="tab-label">Analyse</span>
+    <a class="tab press" href="#/profil" data-tab="profile">
+      <span class="tab-pill"><svg aria-hidden="true" focusable="false" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.5"/><path d="M5 19.5c1.2-3.3 3.8-5 7-5s5.8 1.7 7 5"/></svg></span>
+      <span class="tab-label">Profil</span>
     </a>
   </nav>
-  <noscript><p class="container">Diese App benötigt JavaScript.</p></noscript>
+  <noscript><p class="noscript">Diese App benötigt JavaScript.</p></noscript>
 </body>
 </html>

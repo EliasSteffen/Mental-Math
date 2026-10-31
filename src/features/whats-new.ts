@@ -54,7 +54,7 @@ export function maybeShowWhatsNew(): void {
 export function openChangelog(): void {
   openModal({
     title: t('release.history'),
-    body: h('div', { class: 'releases releases-all' }, ...RELEASES.map(releaseBlock)),
+    body: h('div', { class: 'releases' }, ...RELEASES.map(releaseBlock)),
     actions: [{ label: t('release.close'), primary: true }],
   });
 }

@@ -1,0 +1,109 @@
+/* Ruhiger Fokus – Basis: Reset, Typografie, Fokus-Ring, Zahlen, Druck-Feedback, CTA-Glanz, Keyframes, Reduced Motion.
+   Keine Endlos-Animationen (einzige Ausnahme ist der Atemkreis in views/train.css). */
+
+/* Element-Reset im untersten Layer: jede Komponente setzt ihre Werte selbst und gewinnt ohne Spezifitäts-Tricks. */
+@layer reset {
+  ol, ul { margin:0; padding:0; list-style:none; }
+  a { color:var(--accent-text); text-decoration:none; }
+  a:hover { color:var(--accent); }
+  button {
+    font:inherit; color:inherit; background:none; border:0; padding:0; margin:0;
+    cursor:pointer; -webkit-appearance:none; appearance:none; -webkit-tap-highlight-color:transparent;
+  }
+  input, select, textarea { font:inherit; color:inherit; }
+  input::placeholder, textarea::placeholder { color:var(--muted); opacity:1; }
+}
+
+@layer base {
+  *, *::before, *::after { box-sizing:border-box; }
+
+  html {
+    -webkit-text-size-adjust:100%; text-size-adjust:100%;
+    background-color:var(--bg); /* Fläche beim Überscrollen */
+    color:var(--text);
+  }
+
+  body {
+    margin:0; min-height:100dvh;
+    font-family:var(--font); font-size:var(--text-md); line-height:1.4; font-weight:var(--weight-regular);
+    color:var(--text); background:transparent;
+    overflow-x:hidden;
+    -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale;
+    -webkit-tap-highlight-color:transparent;
+  }
+
+  /* Hintergrund (--bg-fill) als fixierte Ebene hinter dem Inhalt: Aurora/Neon-Verlauf scrollt nicht mit
+     (background-attachment: fixed ignoriert iOS). */
+  body::before {
+    content:""; position:fixed; inset:0; z-index:-1; pointer-events:none;
+    background:var(--bg-fill);
+  }
+
+  h1, h2, h3, h4, p, figure, blockquote, dl, dd { margin:0; }
+  img, svg { max-width:100%; }
+
+  :focus { outline:none; }
+  :focus-visible { outline:3px solid color-mix(in srgb, var(--accent) 40%, transparent); outline-offset:0; }
+
+  [hidden] { display:none !important; }
+
+  /* Hinweis ohne JavaScript (index.html) */
+  .noscript { padding:var(--space-7) var(--gutter); color:var(--muted); text-align:center; }
+
+  /* Zahlen: gerundete Ziffern, gleiche Breite */
+  .num { font-family:var(--font-num); font-variant-numeric:tabular-nums; }
+
+  /* Druck-Feedback: scale(.97) in 100 ms, Fläche 6 % dunkler */
+  .press { transition:var(--press-transition); touch-action:manipulation; }
+  .press:active { transform:scale(.97); filter:brightness(.94); }
+
+  /* Primärbutton-Atmosphäre: Gloss (nur Aurora/Neon sichtbar) und einmaliger Glanz pro Mount */
+  .cta { position:relative; overflow:hidden; isolation:isolate; }
+  .cta::before {
+    content:""; position:absolute; inset:0; border-radius:inherit; z-index:-1; pointer-events:none;
+    background:var(--cta-gloss);
+  }
+  .cta::after {
+    content:""; position:absolute; top:0; bottom:0; left:-60%; width:40%; pointer-events:none;
+    background:linear-gradient(100deg, transparent, rgba(255,255,255,.6), transparent);
+    transform:skewX(-20deg); opacity:0;
+    animation:var(--cta-sheen);
+  }
+
+  /* Ausgeblendete Scrollbalken für horizontale Scroller */
+  .scroll { scrollbar-width:none; }
+  .scroll::-webkit-scrollbar { display:none; }
+
+  /* Einblenden (Ergebniszeile, aufgeklappter Inhalt) und gezeichneter Haken */
+  .rise { animation:rise-in var(--dur-enter) var(--ease-out) both; }
+  .draw path { stroke-dasharray:24; stroke-dashoffset:24; animation:draw 280ms var(--ease-out) 80ms forwards; }
+
+  @keyframes rise-in { from { opacity:0; transform:translateY(8px); } }
+  @keyframes sheet-in { from { opacity:0; transform:translateY(32px); } }
+  @keyframes sheet-out { to { opacity:0; transform:translateY(32px); } }
+  @keyframes draw { to { stroke-dashoffset:0; } }
+  @keyframes fade-in { from { opacity:0; } }
+  @keyframes fade-out { to { opacity:0; } }
+  @keyframes sheen { 0% { left:-60%; opacity:1; } 100% { left:140%; opacity:1; } }
+}
+
+@layer utilities {
+  /* Nur für Screenreader sichtbar */
+  .sr-only {
+    position:absolute; width:1px; height:1px; margin:-1px; padding:0; border:0;
+    overflow:hidden; clip:rect(0 0 0 0); clip-path:inset(50%); white-space:nowrap;
+  }
+
+  /* Reduced Motion: alles wird zu einem 150-ms-Fade. Kein Glanz, keine gezeichneten Linien, keine Bewegung.
+     Liegt im obersten Layer, damit es auch Komponenten- und View-Animationen übersteuert. */
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior:auto; }
+    *, *::before, *::after { transition-property:opacity, color, background-color, border-color, fill, stroke; }
+    .press:active { transform:none; }
+    .rise, .sheet, dialog.modal, .toast { animation:fade-in 150ms linear both; }
+    .sheet.is-closing, dialog.modal.is-closing, .toast.is-leaving { animation:fade-out 150ms linear both; }
+    .confetti { display:none; }
+    .draw path { animation:none; stroke-dashoffset:0; }
+    .cta::after { animation:none; }
+  }
+}

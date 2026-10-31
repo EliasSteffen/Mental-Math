@@ -1,89 +1,185 @@
-import type { CategoryId, Settings, ThemeSetting } from '../types.ts';
+// Profil (Ruhiger Fokus): eine gruppierte Seite statt Tabs – Konto, Training, Darstellung, Rückmeldung, Daten, Über
+// und Erweitert (E2–E5). Eingaben kommen aus dem Kit, aktualisieren sich lokal und speichern sofort: kein Toast (E21),
+// kein rerender() (Fix A11). Konto-Verwaltung und Kategorien liegen in modalen Sheets.
+import type { CategoryId, Level, Settings, ThemeSetting, TimerDisplay } from '../types.ts';
 import { getSettings, setSettings, resetAll, exportJSON, getAttempts, getSessions, getProfile } from '../data/storage.ts';
 import { importJSON } from '../data/transfer.ts';
-import { applyTheme } from '../ui/theme.ts';
+import { applyTheme, THEMES, themeLabel } from '../ui/theme.ts';
 import { toast } from '../ui/toast.ts';
 import { confirmDialog } from '../ui/modal.ts';
 import { openChangelog, fmtIsoDate } from '../features/whats-new.ts';
 import { BUILD_INFO } from '../generated/build-info.ts';
 import { detectLang, setLang, t } from '../i18n/index.ts';
-import { icon } from '../ui/charts.ts';
 import { CATEGORIES } from '../core/catalog.ts';
-import { app, h, appendChildren } from '../ui/dom.ts';
+import { fmt } from '../core/numbers.ts';
+import { app, h, appendChildren, type Child } from '../ui/dom.ts';
 import { rerender, addCleanup } from '../router.ts';
+import { button, group, icon, largeTitle, list, row, segmented, stepper, switchRow, type SwitchControl } from '../ui/kit.ts';
+import { openSheet, type SheetHandle } from '../ui/sheet.ts';
 import type { PasskeyInfo } from '../vendor/auth.ts';
 import * as acct from '../features/account.ts';
 import { getSyncStatus, onSyncStatus, syncNow, syncStatusEntries, wipeCloudData } from '../features/sync.ts';
 
-type TabId = 'general' | 'gameplay' | 'data' | 'about';
-const TABS: ReadonlyArray<readonly [TabId, 'settings.tabGeneral' | 'settings.tabGameplay' | 'settings.tabData' | 'settings.tabAbout', string]> = [
-  ['general', 'settings.tabGeneral', 'gear'], ['gameplay', 'settings.tabGameplay', 'target'],
-  ['data', 'settings.tabData', 'chart'], ['about', 'settings.tabAbout', 'sparkles'],
-];
+const NAME_MIN = 2;
+const NAME_MAX = 32;
+const SOURCE_URL = 'https://github.com/EliasSteffen/Mental-Math';
 
-function currentTab(): TabId {
-  const q = location.hash.split('?')[1] ?? '';
-  const v = new URLSearchParams(q).get('tab');
-  return TABS.find(([id]) => id === v)?.[0] ?? 'general';
+/** Alte Tabs (`?tab=`) → Gruppe, zu der beim Öffnen gescrollt wird (E6). */
+type TabAnchor = 'general' | 'gameplay' | 'data' | 'about';
+
+let uid = 0;
+const nextId = (prefix: string): string => `prof-${prefix}-${++uid}`;
+
+/** Speichert sofort und still (E21). */
+const save = (partial: Partial<Settings>): void => { setSettings(partial); };
+
+function reducedMotion(): boolean {
+  return typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
 }
 
-let lastSavedToast = 0;
-/** Speichert Einstellungen; Hinweis-Toast höchstens alle 1,5 s. */
-function update(partial: Partial<Settings>): void {
-  setSettings(partial);
-  const now = Date.now();
-  if (now - lastSavedToast >= 1500) {
-    lastSavedToast = now;
-    toast(t('settings.saved'), { kind: 'success' });
+/** Ungefähre Größe der gespeicherten Daten in KB – gemessen am Export (die Daten liegen in IndexedDB, nicht mehr in localStorage). */
+function storageKB(): number {
+  try {
+    return Math.round(new Blob([exportJSON()]).size / 102.4) / 10;
+  } catch {
+    return 0;
   }
 }
 
-function segmented<V extends string | number>(
-  label: string,
-  options: ReadonlyArray<readonly [V, string]>,
-  current: V,
-  onPick: (value: V) => void,
-): HTMLDivElement {
-  const seg = h('div', { class: 'segmented', role: 'group', 'aria-label': label });
-  for (const [value, text] of options) {
-    const active = value === current;
-    seg.append(h('button', {
-      type: 'button', class: active ? 'active' : null, 'aria-pressed': String(active),
-      onclick: () => { onPick(value); rerender(); },
-    }, text));
-  }
-  return seg;
+const short = (id: string): string => (id.length > 12 ? `${id.slice(0, 8)}…${id.slice(-4)}` : id);
+const acctDate = (iso: string): string => fmtIsoDate(iso.slice(0, 10));
+/** Erstes Zeichen des Namens (auch Emoji) als Initiale. */
+const initial = (name: string): string => (Array.from(name.trim())[0] ?? '?').toLocaleUpperCase();
+
+/** Ersetzt ein Element an Ort und Stelle (Sync-Zeile bei Statuswechsel). */
+function swap(old: HTMLElement, fresh: HTMLElement): HTMLElement {
+  old.replaceWith(fresh);
+  return fresh;
 }
 
-type BooleanSettingKey = { [K in keyof Settings]: Settings[K] extends boolean ? K : never }[keyof Settings];
+function profGroup(title: string, ...children: Child[]): HTMLElement {
+  const el = group(title, ...children);
+  el.classList.add('prof-group');
+  return el;
+}
 
-function toggle(label: string, key: BooleanSettingKey, settings: Settings, after?: () => void): HTMLLabelElement {
-  const input: HTMLInputElement = h('input', {
-    type: 'checkbox', 'aria-label': label, checked: settings[key] ? true : null,
-    onchange: () => { update({ [key]: input.checked }); if (after) after(); },
+/* ---------- Training ---------- */
+
+const TIMER_HELP: Record<TimerDisplay, `settings.${string}`> = {
+  calm: 'settings.timerCalmHelp', precise: 'settings.timerPreciseHelp', off: 'settings.timerOffHelp',
+};
+
+type DiffValue = 'auto' | '1' | '2' | '3';
+
+function trainingGroup(s: Settings): HTMLElement {
+  const diff = segmented<DiffValue>({
+    label: t('settings.difficulty'),
+    options: [['auto', t('settings.diffAuto')], ['1', t('settings.diffEasy')], ['2', t('settings.diffMedium')], ['3', t('settings.diffHard')]],
+    value: s.difficulty === 'auto' ? 'auto' : (String(s.difficulty) as DiffValue),
+    onChange: (v) => save({ difficulty: v === 'auto' ? 'auto' : (Number(v) as Level) }),
   });
-  return h('label', { class: 'switch' }, input, h('span', { class: 'switch-track' }));
-}
 
-function autoFailToggle(s: Settings): HTMLLabelElement {
-  const input: HTMLInputElement = h('input', {
-    type: 'checkbox', 'aria-label': t('settings.autoFail'), checked: s.autoFail && s.timer ? true : null,
-    disabled: s.timer ? null : true,
-    onchange: () => update({ autoFail: input.checked }),
+  // Alte Werte (z. B. 30) bleiben wählbar, bis man umstellt
+  const lengths = [5, 10, 15, 20];
+  if (!lengths.includes(s.sessionLength)) lengths.push(s.sessionLength);
+  lengths.sort((a, b) => a - b);
+  const len = segmented<string>({
+    label: t('settings.roundLength'), inline: true, even: true, numeric: true,
+    options: lengths.map((n) => [String(n), String(n)] as const),
+    value: String(s.sessionLength),
+    onChange: (v) => save({ sessionLength: Number(v) }),
   });
-  return h('label', { class: 'switch' }, input, h('span', { class: 'switch-track' }));
+
+  const timer = segmented<TimerDisplay>({
+    label: t('settings.timerDisplay'),
+    options: [['calm', t('settings.timerCalm')], ['precise', t('settings.timerPrecise')], ['off', t('settings.timerOff')]],
+    value: s.timerDisplay,
+    help: t(TIMER_HELP[s.timerDisplay]),
+    onChange: (v) => {
+      save({ timerDisplay: v });
+      timer.setHelp(t(TIMER_HELP[v]));
+    },
+  });
+
+  const goal = stepper({
+    label: t('settings.dailyGoal'), value: s.dailyGoalMin, min: 5, max: 60, step: 5,
+    format: (n) => t('settings.minutes', { n }),
+    onChange: (n) => save({ dailyGoalMin: n }),
+  });
+
+  return profGroup(t('settings.training'), list([
+    diff.el, len.el, timer.el, goal,
+    switchRow({ label: t('settings.breathe'), help: t('settings.breatheHelp'), checked: s.breathe, onChange: (v) => save({ breathe: v }) }).el,
+    switchRow({ label: t('settings.confetti'), help: t('settings.confettiHelp'), checked: s.confetti, onChange: (v) => save({ confetti: v }) }).el,
+  ]));
 }
 
-function row(label: string, control: Node, sub?: string): HTMLDivElement {
-  const inline = control instanceof HTMLElement && (control.classList.contains('switch') || control.tagName === 'BUTTON' || control.tagName === 'A');
-  return h('div', { class: `setting-row${inline ? ' inline' : ''}` },
-    h('div', null, label, sub ? h('div', { class: 'small muted' }, sub) : null),
-    control);
+/* ---------- Darstellung ---------- */
+
+type ThemePick = Exclude<ThemeSetting, 'oled'>;
+
+/** Segment ohne OLED (E2): OLED ist der Switch „Reines Schwarz“ unter dem Segment. */
+const THEME_PICKS: readonly ThemePick[] = THEMES.map((x) => x.value).filter((v): v is ThemePick => v !== 'oled');
+
+function appearanceGroup(s: Settings): HTMLElement {
+  let theme: ThemeSetting = s.theme;
+  const pick = (v: ThemeSetting): ThemePick => (v === 'oled' ? 'night' : v);
+  // Sofort anwenden, nicht neu zeichnen
+  const setTheme = (v: ThemeSetting): void => { theme = v; save({ theme: v }); applyTheme(v); };
+
+  const themeSeg = segmented<ThemePick>({
+    label: t('settings.theme'),
+    options: THEME_PICKS.map((v) => [v, themeLabel(v)] as const),
+    value: pick(theme),
+    onChange: (v) => { setTheme(v); paintOled(); },
+  });
+  /** Nur bei Nacht/System sichtbar bzw. solange OLED aktiv ist; an → 'oled', aus → 'night'. */
+  const oled = switchRow({
+    label: t('settings.oled'), checked: theme === 'oled',
+    onChange: (on) => {
+      setTheme(on ? 'oled' : 'night');
+      themeSeg.set(pick(theme)); // System + OLED → Segment zeigt Nacht
+    },
+  });
+  const paintOled = (): void => {
+    oled.set(theme === 'oled');
+    oled.el.hidden = !(theme === 'night' || theme === 'system' || theme === 'oled');
+  };
+  paintOled();
+
+  const lang = segmented<Settings['lang']>({
+    label: t('settings.language'),
+    options: [['auto', t('settings.langAuto')], ['de', t('settings.langDe')], ['en', t('settings.langEn')]],
+    value: s.lang,
+    onChange: (v) => {
+      save({ lang: v });
+      // Andere Sprache → der Router zeichnet mit keepScroll neu; danach den Fokus auf die Auswahl zurücklegen
+      setLang(detectLang(v));
+      document.querySelector<HTMLElement>('[data-prof="lang"] button[aria-pressed="true"]')?.focus({ preventScroll: true });
+    },
+  });
+  lang.el.setAttribute('data-prof', 'lang');
+
+  const pad = segmented<Settings['numpadLayout']>({
+    label: t('settings.numpadLayout'), inline: true, even: true,
+    options: [['calculator', t('settings.numpadCalculator')], ['phone', t('settings.numpadPhone')]],
+    value: s.numpadLayout,
+    onChange: (v) => save({ numpadLayout: v }),
+  });
+
+  return profGroup(t('settings.appearance'), list([themeSeg.el, oled.el, lang.el, pad.el]));
 }
 
-function section(title: string, ...children: Array<Node | null>): HTMLElement {
-  return h('section', { class: 'settings-section' }, h('h2', { class: 'section-title' }, title), ...children);
+/* ---------- Rückmeldung ---------- */
+
+function feedbackGroup(s: Settings): HTMLElement {
+  return profGroup(t('settings.feedback'), list([
+    switchRow({ label: t('settings.haptics'), help: t('settings.hapticsHelp'), checked: s.haptics, onChange: (v) => save({ haptics: v }) }).el,
+    switchRow({ label: t('settings.sound'), help: t('settings.soundHelp'), checked: s.sound, onChange: (v) => save({ sound: v }) }).el,
+  ]));
 }
+
+/* ---------- Daten ---------- */
 
 function download(): void {
   const blob = new Blob([exportJSON()], { type: 'application/json' });
@@ -95,302 +191,23 @@ function download(): void {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-/** Ungefähre Größe aller `mm:v3:*`-Schlüssel in KB (UTF-16 → 2 Byte je Zeichen). */
-function storageKB(): number {
-  let chars = 0;
-  try {
-    const ls = globalThis.localStorage;
-    for (let i = 0; i < ls.length; i++) {
-      const k = ls.key(i);
-      if (k && k.startsWith('mm:v3:')) chars += k.length + (ls.getItem(k)?.length ?? 0);
-    }
-  } catch {
-    /* Speicher nicht verfügbar */
-  }
-  return Math.round((chars * 2) / 102.4) / 10;
-}
-
-const short = (id: string): string => (id.length > 12 ? `${id.slice(0, 8)}…${id.slice(-4)}` : id);
-
-// ---------- Tab: Allgemein ----------
-function generalTab(s: Settings): HTMLElement[] {
-  const swatches = h('div', { class: 'theme-swatches', role: 'group', 'aria-label': t('settings.theme') });
-  const themes: ReadonlyArray<readonly [ThemeSetting, string]> = [['system', t('settings.themeSystem')], ['neon', t('settings.themeNeon')], ['oled', t('settings.themeOled')], ['pastel', t('settings.themePastel')]];
-  for (const [v, name] of themes) {
-    const active = s.theme === v;
-    swatches.append(h('button', {
-      type: 'button', class: `swatch${active ? ' active' : ''}`, 'data-theme-value': v, 'aria-pressed': String(active),
-      onclick: () => { update({ theme: v }); applyTheme(v); rerender(); },
-    }, h('span', { class: 'swatch-dot' }), name));
-  }
-  return [
-    section(t('settings.appearance'),
-      row(t('settings.language'), segmented<Settings['lang']>(t('settings.language'),
-        [['auto', t('settings.langAuto')], ['de', t('settings.langDe')], ['en', t('settings.langEn')]], s.lang,
-        (v) => { setLang(detectLang(v)); update({ lang: v }); })),
-      h('div', { class: 'setting-row' }, h('div', null, t('settings.theme')), swatches)),
-    section(t('settings.feedback'),
-      row(t('settings.haptics'), toggle(t('settings.haptics'), 'haptics', s)),
-      row(t('settings.sound'), toggle(t('settings.sound'), 'sound', s))),
-  ];
-}
-
-// ---------- Tab: Gameplay ----------
-function categoriesSection(s: Settings): HTMLElement {
-  const all: CategoryId[] = CATEGORIES.map((c) => c.id);
-  const enabled: CategoryId[] = Array.isArray(s.enabledCategories)
-    ? all.filter((id) => s.enabledCategories?.includes(id)) : all;
-  const save = (ids: CategoryId[]): void => {
-    update({ enabledCategories: ids.length >= all.length ? null : ids });
-    rerender();
-  };
-  const rows = CATEGORIES.map((c) => {
-    const on = enabled.includes(c.id);
-    const last = on && enabled.length === 1;
-    const input: HTMLInputElement = h('input', {
-      type: 'checkbox', 'aria-label': c.name, checked: on ? true : null, disabled: last ? true : null,
-      onchange: () => save(input.checked ? all.filter((id) => id === c.id || enabled.includes(id)) : enabled.filter((id) => id !== c.id)),
-    });
-    return h('div', { class: 'setting-row cat-row' },
-      h('div', null, c.name, h('div', { class: 'small muted' }, c.description)),
-      h('label', { class: 'switch' }, input, h('span', { class: 'switch-track' })));
+/** `live`: unsichtbare Statusmeldung der Seite (Export ohne Toast, nur gezeichneter Haken). */
+function dataGroup(live: HTMLElement): HTMLElement {
+  const done = h('span', { class: 'prof-done', 'aria-hidden': 'true' });
+  const exportRow = row({
+    icon: 'download', label: t('settings.exportBtn'), trailing: done,
+    onClick: () => {
+      try {
+        download();
+      } catch {
+        toast(t('settings.exportError'), { kind: 'error' });
+        return;
+      }
+      done.replaceChildren(h('span', { class: 'draw' }, icon('check', 20))); // neues Element → Haken zeichnet sich erneut
+      live.textContent = '';
+      requestAnimationFrame(() => { live.textContent = t('settings.exported'); });
+    },
   });
-  return section(t('settings.categories'),
-    h('p', { class: 'small muted' }, t('settings.categoriesHint')),
-    ...rows,
-    enabled.length === 1 ? h('p', { class: 'small muted' }, t('settings.lastCategory')) : null,
-    h('div', { class: 'btn-row' },
-      h('button', {
-        type: 'button', class: 'btn', disabled: enabled.length === all.length ? true : null,
-        onclick: () => save(all),
-      }, t('settings.enableAll'))));
-}
-
-function gameplayTab(s: Settings): HTMLElement[] {
-  const goal: HTMLSelectElement = h('select', {
-    class: 'select', 'aria-label': t('settings.dailyGoal'),
-    onchange: () => update({ dailyGoalMin: Number(goal.value) }),
-  }, [5, 10, 15, 20, 30, 45, 60].map((m) => h('option', { value: m, selected: m === s.dailyGoalMin ? true : null }, t('settings.minutes', { n: m }))));
-  const diffCur: 'auto' | 1 | 2 | 3 = s.difficulty === 'auto' ? 'auto' : s.difficulty;
-  return [
-    section(t('settings.training'),
-      row(t('settings.dailyGoal'), goal),
-      row(t('settings.difficulty'), segmented<'auto' | 1 | 2 | 3>(t('settings.difficulty'),
-        [['auto', t('settings.diffAuto')], [1, t('settings.diffEasy')], [2, t('settings.diffMedium')], [3, t('settings.diffHard')]], diffCur, (v) => update({ difficulty: v }))),
-      row(t('settings.roundLength'), segmented<number>(t('settings.roundLength'),
-        [[5, '5'], [10, '10'], [20, '20'], [30, '30']], s.sessionLength, (v) => update({ sessionLength: v }))),
-      row(t('settings.timer'), toggle(t('settings.timer'), 'timer', s, rerender), t('settings.timerHint')),
-      row(t('settings.autoFail'), autoFailToggle(s),
-        s.timer ? t('settings.autoFailOn') : t('settings.autoFailNeedsTimer')),
-      row(t('settings.autoSubmit'), toggle(t('settings.autoSubmit'), 'autoSubmit', s), t('settings.autoSubmitHint')),
-      row(t('settings.estimate'), toggle(t('settings.estimate'), 'estimateMode', s), t('settings.estimateHint')),
-      row(t('settings.ghost'), toggle(t('settings.ghost'), 'ghost', s), t('settings.ghostHint'))),
-    section(t('settings.input'),
-      row(t('settings.keypad'), segmented<'auto' | 'on' | 'off'>(t('settings.keypad'),
-        [['auto', t('settings.langAuto')], ['on', t('settings.keypadOn')], ['off', t('settings.keypadOff')]], s.keypad || 'auto', (v) => update({ keypad: v })),
-      t('settings.keypadHint')),
-      row(t('settings.numpadLayout'), segmented<'calculator' | 'phone'>(t('settings.numpadLayout'),
-        [['calculator', t('settings.numpadCalculator')], ['phone', t('settings.numpadPhone')]], s.numpadLayout, (v) => update({ numpadLayout: v })))),
-    categoriesSection(s),
-  ];
-}
-
-// ---------- Konto (Passkey) ----------
-const NAME_MIN = 2;
-const NAME_MAX = 32;
-
-/** Führt eine Konto-Aktion aus; Button zeigt Busy-Zustand, Fehler als Toast (außer Abbruch). */
-async function runBusy(btn: HTMLButtonElement, fn: () => Promise<void>): Promise<boolean> {
-  btn.disabled = true;
-  btn.setAttribute('aria-busy', 'true');
-  try {
-    await fn();
-    return true;
-  } catch (e) {
-    const code = acct.errorCode(e);
-    if (code !== 'cancelled') toast(t(`account.err.${code}`), { kind: 'error' });
-    return false;
-  } finally {
-    btn.disabled = false;
-    btn.removeAttribute('aria-busy');
-  }
-}
-
-const acctDate = (iso: string): string => fmtIsoDate(iso.slice(0, 10));
-
-/** Inline-Formular zum Umbenennen (Name oder Passkey). */
-function inlineEdit(initial: string, label: string, validate: (v: string) => string | null, onSave: (v: string) => Promise<boolean>, onCancel: () => void): HTMLFormElement {
-  const input: HTMLInputElement = h('input', { type: 'text', value: initial, maxlength: NAME_MAX, 'aria-label': label, autocomplete: 'off' });
-  const err = h('div', { class: 'small acct-err', role: 'alert' });
-  const save: HTMLButtonElement = h('button', { type: 'submit', class: 'btn primary' }, t('account.save'));
-  const form: HTMLFormElement = h('form', { class: 'acct-edit' },
-    h('div', { class: 'acct-edit-row' }, input, save,
-      h('button', { type: 'button', class: 'btn', onclick: onCancel }, t('account.cancel'))),
-    err);
-  form.addEventListener('submit', (ev) => {
-    ev.preventDefault();
-    const v = input.value.trim();
-    const bad = validate(v);
-    err.textContent = bad ?? '';
-    if (bad) return;
-    void runBusy(save, async () => { await onSave(v); });
-  });
-  setTimeout(() => input.focus(), 0);
-  return form;
-}
-
-function accountSignedOut(box: HTMLElement): void {
-  const input: HTMLInputElement = h('input', { type: 'text', maxlength: NAME_MAX, placeholder: t('account.namePlaceholder'), autocomplete: 'username', 'aria-label': t('account.nameLabel') });
-  const err = h('div', { class: 'small acct-err', role: 'alert' });
-  const create: HTMLButtonElement = h('button', { type: 'button', class: 'btn primary' }, t('account.create'));
-  const login: HTMLButtonElement = h('button', { type: 'button', class: 'btn' }, t('account.login'));
-  const both = [create, login];
-  const busy = async (btn: HTMLButtonElement, fn: () => Promise<void>): Promise<void> => {
-    for (const b of both) b.disabled = true;
-    await runBusy(btn, fn);
-    for (const b of both) b.disabled = false;
-  };
-  create.addEventListener('click', () => {
-    const v = input.value.trim();
-    const bad = v.length < NAME_MIN || v.length > NAME_MAX;
-    err.textContent = bad ? t('account.nameInvalid') : '';
-    input.setAttribute('aria-invalid', String(bad));
-    if (bad) { input.focus(); return; }
-    void busy(create, async () => {
-      await acct.register(v);
-      toast(t('account.registered'), { kind: 'success', durationMs: 6000 });
-    });
-  });
-  login.addEventListener('click', () => { void busy(login, async () => { await acct.login(); toast(t('account.loggedIn'), { kind: 'success' }); }); });
-
-  const controls = h('div', { class: 'acct-controls' },
-    h('label', { class: 'field' }, h('span', null, t('account.nameLabel')), input), err, create,
-    h('div', { class: 'acct-divider' }, h('span', null, t('account.or'))), login);
-  const hint = h('p', { class: 'small muted' }, t('account.unsupported'));
-  appendChildren(box, [h('p', { class: 'small muted' }, t('account.intro')), controls]);
-  void acct.support().then((info) => { if (!info.webauthn && controls.isConnected) controls.replaceWith(hint); }).catch(() => { /* Button-Aktionen melden Fehler selbst */ });
-}
-
-/** Statuszeile der Synchronisierung; aktualisiert sich live (Aufräumen über den Router). */
-function syncLine(): HTMLElement {
-  const line = h('p', { class: 'small muted acct-sync', role: 'status' });
-  const draw = (): void => {
-    const parts = syncStatusEntries(getSyncStatus()).map((e) => t(e.key, e.params));
-    line.textContent = parts.join(' · ');
-  };
-  draw();
-  addCleanup(onSyncStatus(draw));
-  return line;
-}
-
-function accountSignedIn(box: HTMLElement, username: string): void {
-  let editingName = false;
-  let editingId: string | null = null;
-  let passkeys: PasskeyInfo[] | null = null;
-  const body = h('div', { class: 'acct-body' });
-  box.append(body);
-
-  const reload = async (): Promise<void> => {
-    try { passkeys = await acct.listPasskeys(); } catch (e) { toast(t(`account.err.${acct.errorCode(e)}`), { kind: 'error' }); passkeys = passkeys ?? []; }
-    draw();
-  };
-
-  function passkeyItem(p: PasskeyInfo, last: boolean): HTMLElement {
-    const label = p.name ?? t('account.passkeyFallback', { date: acctDate(p.createdAt) });
-    if (editingId === p.id) {
-      return h('li', { class: 'acct-pk' }, inlineEdit(p.name ?? '', t('account.renameAria'),
-        (v) => (v.length < 1 || v.length > NAME_MAX ? t('account.nameInvalid') : null),
-        async (v) => { await acct.renamePasskey(p.id, v); editingId = null; await reload(); return true; },
-        () => { editingId = null; draw(); }));
-    }
-    const del: HTMLButtonElement = h('button', {
-      type: 'button', class: 'btn danger', disabled: last ? true : null, 'aria-label': `${t('account.deleteAria')}: ${label}`,
-      title: last ? t('account.lastPasskeyHint') : null,
-      onclick: () => {
-        void confirmDialog(t('account.deletePasskeyConfirm'), { title: t('account.deletePasskeyTitle'), confirmLabel: t('account.delete'), danger: true }).then((yes) => {
-          if (!yes) return;
-          void runBusy(del, async () => { await acct.deletePasskey(p.id); toast(t('account.passkeyDeleted'), { kind: 'info' }); await reload(); });
-        });
-      },
-    }, t('account.delete'));
-    return h('li', { class: 'acct-pk' },
-      h('div', { class: 'acct-pk-info' },
-        h('div', { class: 'acct-pk-name' }, h('span', null, label), p.backedUp ? h('span', { class: 'badge good' }, t('account.synced')) : null),
-        h('div', { class: 'small muted' }, t('account.created', { date: acctDate(p.createdAt) }),
-          p.lastUsedAt ? ` · ${t('account.lastUsed', { date: acctDate(p.lastUsedAt) })}` : null),
-        last ? h('div', { class: 'small muted' }, t('account.lastPasskeyHint')) : null),
-      h('div', { class: 'acct-pk-actions' },
-        h('button', { type: 'button', class: 'btn', 'aria-label': `${t('account.renameAria')}: ${label}`, onclick: () => { editingId = p.id; draw(); } }, t('account.rename')),
-        del));
-  }
-
-  function draw(): void {
-    body.replaceChildren();
-    const nameRow = editingName
-      ? inlineEdit(username, t('account.nameLabel'),
-        (v) => (v.length < NAME_MIN || v.length > NAME_MAX ? t('account.nameInvalid') : null),
-        async (v) => { await acct.renameUser(v); toast(t('account.renamed'), { kind: 'success' }); return true; },
-        () => { editingName = false; draw(); })
-      : h('div', { class: 'acct-name' },
-        h('div', null, h('div', { class: 'small muted' }, t('account.signedInAs')), h('strong', null, username)),
-        h('button', { type: 'button', class: 'btn', onclick: () => { editingName = true; draw(); } }, t('account.change')));
-    const syncBtn: HTMLButtonElement = h('button', { type: 'button', class: 'btn', onclick: () => {
-      void runBusy(syncBtn, async () => {
-        const res = await syncNow();
-        if (res.phase === 'idle') toast(t('account.sync.syncDone'), { kind: 'success' });
-        else toast(t(syncStatusEntries(res)[0]?.key ?? 'account.sync.failed'), { kind: 'error' });
-      });
-    } }, t('account.sync.syncNow'));
-    const list = passkeys
-      ? h('ul', { class: 'acct-pks' }, passkeys.map((p) => passkeyItem(p, passkeys !== null && passkeys.length <= 1)))
-      : h('p', { class: 'small muted' }, t('account.loading'));
-    const add: HTMLButtonElement = h('button', { type: 'button', class: 'btn', onclick: () => {
-      void runBusy(add, async () => { await acct.addPasskey(); toast(t('account.passkeyAdded'), { kind: 'success' }); await reload(); });
-    } }, t('account.addPasskey'));
-    const out: HTMLButtonElement = h('button', { type: 'button', class: 'btn', onclick: () => {
-      void runBusy(out, async () => { await acct.logout(); toast(t('account.loggedOut'), { kind: 'info' }); });
-    } }, t('account.logout'));
-    const del: HTMLButtonElement = h('button', { type: 'button', class: 'btn danger', onclick: () => {
-      void confirmDialog(t('account.deleteAccountConfirm'), { title: t('account.deleteAccountTitle'), confirmLabel: t('account.deleteAccount'), danger: true }).then((yes) => {
-        if (!yes) return;
-        void runBusy(del, async () => { await acct.deleteAccount(); toast(t('account.accountDeleted'), { kind: 'info' }); });
-      });
-    } }, t('account.deleteAccount'));
-    appendChildren(body, [nameRow, syncLine(), syncBtn, h('h3', { class: 'acct-sub' }, t('account.passkeys')), list,
-      h('p', { class: 'small muted' }, t('account.addPasskeyHint')),
-      h('div', { class: 'btn-row' }, add, out), h('div', { class: 'btn-row' }, del)]);
-  }
-  draw();
-  void reload();
-}
-
-/** Konto-Karte: rendert nach Zustand neu; blendet sich aus, wenn das Feature deaktiviert ist. */
-function accountCard(): HTMLElement {
-  const box = h('section', { class: 'settings-section acct' });
-  let lastKey = '';
-  const render = (): void => {
-    const st = acct.getAccountState();
-    const key = st.status === 'signed-in' ? `in:${st.user.id}:${st.user.username}` : st.status;
-    if (key === lastKey) return;
-    lastKey = key;
-    box.replaceChildren();
-    box.hidden = st.status === 'disabled';
-    if (st.status === 'disabled') return;
-    box.append(h('h2', { class: 'section-title' }, t('account.title')));
-    if (st.status === 'loading') box.append(h('p', { class: 'small muted' }, t('account.loading')));
-    else if (st.status === 'signed-out') accountSignedOut(box);
-    else accountSignedIn(box, st.user.username);
-  };
-  render();
-  addCleanup(acct.onAccountChange(render));
-  return box;
-}
-
-// ---------- Tab: Daten & Account ----------
-function dataTab(): HTMLElement[] {
-  const attempts = getAttempts().length;
-  const sessions = getSessions().length;
-  const profile = getProfile();
 
   const fileInput: HTMLInputElement = h('input', {
     type: 'file', accept: 'application/json,.json', hidden: true, 'aria-label': t('settings.fileAria'),
@@ -415,81 +232,549 @@ function dataTab(): HTMLElement[] {
     applyTheme(getSettings().theme);
     setLang(detectLang(getSettings().lang));
     toast(t('settings.importDone', { attempts: res.attempts, sessions: res.sessions }), { kind: 'success' });
-    rerender();
+    rerender({ keepScroll: true }); // alle Einstellungen können sich geändert haben
   }
 
-  const resetBtn = h('button', {
-    type: 'button', class: 'btn danger',
-    onclick: () => {
-      const cloud = acct.getAccountState().status === 'signed-in';
-      void confirmDialog(t(cloud ? 'settings.resetConfirmCloud' : 'settings.resetConfirm'),
-        { title: t('settings.resetTitle'), confirmLabel: t('settings.deleteLabel'), danger: true }).then(async (yes) => {
-        if (!yes) return;
-        if (cloud) {
-          // erst Cloud löschen; bei Fehler lokal nichts löschen (sonst käme alles beim nächsten Sync zurück)
-          try { await wipeCloudData(); } catch { toast(t('account.sync.wipeFailed'), { kind: 'error' }); return; }
-        }
-        resetAll();
-        applyTheme('system');
-        setLang(detectLang('auto'));
-        toast(t('settings.resetDone'), { kind: 'info' });
-        rerender();
-      });
+  const onReset = (): void => {
+    const cloud = acct.getAccountState().status === 'signed-in';
+    void confirmDialog(t(cloud ? 'settings.resetConfirmCloud' : 'settings.resetConfirm'),
+      { title: t('settings.resetTitle'), confirmLabel: t('settings.deleteLabel'), danger: true }).then(async (yes) => {
+      if (!yes) return;
+      if (cloud) {
+        // erst Cloud löschen; bei Fehler lokal nichts löschen (sonst käme alles beim nächsten Sync zurück)
+        try { await wipeCloudData(); } catch { toast(t('account.sync.wipeFailed'), { kind: 'error' }); return; }
+      }
+      resetAll();
+      applyTheme('system');
+      setLang(detectLang('auto'));
+      toast(t('settings.resetDone'), { kind: 'info' });
+      rerender({ keepScroll: true });
+    });
+  };
+
+  const usage = `${t('settings.storedCount', { attempts: fmt(getAttempts().length), sessions: fmt(getSessions().length) })} · ${t('settings.storageUsed', { kb: fmt(storageKB()) })}`;
+  return profGroup(t('settings.data'),
+    list([
+      exportRow,
+      row({ icon: 'upload', label: t('settings.importLabel'), onClick: () => fileInput.click() }),
+      row({ icon: 'trash', label: t('settings.deleteAll'), tone: 'danger', onClick: onReset }),
+    ]),
+    h('p', { class: 'prof-note' }, usage),
+    fileInput);
+}
+
+/* ---------- Über ---------- */
+
+function aboutGroup(): HTMLElement {
+  const profile = getProfile();
+  const news = row({
+    icon: 'info', label: t('settings.news'), value: BUILD_INFO.version, chevron: true, onClick: () => openChangelog(),
+  });
+  // „Version 1.10.0“; das Wort entfällt unter 360 px (profile.css)
+  const ver = news.querySelector('.row-value');
+  ver?.classList.add('num');
+  ver?.prepend(h('span', { class: 'prof-ver-word' }, `${t('settings.version')} `));
+  const source = row({ icon: 'link', label: t('settings.sourceCode'), value: 'GitHub', href: SOURCE_URL, target: '_blank' });
+  const meta = (label: string, value: string, title?: string): HTMLElement =>
+    h('div', null, h('dt', null, label), h('dd', { class: 'num', title }, value));
+  return profGroup(t('settings.about'),
+    list([news, source]),
+    h('dl', { class: 'prof-meta' },
+      meta(t('settings.build'), `${BUILD_INFO.build} · ${fmtIsoDate(BUILD_INFO.date)}`),
+      meta(t('settings.deviceId'), short(profile.deviceId), profile.deviceId),
+      meta(t('settings.profileId'), short(profile.id), profile.id)));
+}
+
+/* ---------- Erweitert (E5) ---------- */
+
+function advancedGroup(s: Settings): HTMLElement {
+  // Versteckte Kategorien (z. B. „Eigenes“) gehören nicht in die Auswahl (wie activeCategories)
+  const visible = CATEGORIES.filter((c) => !c.hidden);
+  const all: CategoryId[] = visible.map((c) => c.id);
+  let enabled: CategoryId[] = Array.isArray(s.enabledCategories) ? all.filter((id) => s.enabledCategories?.includes(id)) : all;
+  if (enabled.length === 0) enabled = all;
+
+  const catValue = (): string => (enabled.length >= all.length
+    ? t('settings.catsAll') : t('settings.catsSome', { n: enabled.length, total: all.length }));
+  const cats = row({
+    label: t('settings.categories'), value: catValue(), chevron: true, onClick: () => openCategories(),
+    attrs: { 'aria-haspopup': 'dialog' },
+  });
+  const setEnabled = (ids: CategoryId[]): void => {
+    enabled = ids;
+    save({ enabledCategories: ids.length >= all.length ? null : ids });
+    const v = cats.querySelector('.row-value');
+    if (v) v.textContent = catValue();
+  };
+
+  /** Bottom Sheet mit einem Switch je Kategorie; mindestens eine bleibt aktiv. */
+  function openCategories(): void {
+    const box = list([]);
+    const lastHint = h('p', { class: 'prof-note', role: 'status' });
+    const allBtn = button({ label: t('settings.enableAll'), full: true });
+    let ctls: Array<readonly [CategoryId, SwitchControl]> = [];
+    const paint = (): void => {
+      const last = enabled.length === 1;
+      lastHint.textContent = last ? t('settings.lastCategory') : '';
+      lastHint.hidden = !last;
+      allBtn.disabled = enabled.length >= all.length;
+      for (const [id, ctl] of ctls) ctl.setDisabled(last && enabled.includes(id));
+    };
+    const draw = (): void => {
+      ctls = visible.map((c) => [c.id, switchRow({
+        label: c.name, help: c.description, checked: enabled.includes(c.id),
+        onChange: (on) => {
+          setEnabled(on ? all.filter((id) => id === c.id || enabled.includes(id)) : enabled.filter((id) => id !== c.id));
+          paint();
+        },
+      })] as const);
+      box.replaceChildren(...ctls.map(([, ctl]) => ctl.el));
+      paint();
+    };
+    allBtn.addEventListener('click', () => {
+      setEnabled(all);
+      draw();
+      box.querySelector<HTMLElement>('button[role="switch"]')?.focus();
+    });
+    draw();
+    openSheet({
+      title: t('settings.categories'),
+      children: [h('p', { class: 'prof-sheet-text' }, t('settings.categoriesHint')), box, lastHint, allBtn],
+    });
+  }
+
+  const keypad = segmented<Settings['keypad']>({
+    label: t('settings.keypad'),
+    options: [['auto', t('settings.keypadAuto')], ['on', t('settings.keypadOn')], ['off', t('settings.keypadOff')]],
+    value: s.keypad || 'auto', help: t('settings.keypadHint'),
+    onChange: (v) => save({ keypad: v }),
+  });
+
+  // Auto-Fail ist nur mit Zeitwertung sinnvoll: gesperrt und als „aus“ gezeigt, solange `timer` aus ist
+  const autoFailHelp = (timer: boolean): string => t(timer ? 'settings.autoFailOn' : 'settings.autoFailNeedsTimer');
+  const autoFail = switchRow({
+    label: t('settings.autoFail'), help: autoFailHelp(s.timer),
+    checked: s.autoFail && s.timer, disabled: !s.timer, onChange: (v) => save({ autoFail: v }),
+  });
+  const onTimer = (v: boolean): void => {
+    save({ timer: v });
+    autoFail.set(getSettings().autoFail && v);
+    autoFail.setDisabled(!v);
+    autoFail.setHelp(autoFailHelp(v));
+  };
+
+  return profGroup(t('settings.advanced'), list([
+    cats,
+    keypad.el,
+    switchRow({ label: t('settings.autoSubmit'), help: t('settings.autoSubmitHint'), checked: s.autoSubmit, onChange: (v) => save({ autoSubmit: v }) }).el,
+    switchRow({ label: t('settings.estimate'), help: t('settings.estimateHint'), checked: s.estimateMode, onChange: (v) => save({ estimateMode: v }) }).el,
+    switchRow({ label: t('settings.timer'), help: t('settings.timerHint'), checked: s.timer, onChange: onTimer }).el,
+    autoFail.el,
+    switchRow({ label: t('settings.ghost'), help: t('settings.ghostHint'), checked: s.ghost, onChange: (v) => save({ ghost: v }) }).el,
+  ]));
+}
+
+/* ---------- Konto (Passkey) ---------- */
+
+/** Rückmeldung im Konto-Sheet: Toasts lägen unter dem modalen Dialog. */
+interface SheetCtx {
+  say(text: string, tone: 'good' | 'bad'): void;
+  addCleanup(fn: () => void): void;
+}
+
+/** Führt eine Konto-Aktion aus; Button zeigt Busy-Zustand, Fehler (außer Abbruch) gehen an `onError`. */
+async function runBusy(btn: HTMLButtonElement, fn: () => Promise<void>, onError: (text: string) => void): Promise<boolean> {
+  btn.disabled = true;
+  btn.setAttribute('aria-busy', 'true');
+  try {
+    await fn();
+    return true;
+  } catch (e) {
+    const code = acct.errorCode(e);
+    if (code !== 'cancelled') onError(t(`account.err.${code}`));
+    return false;
+  } finally {
+    btn.disabled = false;
+    btn.removeAttribute('aria-busy');
+  }
+}
+
+/** Avatar-Kreis: Initiale bzw. Personen-Icon. */
+const avatar = (content: Child): HTMLElement => h('span', { class: 'prof-avatar', 'aria-hidden': 'true' }, content);
+
+/** „🔑 Mit Passkey angemeldet“ */
+const passkeySub = (): HTMLElement => h('span', { class: 'prof-acct-sub' }, icon('key', 14), t('account.signedInWith'));
+
+/** Inline-Formular zum Umbenennen (Anzeigename oder Passkey). Esc bricht ab, statt das Sheet zu schließen. */
+function inlineEdit(o: {
+  initial: string; label: string; validate: (v: string) => string | null;
+  onSave: (v: string, btn: HTMLButtonElement) => void; onCancel: () => void;
+}): HTMLFormElement {
+  const input: HTMLInputElement = h('input', {
+    class: 'prof-input', type: 'text', value: o.initial, maxlength: NAME_MAX, 'aria-label': o.label, autocomplete: 'off',
+  });
+  const err = h('p', { class: 'prof-err', role: 'alert' });
+  const saveBtn = button({ label: t('account.save'), kind: 'soft', type: 'submit' });
+  const form: HTMLFormElement = h('form', { class: 'prof-edit', novalidate: true },
+    input, err, h('div', { class: 'prof-edit-actions' }, button({ label: t('account.cancel'), kind: 'quiet', onClick: o.onCancel }), saveBtn));
+  form.addEventListener('submit', (ev) => {
+    ev.preventDefault();
+    const v = input.value.trim();
+    const bad = o.validate(v);
+    err.textContent = bad ?? '';
+    input.setAttribute('aria-invalid', String(bad !== null));
+    if (bad) { input.focus(); return; }
+    o.onSave(v, saveBtn);
+  });
+  form.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    e.preventDefault();
+    e.stopPropagation();
+    o.onCancel();
+  });
+  setTimeout(() => { input.focus(); input.select(); }, 0);
+  return form;
+}
+
+/** Bestätigung an Ort und Stelle (confirmDialog läge unter dem modalen Sheet). */
+function confirmStrip(text: string, confirmLabel: string, onConfirm: (btn: HTMLButtonElement) => void, onCancel: () => void): HTMLElement {
+  const cancel = button({ label: t('account.cancel'), kind: 'quiet', onClick: onCancel });
+  const ok = button({ label: confirmLabel, tone: 'danger', onClick: () => onConfirm(ok) });
+  const textId = nextId('confirm');
+  setTimeout(() => cancel.focus(), 0);
+  return h('div', { class: 'prof-confirm', role: 'group', 'aria-labelledby': textId },
+    h('p', { class: 'prof-confirm-text', id: textId }, text),
+    h('div', { class: 'prof-confirm-actions' }, cancel, ok));
+}
+
+const subhead = (text: string): HTMLElement => h('h3', { class: 'prof-subhead' }, text);
+
+/** Sheet-Inhalt abgemeldet: Konto erstellen oder mit Passkey anmelden (bisherige Logik). */
+function signedOutContent(ctx: SheetCtx): Child[] {
+  const inputId = nextId('name');
+  const input: HTMLInputElement = h('input', {
+    class: 'prof-input', id: inputId, type: 'text', maxlength: NAME_MAX, placeholder: t('account.namePlaceholder'),
+    autocomplete: 'username', enterkeyhint: 'go',
+  });
+  const err = h('p', { class: 'prof-err', role: 'alert' });
+  const create = button({ label: t('account.create'), kind: 'primary', full: true, cta: false, type: 'submit' });
+  const login = button({ label: t('account.login'), icon: 'key', full: true });
+  const both = [create, login];
+  const busy = async (btn: HTMLButtonElement, fn: () => Promise<void>): Promise<void> => {
+    for (const b of both) b.disabled = true;
+    await runBusy(btn, fn, (m) => ctx.say(m, 'bad'));
+    for (const b of both) b.disabled = false;
+  };
+  const form: HTMLFormElement = h('form', { class: 'prof-form', novalidate: true },
+    h('label', { class: 'prof-field', for: inputId }, t('account.nameLabel')), input, err, create);
+  form.addEventListener('submit', (ev) => {
+    ev.preventDefault();
+    const v = input.value.trim();
+    const bad = v.length < NAME_MIN || v.length > NAME_MAX;
+    err.textContent = bad ? t('account.nameInvalid') : '';
+    input.setAttribute('aria-invalid', String(bad));
+    if (bad) { input.focus(); return; }
+    // Erfolg → Kontozustand wechselt, das Sheet schließt sich; der Toast erscheint danach auf der Seite
+    void busy(create, async () => {
+      await acct.register(v);
+      toast(t('account.registered'), { kind: 'success', durationMs: 6000 });
+    });
+  });
+  login.addEventListener('click', () => {
+    void busy(login, async () => { await acct.login(); toast(t('account.loggedIn'), { kind: 'success' }); });
+  });
+
+  const controls = h('div', { class: 'prof-signin' }, form, h('p', { class: 'prof-or' }, h('span', null, t('account.or'))), login);
+  void acct.support().then((info) => {
+    if (!info.webauthn && controls.isConnected) controls.replaceWith(h('p', { class: 'prof-sheet-text' }, t('account.unsupported')));
+  }).catch(() => { /* Button-Aktionen melden Fehler selbst */ });
+  return [h('p', { class: 'prof-sheet-text' }, t('account.intro')), controls];
+}
+
+/** Sheet-Inhalt angemeldet: Name, Sync, Passkeys, Abmelden, Konto löschen (bisherige Logik, neu dargestellt). */
+function signedInContent(ctx: SheetCtx, username: string): { nodes: Child[]; onUser(name: string): void } {
+  let name = username;
+  let editingName = false;
+  let editingId: string | null = null;
+  let confirmId: string | null = null;
+  let passkeys: PasskeyInfo[] | null = null;
+  const onError = (m: string): void => ctx.say(m, 'bad');
+
+  // Name
+  const head = list([]);
+  function drawHead(): void {
+    if (editingName) {
+      head.replaceChildren(h('div', { class: 'prof-pad' }, inlineEdit({
+        initial: name, label: t('account.nameLabel'),
+        validate: (v) => (v.length < NAME_MIN || v.length > NAME_MAX ? t('account.nameInvalid') : null),
+        onSave: (v, btn) => {
+          void runBusy(btn, async () => {
+            await acct.renameUser(v);
+            name = v;
+            editingName = false;
+            drawHead();
+            // Fokus auf „Ändern“ – sonst fällt er mit dem entfernten Formular aus dem Sheet
+            head.querySelector<HTMLElement>('button')?.focus();
+            ctx.say(t('account.renamed'), 'good');
+          }, onError);
+        },
+        onCancel: () => { editingName = false; drawHead(); head.querySelector<HTMLElement>('button')?.focus(); },
+      })));
+      return;
+    }
+    const change = button({ label: t('account.change'), kind: 'link', onClick: () => { editingName = true; drawHead(); } });
+    change.setAttribute('aria-label', `${t('account.change')}: ${t('account.nameLabel')}`);
+    head.replaceChildren(h('div', { class: 'prof-acct' },
+      avatar(initial(name)),
+      h('span', { class: 'prof-acct-text' }, h('span', { class: 'prof-acct-name' }, name), passkeySub()),
+      change));
+  }
+
+  // Sync
+  const syncText = h('p', { class: 'prof-sync-text', role: 'status' });
+  const drawSync = (): void => {
+    syncText.textContent = syncStatusEntries(getSyncStatus()).map((e) => t(e.key, e.params)).join(' · ');
+  };
+  ctx.addCleanup(onSyncStatus(drawSync));
+  const syncBtn = button({ label: t('account.sync.syncNow'), icon: 'sync', full: true });
+  syncBtn.addEventListener('click', () => {
+    void runBusy(syncBtn, async () => {
+      const res = await syncNow();
+      if (res.phase === 'idle') ctx.say(t('account.sync.syncDone'), 'good');
+      else ctx.say(t(syncStatusEntries(res)[0]?.key ?? 'account.sync.failed'), 'bad');
+    }, onError);
+  });
+
+  // Passkeys
+  const pkList = h('div', { class: 'list', role: 'list', 'aria-label': t('account.passkeys') });
+  const reload = async (): Promise<void> => {
+    try { passkeys = await acct.listPasskeys(); } catch (e) { onError(t(`account.err.${acct.errorCode(e)}`)); passkeys = passkeys ?? []; }
+    drawPasskeys();
+  };
+  const focusPk = (id: string): void => { pkList.querySelector<HTMLElement>(`[data-pk="${CSS.escape(id)}"] button:not(:disabled)`)?.focus(); };
+
+  function passkeyItem(p: PasskeyInfo, last: boolean): HTMLElement {
+    const label = p.name ?? t('account.passkeyFallback', { date: acctDate(p.createdAt) });
+    const item = (...kids: Child[]): HTMLElement => h('div', { class: 'prof-pk', role: 'listitem', 'data-pk': p.id }, ...kids);
+    if (editingId === p.id) {
+      return item(h('div', { class: 'prof-pk-wide' }, inlineEdit({
+        initial: p.name ?? '', label: t('account.renameAria'),
+        validate: (v) => (v.length < 1 || v.length > NAME_MAX ? t('account.nameInvalid') : null),
+        onSave: (v, btn) => {
+          void runBusy(btn, async () => { await acct.renamePasskey(p.id, v); editingId = null; await reload(); focusPk(p.id); }, onError);
+        },
+        onCancel: () => { editingId = null; drawPasskeys(); focusPk(p.id); },
+      })));
+    }
+    if (confirmId === p.id) {
+      return item(h('div', { class: 'prof-pk-wide' }, confirmStrip(t('account.deletePasskeyConfirm'), t('account.delete'),
+        (btn) => {
+          void runBusy(btn, async () => {
+            await acct.deletePasskey(p.id);
+            confirmId = null;
+            ctx.say(t('account.passkeyDeleted'), 'good');
+            await reload();
+            pkList.querySelector<HTMLElement>('button:not(:disabled)')?.focus();
+          }, onError);
+        },
+        () => { confirmId = null; drawPasskeys(); focusPk(p.id); })));
+    }
+    const rename = button({ label: t('account.rename'), kind: 'link', onClick: () => { editingId = p.id; confirmId = null; drawPasskeys(); } });
+    rename.setAttribute('aria-label', `${t('account.renameAria')}: ${label}`);
+    const del = button({
+      label: t('account.delete'), kind: 'link', tone: 'danger',
+      onClick: () => { confirmId = p.id; editingId = null; drawPasskeys(); },
+    });
+    del.setAttribute('aria-label', `${t('account.deleteAria')}: ${label}`);
+    if (last) { del.disabled = true; del.title = t('account.lastPasskeyHint'); }
+    const meta = [t('account.created', { date: acctDate(p.createdAt) }),
+      p.lastUsedAt ? t('account.lastUsed', { date: acctDate(p.lastUsedAt) }) : null].filter(Boolean).join(' · ');
+    return item(
+      h('span', { class: 'prof-pk-icon' }, icon('key', 22)),
+      h('div', { class: 'prof-pk-text' },
+        h('p', { class: 'prof-pk-name' }, h('span', null, label), p.backedUp ? h('span', { class: 'prof-badge' }, t('account.synced')) : null),
+        h('p', { class: 'prof-pk-sub' }, meta),
+        last ? h('p', { class: 'prof-pk-sub' }, t('account.lastPasskeyHint')) : null),
+      h('div', { class: 'prof-pk-actions' }, rename, del));
+  }
+
+  function drawPasskeys(): void {
+    if (!passkeys) {
+      pkList.replaceChildren(h('p', { class: 'prof-pad prof-sheet-text', role: 'listitem' }, t('account.loading')));
+      return;
+    }
+    const pks = passkeys;
+    pkList.replaceChildren(...pks.map((p) => passkeyItem(p, pks.length <= 1)));
+  }
+
+  const add = button({ label: t('account.addPasskey'), icon: 'key', full: true });
+  add.addEventListener('click', () => {
+    void runBusy(add, async () => { await acct.addPasskey(); ctx.say(t('account.passkeyAdded'), 'good'); await reload(); }, onError);
+  });
+
+  // Abmelden / Konto löschen (Erfolg → Kontozustand wechselt, das Sheet schließt sich)
+  const footer = h('div', { class: 'prof-sheet-actions' });
+  function drawFooter(confirming: boolean): void {
+    if (confirming) {
+      footer.replaceChildren(confirmStrip(t('account.deleteAccountConfirm'), t('account.deleteAccount'),
+        (btn) => { void runBusy(btn, async () => { await acct.deleteAccount(); toast(t('account.accountDeleted'), { kind: 'info' }); }, onError); },
+        () => { drawFooter(false); footer.querySelector<HTMLElement>('.danger')?.focus(); }));
+      return;
+    }
+    const out = button({ label: t('account.logout'), full: true });
+    out.addEventListener('click', () => {
+      void runBusy(out, async () => { await acct.logout(); toast(t('account.loggedOut'), { kind: 'info' }); }, onError);
+    });
+    const del = button({ label: t('account.deleteAccount'), kind: 'quiet', icon: 'trash', full: true, tone: 'danger', onClick: () => drawFooter(true) });
+    footer.replaceChildren(out, del);
+  }
+
+  drawHead();
+  drawSync();
+  drawPasskeys();
+  drawFooter(false);
+  void reload();
+
+  return {
+    nodes: [
+      head,
+      subhead(t('account.syncTitle')), h('div', { class: 'list' }, h('div', { class: 'prof-sync-line' }, h('span', { class: 'prof-pk-icon' }, icon('sync', 22)), syncText)), syncBtn,
+      subhead(t('account.passkeys')), pkList, h('p', { class: 'prof-sheet-text' }, t('account.addPasskeyHint')), add,
+      footer,
+    ],
+    onUser: (next) => {
+      if (next === name && !editingName) return;
+      name = next;
+      editingName = false;
+      drawHead();
     },
-  }, t('settings.resetAll'));
-
-  return [
-    section(t('settings.storage'),
-      row(t('settings.storedData'), h('span', { class: 'muted' }, t('settings.storedCount', { attempts, sessions })),
-        t('settings.storageUsed', { kb: storageKB() }))),
-    section(t('settings.backup'),
-      row(t('settings.exportJson'), h('button', { type: 'button', class: 'btn', onclick: download }, t('settings.exportBtn')), t('settings.exportHint')),
-      row(t('settings.importJson'), h('button', { type: 'button', class: 'btn', onclick: () => fileInput.click() }, t('settings.importLabel')),
-        t('settings.importHint')),
-      fileInput,
-      row(t('settings.deleteAll'), resetBtn)),
-    accountCard(),
-    section(t('settings.account'),
-      row(t('settings.deviceId'), h('code', { class: 'id-chip', title: profile.deviceId }, short(profile.deviceId))),
-      row(t('settings.profileId'), h('code', { class: 'id-chip', title: profile.id }, short(profile.id)))),
-  ];
+  };
 }
 
-// ---------- Tab: Über ----------
-function aboutTab(): HTMLElement[] {
-  return [
-    section('Mental Math',
-      row(t('settings.version'), h('span', { class: 'muted' }, BUILD_INFO.version)),
-      row(t('settings.build'), h('span', { class: 'muted' }, BUILD_INFO.build)),
-      row(t('settings.buildDate'), h('span', { class: 'muted' }, fmtIsoDate(BUILD_INFO.date))),
-      row(t('settings.whatsNew'), h('button', { type: 'button', class: 'btn', onclick: () => openChangelog() }, t('settings.viewChanges'))),
-      row(t('settings.sourceCode'), h('a', { class: 'linkbtn', href: 'https://github.com/EliasSteffen/Mental-Math', target: '_blank', rel: 'noopener' }, 'GitHub'))),
-  ];
-}
-
-function tabBar(active: TabId): HTMLElement {
-  const bar = h('div', { class: 'settings-tabs', role: 'tablist', 'aria-label': t('settings.title') });
-  for (const [id, label, ic] of TABS) {
-    const on = id === active;
-    bar.append(h('button', {
-      type: 'button', role: 'tab', class: `settings-tab${on ? ' active' : ''}`, 'aria-selected': String(on), 'data-tab': id,
-      onclick: () => {
-        if (on) return;
-        history.replaceState(null, '', `#/settings?tab=${id}`);
-        rerender();
-      },
-    }, icon(ic, { size: 18 }), h('span', null, t(label))));
+/** Modales Konto-Sheet; schließt sich, sobald sich der Anmeldezustand ändert (an-/abgemeldet, gelöscht). */
+function openAccountSheet(): void {
+  const st = acct.getAccountState();
+  if (st.status !== 'signed-in' && st.status !== 'signed-out') return;
+  const mode = st.status;
+  const cleanups: Array<() => void> = [];
+  const msg = h('p', { class: 'prof-msg', role: 'status', hidden: true });
+  const ctx: SheetCtx = {
+    say: (text, tone) => {
+      msg.textContent = text;
+      msg.className = `prof-msg is-${tone}`;
+      msg.hidden = false;
+    },
+    addCleanup: (fn) => { cleanups.push(fn); },
+  };
+  let onUser: ((name: string) => void) | null = null;
+  let nodes: Child[];
+  if (st.status === 'signed-in') {
+    const c = signedInContent(ctx, st.user.username);
+    nodes = c.nodes;
+    onUser = c.onUser;
+  } else {
+    nodes = signedOutContent(ctx);
   }
-  return bar;
+  let sheet: SheetHandle | null = null;
+  ctx.addCleanup(acct.onAccountChange((s) => {
+    if (s.status !== mode) { sheet?.close(); return; }
+    if (s.status === 'signed-in') onUser?.(s.user.username);
+  }));
+  sheet = openSheet({
+    title: t('account.title'),
+    children: [msg, ...nodes],
+    onClose: () => { for (const fn of cleanups.splice(0)) fn(); },
+  });
+}
+
+/** Zeile „Geräte-Sync“ mit Status; „bald verfügbar“ nur ohne Konto-Funktion. */
+function syncRow(): HTMLElement {
+  const st = acct.getAccountState();
+  const label = t('account.syncTitle');
+  let el: HTMLElement;
+  if (!acct.accountEnabled() || st.status === 'disabled') el = row({ icon: 'sync', label, value: t('account.syncSoon') });
+  else if (st.status === 'loading') el = row({ icon: 'sync', label });
+  else if (st.status === 'signed-out') el = row({ icon: 'sync', label, value: t('account.syncSignedOut') });
+  else el = row({ icon: 'sync', label, sub: syncStatusEntries(getSyncStatus()).map((e) => t(e.key, e.params)).join(' · ') });
+  el.classList.add('prof-sync');
+  return el;
+}
+
+/** Kopfzeile der Konto-Karte je Zustand; null ohne Konto-Funktion. */
+function accountHead(st: acct.AccountState): HTMLElement | null {
+  if (st.status === 'disabled') return null;
+  const chevron = h('span', { class: 'row-chevron' }, icon('chevron-right', 18));
+  if (st.status === 'loading') {
+    return h('div', { class: 'prof-acct' }, avatar(icon('person', 22)),
+      h('span', { class: 'prof-acct-text' }, h('span', { class: 'prof-acct-sub' }, t('account.loading'))));
+  }
+  const text = st.status === 'signed-in'
+    ? h('span', { class: 'prof-acct-text' }, h('span', { class: 'prof-acct-name' }, st.user.username), passkeySub())
+    : h('span', { class: 'prof-acct-text' },
+      h('span', { class: 'prof-acct-name' }, t('account.signInRow')),
+      h('span', { class: 'prof-acct-sub' }, t('account.signInSub')));
+  return h('button', { type: 'button', class: 'prof-acct press', 'aria-haspopup': 'dialog', onclick: () => openAccountSheet() },
+    avatar(st.status === 'signed-in' ? initial(st.user.username) : icon('person', 22)), text, chevron);
+}
+
+/** Konto-Karte: Konto-Zeile (→ Sheet) und Geräte-Sync; folgt Konto- und Sync-Status live. */
+function accountCard(): HTMLElement {
+  const box = list([]);
+  let lastKey = '';
+  let sync: HTMLElement | null = null;
+  const draw = (): void => {
+    const st = acct.getAccountState();
+    const key = st.status === 'signed-in' ? `in:${st.user.id}:${st.user.username}` : st.status;
+    if (key === lastKey) return;
+    lastKey = key;
+    sync = syncRow();
+    box.replaceChildren(...[accountHead(st), sync].filter((x): x is HTMLElement => x !== null));
+  };
+  draw();
+  addCleanup(acct.onAccountChange(draw));
+  addCleanup(onSyncStatus(() => { if (sync) sync = swap(sync, syncRow()); }));
+  return h('section', { 'aria-label': t('account.title') }, box);
+}
+
+/* ---------- Seite ---------- */
+
+/** Für welche Adresse zuletzt zur Gruppe gescrollt wurde (Neuzeichnen, z. B. Sprachwechsel, scrollt nicht erneut). */
+let anchoredHash: string | null = null;
+
+/** Altes `?tab=` → zur passenden Gruppe scrollen (nach der Scroll-Wiederherstellung des Routers). */
+function scrollToAnchor(groups: Readonly<Record<TabAnchor, HTMLElement>>): void {
+  const hash = location.hash;
+  const tab = new URLSearchParams(hash.split('?')[1] ?? '').get('tab');
+  const target = tab !== null && Object.hasOwn(groups, tab) ? groups[tab as TabAnchor] : null;
+  if (!target) { anchoredHash = null; return; }
+  addCleanup(() => { if (location.hash !== hash) anchoredHash = null; });
+  if (anchoredHash === hash) return;
+  anchoredHash = hash;
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    if (target.isConnected) target.scrollIntoView({ block: 'start', behavior: reducedMotion() ? 'auto' : 'smooth' });
+  }));
 }
 
 export function renderSettings(): void {
   const s = getSettings();
-  const tab = currentTab();
-  const content = tab === 'general' ? generalTab(s) : tab === 'gameplay' ? gameplayTab(s) : tab === 'data' ? dataTab() : aboutTab();
+  const live = h('p', { class: 'sr-only', role: 'status' });
+  const groups: Record<TabAnchor, HTMLElement> = {
+    gameplay: trainingGroup(s),
+    general: appearanceGroup(s),
+    data: dataGroup(live),
+    about: aboutGroup(),
+  };
+  // Kein Floating CTA auf Profil (der Router setzt setPrimaryAction(null))
   appendChildren(app, [
-    h('h1', { class: 'page-title' }, t('settings.title')),
-    tabBar(tab),
-    h('div', { class: 'settings-panel', role: 'tabpanel' }, content),
+    largeTitle(t('settings.title')),
+    accountCard(),
+    groups.gameplay,
+    groups.general,
+    feedbackGroup(s),
+    groups.data,
+    groups.about,
+    advancedGroup(s),
+    live,
   ]);
+  scrollToAnchor(groups);
 }

@@ -137,8 +137,11 @@ export interface Session {
   avgTimeMs: number;
 }
 
-export type ThemeSetting = 'system' | 'neon' | 'oled' | 'pastel';
+/** 'system' folgt prefers-color-scheme (→ 'paper' oder 'night'). Alte Werte: 'pastel' → 'paper' (Migration in schema.ts). */
+export type ThemeSetting = 'system' | 'paper' | 'night' | 'oled' | 'aurora' | 'neon';
 export type Theme = Exclude<ThemeSetting, 'system'>;
+/** Zeitanzeige im Training: Linie ohne Zahlen, Sekunden/Punkte/Level oder nichts. Gemessen wird immer. */
+export type TimerDisplay = 'calm' | 'precise' | 'off';
 
 export interface Settings {
   sessionLength: number;
@@ -165,6 +168,13 @@ export interface Settings {
   lang: 'auto' | 'de' | 'en';
   /** zuletzt gesehene App-Version (für „Was ist neu?“) */
   lastSeenVersion: string;
+  // Ruhiger Fokus
+  /** Nur die Anzeige; `timer` bleibt „Zeit in Punkte einrechnen“ (E3) */
+  timerDisplay: TimerDisplay;
+  /** Atempause vor der ersten Aufgabe (E4, E19) */
+  breathe: boolean;
+  /** „Feiern“: Konfetti beim Tagesziel (E4) */
+  confetti: boolean;
 }
 
 export interface ReviewItem { box: number; dueAt: number; lastTs: number }

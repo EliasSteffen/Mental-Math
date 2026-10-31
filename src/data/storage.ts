@@ -10,7 +10,7 @@ import { Repository, sumByKey } from '../vendor/storage.ts';
 import { createLegacyStore, getDefaultAdapter, initStorageAdapter, setDefaultAdapter, V3_PREFIX } from './adapters.ts';
 import { LEGACY_BACKUP_KEY, LEGACY_KEY, migrateV1 } from './migrate.ts';
 import { createMeta, touch } from './meta.ts';
-import { DEFAULT_PARALLEL_STATS, DEFAULT_SETTINGS, isObj, normalize, normalizeParallel } from './schema.ts';
+import { DEFAULT_PARALLEL_STATS, DEFAULT_SETTINGS, isObj, normalize, normalizeParallel, normalizeSettings } from './schema.ts';
 
 export { DEFAULT_PARALLEL_STATS, DEFAULT_SETTINGS, normalize };
 
@@ -189,14 +189,15 @@ export function addSession(session: Session): void {
 }
 
 // ---------- Settings ----------
+/** Gespeicherte (auch synchronisierte) Einstellungen, normalisiert und migriert (pastel → paper, timerDisplay, …). */
 export const getSettings = (): Settings => view('settings', () => {
   const { updatedAt: _u, ...rest } = (r().getDoc<Record<string, unknown>>('settings') ?? {}) as Record<string, unknown>;
   void _u;
-  return { ...DEFAULT_SETTINGS, ...(rest as Partial<Settings>) };
+  return normalizeSettings(rest);
 });
 
 export function setSettings(partial: Partial<Settings>): Settings {
-  const next = { ...getSettings(), ...partial };
+  const next = normalizeSettings({ ...getSettings(), ...partial });
   r().putDoc('settings', { ...next, updatedAt: Date.now() });
   return getSettings();
 }

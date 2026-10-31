@@ -1,6 +1,7 @@
-// charts.ts – UI-Bausteine (nur DOM-API, kein innerHTML, keine style-Attribute)
+// charts.ts – Icons und Diagramme (Lernkurve, Heatmap, Fortschrittsbalken), Konfetti. Nur DOM-API, keine style-Attribute;
+// die Optik steht in components.css.
 import type { HeatCell } from '../types.ts';
-import { t } from '../i18n/index.ts';
+import { locale, t } from '../i18n/index.ts';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
@@ -15,79 +16,110 @@ function svgEl(tag: string, attrs: Record<string, SvgAttrValue> = {}): SVGElemen
   return el;
 }
 
-type IconPart = readonly [tag: string, d: string | null, attrs?: Record<string, number>];
+type IconPart = readonly [tag: 'path' | 'circle' | 'rect', d: string | null, attrs?: Record<string, number>];
 
-const ICONS: Record<string, readonly IconPart[]> = {
-  book: [['path', 'M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5z'], ['path', 'M4 20.5A2.5 2.5 0 0 0 6.5 23H20v-5'], ['path', 'M9 8h6']],
-  play: [['path', 'M7 4.5v15l12-7.5z']],
-  chart: [['path', 'M4 20V10'], ['path', 'M10 20V4'], ['path', 'M16 20v-7'], ['path', 'M22 20H2']],
-  gear: [['circle', null, { cx: 12, cy: 12, r: 3 }], ['path', 'M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z']],
-  flame: [['path', 'M12 2s5 4.5 5 10a5 5 0 0 1-10 0c0-2 1-3.5 2-4.5 0 2 1 3 2 3 0-3-1-5.5 1-8.5z']],
-  star: [['path', 'M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z']],
-  target: [['circle', null, { cx: 12, cy: 12, r: 9 }], ['circle', null, { cx: 12, cy: 12, r: 5 }], ['circle', null, { cx: 12, cy: 12, r: 1 }]],
-  repeat: [['path', 'M17 2l4 4-4 4'], ['path', 'M3 11V9a3 3 0 0 1 3-3h15'], ['path', 'M7 22l-4-4 4-4'], ['path', 'M21 13v2a3 3 0 0 1-3 3H3']],
-  check: [['path', 'M4 12.5l5 5L20 6.5']],
-  x: [['path', 'M6 6l12 12'], ['path', 'M18 6L6 18']],
-  chevron: [['path', 'M9 6l6 6-6 6']],
+const c = (cx: number, cy: number, r: number): IconPart => ['circle', null, { cx, cy, r }];
+const rect = (x: number, y: number, width: number, height: number, rx: number): IconPart => ['rect', null, { x, y, width, height, rx }];
+
+/** Icon-Set „Ruhiger Fokus“: Pfade aus den Artboards (docs/design/ruhiger-fokus), Strichstärke 1,75. */
+const ICON_SET = {
+  // Tabs
+  sun: [c(12, 12, 4), ['path', 'M12 2.5v2M12 19.5v2M4.6 4.6L6 6M18 18l1.4 1.4M2.5 12h2M19.5 12h2M4.6 19.4L6 18M18 6l1.4-1.4']],
+  book: [['path', 'M12 6.5C10.5 5.3 8.4 4.75 4 4.75v13.5c4.4 0 6.5.55 8 1.75 1.5-1.2 3.6-1.75 8-1.75V4.75c-4.4 0-6.5.55-8 1.75Z'], ['path', 'M12 6.5V20']],
+  bars: [['path', 'M5 19V11M12 19V5M19 19v-6']],
+  person: [c(12, 8, 3.5), ['path', 'M5 19.5c1.2-3.3 3.8-5 7-5s5.8 1.7 7 5']],
+  // Navigation und Training
+  close: [['path', 'M6 6l12 12M18 6L6 18']],
+  'chevron-right': [['path', 'M9 6l6 6-6 6']],
+  'chevron-left': [['path', 'M15 6l-6 6 6 6']],
+  'chevron-down': [['path', 'M6 9l6 6 6-6']],
+  undo: [['path', 'M9 14L4 9l5-5'], ['path', 'M4 9h10.5a5.5 5.5 0 0 1 0 11H11']],
+  bulb: [['path', 'M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3Z']],
+  check: [['path', 'M5 12.5l4.5 4.5L19 7.5']],
+  backspace: [['path', 'M9 5h10a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H9l-6-7 6-7Z'], ['path', 'M12 9.5l5 5M17 9.5l-5 5']],
+  'plus-minus': [['path', 'M12 4.5v8M8 8.5h8M8 18.5h8']],
+  // Aktionen
+  search: [c(11, 11, 6.5), ['path', 'M16 16l4 4']],
+  refresh: [['path', 'M20 11a8 8 0 0 0-14.7-4.3L4 8M4 4v4h4M4 13a8 8 0 0 0 14.7 4.3L20 16M20 20v-4h-4']],
+  chat: [['path', 'M5 18.5V6.5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H8.5L5 18.5Z']],
+  // Inhalte
+  calendar: [rect(4, 5, 16, 15, 3), ['path', 'M8 3v4M16 3v4M4 10h16']],
+  grid: [rect(4, 4, 6.5, 6.5, 1.5), rect(13.5, 4, 6.5, 6.5, 1.5), rect(4, 13.5, 6.5, 6.5, 1.5), rect(13.5, 13.5, 6.5, 6.5, 1.5)],
+  link: [['path', 'M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1'], ['path', 'M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1']],
+  flame: [['path', 'M12 21c-3.9 0-6.5-2.6-6.5-6.2 0-3.3 2.4-5.4 3.9-7.6.5 1.7 1.4 2.8 2.6 3.4.3-2.9 1.6-5.3 3.6-7.1-.1 2.9 1.3 4.6 2.5 6.4 1 1.4 1.4 2.8 1.4 4.6 0 3.8-3.1 6.5-7.5 6.5Z']],
+  target: [c(12, 12, 8.5), c(12, 12, 4.5), c(12, 12, 1)],
+  // Konto und Daten
+  key: [c(8, 15, 4), ['path', 'M10.8 12.2L20 3M16 7l3 3M14 9l2 2']],
+  sync: [['path', 'M7 18h10.5a4 4 0 0 0 .6-7.95A6 6 0 0 0 6.6 9.1 4.5 4.5 0 0 0 7 18Z']],
+  download: [['path', 'M12 4v11M7 10l5 5 5-5M5 20h14']],
+  upload: [['path', 'M12 20V9M7 14l5-5 5 5M5 4h14']],
+  trash: [['path', 'M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3']],
   sparkles: [['path', 'M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8z'], ['path', 'M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z']],
-  'plus-minus': [['path', 'M7 4v8'], ['path', 'M3 8h8'], ['path', 'M3 19h8'], ['path', 'M14 6h7'], ['path', 'M14 15h7'], ['path', 'M14 19h7']],
+  info: [c(12, 12, 8.5), ['path', 'M12 11v5M12 8h.01']],
+  // Ergänzungen ohne eigenes Artboard (Start, Einstellungen der Spielmodi, Bestwert)
+  play: [['path', 'M7 4.5v15l12-7.5z']],
+  gear: [c(12, 12, 3), ['path', 'M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z']],
   trophy: [['path', 'M8 4h8v6a4 4 0 0 1-8 0z'], ['path', 'M8 6H4v1a4 4 0 0 0 4 4'], ['path', 'M16 6h4v1a4 4 0 0 1-4 4'], ['path', 'M12 14v4'], ['path', 'M8 21h8']],
-  clock: [['circle', null, { cx: 12, cy: 12, r: 9 }], ['path', 'M12 7v5l3 2']],
-};
+} as const satisfies Record<string, readonly IconPart[]>;
 
-export function icon(name: string, { size = 24 }: { size?: number } = {}): SVGElement {
+export type IconName = keyof typeof ICON_SET;
+
+/** Abweichende Strichstärken aus den Artboards (Chevrons 2, Haken 2,25). */
+const ICON_STROKE: Partial<Record<IconName, number>> = { 'chevron-right': 2, 'chevron-left': 2, 'chevron-down': 2, check: 2.25 };
+
+export function icon(name: IconName, { size = 24, strokeWidth }: { size?: number; strokeWidth?: number } = {}): SVGElement {
   const root = svgEl('svg', {
     class: `icon icon-${name}`, viewBox: '0 0 24 24', width: size, height: size, fill: 'none',
-    stroke: 'currentColor', 'stroke-width': 2, 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'aria-hidden': 'true', focusable: 'false',
+    stroke: 'currentColor', 'stroke-width': strokeWidth ?? ICON_STROKE[name] ?? 1.75,
+    'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'aria-hidden': 'true', focusable: 'false',
   });
-  for (const [tag, d, attrs] of ICONS[name] ?? []) {
+  const parts: readonly IconPart[] = ICON_SET[name] ?? [];
+  for (const [tag, d, attrs] of parts) {
     root.append(svgEl(tag, tag === 'path' ? { d } : attrs));
   }
   return root;
 }
 
-const RING_PX: Record<string, number> = { sm: 40, md: 64, lg: 120 };
-
-export function ring(
-  value0to1: number,
-  { size = 'md', text = '', cls = '' }: { size?: string; text?: string | number | null; cls?: string } = {},
-): SVGElement {
-  const v = Number.isFinite(value0to1) ? Math.max(0, Math.min(1, value0to1)) : 0;
-  const pct = Math.round(v * 1000) / 10;
-  const px = RING_PX[size] ?? RING_PX['md'];
-  const root = svgEl('svg', {
-    class: `ring ${size}${cls ? ' ' + cls : ''}`, viewBox: '0 0 36 36', width: px, height: px, role: 'img',
-    'aria-label': text ? `${text}` : `${Math.round(v * 100)} %`,
-  });
-  root.append(svgEl('circle', { class: 'ring-track', cx: 18, cy: 18, r: 15.915, fill: 'none' }));
-  root.append(svgEl('circle', {
-    class: 'ring-value', cx: 18, cy: 18, r: 15.915, fill: 'none', 'stroke-dasharray': `${pct} 100`, 'stroke-linecap': 'round',
-    transform: 'rotate(-90 18 18)',
-  }));
-  if (text !== '' && text !== null && text !== undefined) {
-    const t = svgEl('text', { class: 'ring-text', x: 18, y: 18, 'text-anchor': 'middle', 'dominant-baseline': 'central' });
-    t.textContent = String(text);
-    root.append(t);
-  }
-  return root;
-}
-
-let sparkId = 0;
-
 type Pt = readonly [number, number];
 
+export interface SparklineOptions {
+  /** Fläche unter der Linie (--accent-soft) */
+  area?: boolean;
+  /** feste Obergrenze (z. B. 1 für Anteile); Untergrenze dann 0 */
+  max?: number | null;
+  /** true: null ist eine Lücke; false: vorhandene Punkte werden verbunden */
+  gaps?: boolean;
+  /** true: y-Achse spannt nur min–max der Werte (Trend statt Nullbasis), ignoriert bei `max` */
+  fit?: boolean;
+  /** Seitenverhältnis über viewBox (Standard 120 × 40); gestreckt wird per CSS */
+  width?: number;
+  height?: number;
+  /** aria-label (Standard „Verlauf“) */
+  label?: string;
+}
+
+/** Linie mit optionaler Fläche (Lernkurve). Strich bleibt bei jeder Breite 2 px (vector-effect in CSS). */
 export function sparkline(
   values: ReadonlyArray<number | null | undefined>,
-  { area = true, max = null, gaps = false }: { area?: boolean; max?: number | null; gaps?: boolean } = {},
+  { area = true, max = null, gaps = false, fit = false, width = 120, height = 40, label }: SparklineOptions = {},
 ): SVGElement {
-  const W = 120, H = 40, PAD = 3;
-  const root = svgEl('svg', { class: 'spark', viewBox: `0 0 ${W} ${H}`, preserveAspectRatio: 'none', role: 'img', 'aria-label': t('analyse.trend') });
+  const W = Math.max(8, width), H = Math.max(8, height), PAD = 3;
+  const root = svgEl('svg', {
+    class: 'spark', viewBox: `0 0 ${W} ${H}`, preserveAspectRatio: 'none', role: 'img', 'aria-label': label ?? t('analyse.trend'),
+  });
   const vals = Array.isArray(values) ? values : [];
   const isNum = (v: number | null | undefined): v is number => typeof v === 'number' && Number.isFinite(v);
   const nums = vals.filter(isNum);
   if (!nums.length) return root;
-  const hi = max !== null && Number.isFinite(max) ? max : Math.max(...nums, 1);
-  const lo = max !== null ? 0 : Math.min(0, ...nums);
+  const fixedMax = max !== null && Number.isFinite(max) ? max : null;
+  let hi = fixedMax ?? (fit ? Math.max(...nums) : Math.max(...nums, 1));
+  let lo = fixedMax !== null ? 0 : fit ? Math.min(...nums) : Math.min(0, ...nums);
+  if (fit && fixedMax === null) {
+    // 10 % Luft oben und unten; flache Reihen liegen mittig
+    const pad = (hi - lo) * 0.1 || Math.abs(hi) * 0.1 || 1;
+    hi += pad;
+    lo -= pad;
+  }
   const span = hi - lo || 1;
   const n = vals.length;
   const x = (i: number): number => (n === 1 ? W / 2 : PAD + (i * (W - 2 * PAD)) / (n - 1));
@@ -102,20 +134,14 @@ export function sparkline(
   });
   if (cur.length) segs.push(cur);
 
+  const pts = (s: readonly Pt[]): string => s.map(([px, py]) => `${px.toFixed(1)},${py.toFixed(1)}`).join(' ');
   if (area) {
-    const id = `spark-grad-${++sparkId}`;
-    const defs = svgEl('defs');
-    const grad = svgEl('linearGradient', { id, x1: 0, y1: 0, x2: 0, y2: 1 });
-    grad.append(svgEl('stop', { class: 'stop-a', offset: '0%' }), svgEl('stop', { class: 'stop-b', offset: '100%' }));
-    defs.append(grad);
-    root.append(defs);
     for (const s of segs) {
       const first = s[0];
       const last = s[s.length - 1];
       if (s.length < 2 || !first || !last) continue;
-      const d = `M${first[0].toFixed(1)},${(H - PAD).toFixed(1)} ` + s.map(([px, py]) => `L${px.toFixed(1)},${py.toFixed(1)}`).join(' ')
-        + ` L${last[0].toFixed(1)},${(H - PAD).toFixed(1)} Z`;
-      root.append(svgEl('path', { class: 'area', d, fill: `url(#${id})` }));
+      const base = (H - PAD).toFixed(1);
+      root.append(svgEl('path', { class: 'area', d: `M${first[0].toFixed(1)},${base} L${pts(s).replaceAll(' ', ' L')} L${last[0].toFixed(1)},${base} Z` }));
     }
   }
   for (const s of segs) {
@@ -123,35 +149,62 @@ export function sparkline(
     if (s.length === 1 && first) {
       root.append(svgEl('circle', { class: 'dot', cx: first[0].toFixed(1), cy: first[1].toFixed(1), r: 2 }));
     } else {
-      root.append(svgEl('polyline', { class: 'line', fill: 'none', points: s.map(([px, py]) => `${px.toFixed(1)},${py.toFixed(1)}`).join(' ') }));
+      root.append(svgEl('polyline', { class: 'line', fill: 'none', points: pts(s) }));
     }
   }
   return root;
 }
 
-export function heatmapGrid(cells: readonly HeatCell[] | null | undefined): HTMLDivElement {
+const pad2 = (n: number): string => String(n).padStart(2, '0');
+const localKey = (d: Date): string => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+
+/**
+ * Heatmap (Spalten = Wochen, Zeilen = Mo–So), 4 Stufen von --surface-2 bis --accent.
+ * Tage nach `today` (YYYY-MM-DD, Standard: heute) bleiben leer (.is-future).
+ */
+export function heatmapGrid(
+  cells: readonly HeatCell[] | null | undefined,
+  { label, today }: { label?: string; today?: string } = {},
+): HTMLDivElement {
   const root = document.createElement('div');
   root.className = 'heatmap';
   root.setAttribute('role', 'img');
-  root.setAttribute('aria-label', t('analyse.heatmapAria'));
+  root.setAttribute('aria-label', label ?? t('analyse.heatmapAria'));
+  const todayKey = today ?? localKey(new Date());
+  const dateFmt = new Intl.DateTimeFormat(locale(), { weekday: 'short', day: 'numeric', month: 'short' });
   for (const c of cells ?? []) {
     const cell = document.createElement('span');
     cell.className = 'hm-cell';
     cell.dataset['level'] = String(Math.max(0, Math.min(4, c.level | 0)));
-    if (c.date) cell.title = `${c.date}${c.ms ? ` · ${t('analyse.minutes', { n: Math.round(c.ms / 60000) })}` : ''}`;
+    if (c.date && c.date > todayKey) {
+      cell.classList.add('is-future');
+    } else if (c.date) {
+      const [y = 0, m = 1, d = 1] = c.date.split('-').map(Number);
+      const day = dateFmt.format(new Date(y, m - 1, d, 12));
+      cell.title = c.ms ? `${day} · ${t('analyse.minutes', { n: Math.round(c.ms / 60000) })}` : day;
+    }
     root.append(cell);
   }
   return root;
 }
 
-export function progressBar(value0to100: number): HTMLDivElement {
+/**
+ * Fortschrittsbalken 4 px (--surface-2 / --accent). `decorative`: nur Optik (aria-hidden), wenn ein Text daneben
+ * den Wert nennt; sonst role=progressbar mit optionalem aria-label.
+ */
+export function progressBar(value0to100: number, { label, decorative = false }: { label?: string; decorative?: boolean } = {}): HTMLDivElement {
   const v = Number.isFinite(value0to100) ? Math.max(0, Math.min(100, value0to100)) : 0;
   const root = document.createElement('div');
   root.className = 'progress';
-  root.setAttribute('role', 'progressbar');
-  root.setAttribute('aria-valuemin', '0');
-  root.setAttribute('aria-valuemax', '100');
-  root.setAttribute('aria-valuenow', String(Math.round(v)));
+  if (decorative) {
+    root.setAttribute('aria-hidden', 'true');
+  } else {
+    root.setAttribute('role', 'progressbar');
+    root.setAttribute('aria-valuemin', '0');
+    root.setAttribute('aria-valuemax', '100');
+    root.setAttribute('aria-valuenow', String(Math.round(v)));
+    if (label) root.setAttribute('aria-label', label);
+  }
   const bar = document.createElement('span');
   bar.className = 'progress-bar';
   bar.style.setProperty('--w', String(v));
@@ -178,4 +231,3 @@ export function confetti(): HTMLDivElement {
   return root;
 }
 
-export { toast } from './toast.ts';

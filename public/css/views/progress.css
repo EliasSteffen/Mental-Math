@@ -1,0 +1,74 @@
+/* View „Fortschritt“ (src/views/analyse.ts). Nur View-spezifische Regeln; Bausteine und Diagramme (Heatmap, Lernkurve,
+   Fortschrittsbalken) kommen aus components.css. Dynamische Werte nur über CSS-Variablen: --h (Höhe 0–100), --w (Breite 0–100). */
+@layer views {
+  /* ---------- Fokus-Karte (Hero) ---------- */
+  .prog-focus { gap:var(--space-3); }
+  .prog-focus-label {
+    display:flex; align-items:center; gap:6px;
+    font-size:var(--text-xs); font-weight:var(--weight-semibold); line-height:1.3; color:var(--accent-text);
+  }
+  .prog-focus-label .icon { stroke-width:2; }
+  .prog-focus-title { font-size:var(--text-lg); font-weight:var(--weight-bold); line-height:1.25; overflow-wrap:break-word; text-wrap:balance; }
+  .prog-focus-text { font-size:var(--text-sm); line-height:1.5; }
+  .prog-strong { font-weight:var(--weight-semibold); white-space:nowrap; }
+  .prog-example {
+    padding:var(--space-3); border-radius:var(--radius-key); background:var(--surface-2);
+    font-size:var(--text-sm); line-height:1.5; overflow-wrap:anywhere;
+  }
+  .prog-focus > .btn.link { align-self:flex-start; margin:calc(-1 * var(--space-1)) 0 calc(-1 * var(--space-2)) calc(-1 * var(--space-1)); }
+
+  /* ---------- Ansichten und Karten (Umschalter = kit.segmented mit 4 Optionen, Kartenkopf = kit.card) ---------- */
+  .prog-panel { min-width:0; }
+  .prog-view { display:flex; flex-direction:column; gap:var(--space-4); min-width:0; }
+  .prog-card-foot { font-size:var(--text-xs); color:var(--muted); }
+  .prog-empty { font-size:var(--text-sm); line-height:1.5; color:var(--muted); }
+
+  /* ---------- Wochenbalken mit Ziellinie ---------- */
+  .prog-week { display:flex; flex-direction:column; gap:6px; min-width:0; }
+  .prog-week-bars, .prog-week-days {
+    display:grid; grid-template-columns:repeat(7, minmax(0, 1fr)); gap:clamp(6px, 2.6vw, 10px);
+  }
+  .prog-week-bars { position:relative; grid-template-rows:minmax(0, 1fr); align-items:end; height:98px; }
+  .prog-week-goal {
+    position:absolute; left:0; right:0; bottom:calc(var(--h, 75) * 1%);
+    border-top:1px dashed var(--muted); opacity:.6; pointer-events:none;
+  }
+  .prog-week-bar {
+    display:block; width:100%; height:max(4px, calc(var(--h, 0) * 1%)); border-radius:6px;
+    background:color-mix(in srgb, var(--accent) 45%, var(--surface-2));
+  }
+  .prog-week-bar.is-zero { background:var(--surface-2); }
+  .prog-week-bar.is-met { background:var(--accent); }
+  .prog-week-bar.is-future { height:6px; background:transparent; border:1px dashed var(--border); }
+  .prog-week-days > span { font-size:var(--text-xs); line-height:16px; color:var(--muted); text-align:center; white-space:nowrap; }
+  .prog-week-days > .is-today { color:var(--text); font-weight:var(--weight-semibold); }
+
+  /* ---------- Level mit XP-Balken (in der Liste) ---------- */
+  .prog-level { display:flex; flex-direction:column; gap:var(--space-2); padding:14px var(--space-4); }
+  .prog-level-head { display:flex; flex-wrap:wrap; align-items:baseline; justify-content:space-between; gap:var(--space-1) var(--space-3); }
+  .prog-level-label { font-size:var(--text-md); }
+  .prog-level-meta { font-size:var(--text-xs); color:var(--muted); }
+
+  /* ---------- Kategorien: Balkenliste als Karte mit Trennlinien ---------- */
+  .prog-cats { gap:0; padding:0 var(--space-4); }
+  .prog-cats .bar-list { gap:0; }
+  .prog-cats .bar-list > li { min-height:48px; padding:var(--space-2) 0; }
+  .prog-cats .bar-list > li + li { border-top:1px solid var(--border); }
+  .prog-cats .bar-list-label { white-space:normal; overflow-wrap:anywhere; line-height:1.3; }
+
+  /* ---------- Verlauf: Heatmap, Lernkurven ---------- */
+  .prog-heat { display:flex; flex-direction:column; gap:var(--space-3); max-width:360px; min-width:0; }
+  .prog-heat-legend {
+    display:flex; align-items:center; justify-content:flex-end; gap:var(--space-1);
+    font-size:var(--text-xs); color:var(--muted);
+  }
+  .prog-curve-card { gap:var(--space-2); }
+  .prog-range { color:var(--text); font-size:var(--text-sm); }
+  .prog-range-first { color:var(--muted); }
+  .prog-curve { height:72px; min-width:0; }
+  .prog-curve > .spark { height:100%; }
+
+  /* ---------- Fehler: Lösungsweg im Sheet ---------- */
+  .prog-sheet-task { font-size:var(--text-lg); font-weight:var(--weight-semibold); line-height:1.35; overflow-wrap:anywhere; }
+  .prog-sheet-detail { font-size:var(--text-sm); color:var(--muted); overflow-wrap:anywhere; }
+}

@@ -1,0 +1,35 @@
+/* View „Heute“ – gehört Welle 2 · A (src/views/home.ts). Nur View-spezifische Regeln; Bausteine kommen aus components.css. */
+@layer views {
+  /* ---------- Hero „Empfohlen für heute“ (.card.hero aus dem Kit) ---------- */
+  .today-hero-head { display:flex; flex-direction:column; gap:6px; min-width:0; }
+  .today-hero-label { font-size:var(--text-xs); line-height:1.3; color:var(--muted); }
+  .today-hero-title {
+    font-size:var(--text-lg); font-weight:var(--weight-bold); line-height:1.25;
+    overflow-wrap:anywhere;
+  }
+  .today-hero-sub { font-size:var(--text-sm); line-height:1.4; color:var(--muted); }
+
+  /* Insight unter der Trennlinie: Zeit-Balken (E9) oder der Grund als ruhiger Text */
+  .today-insight {
+    display:flex; flex-direction:column; gap:var(--space-2); min-width:0;
+    padding-top:var(--space-4); border-top:1px solid var(--border);
+  }
+  .today-insight-text { font-size:var(--text-sm); line-height:1.5; }
+  .today-insight-text.is-quiet { color:var(--muted); }
+
+  /* Balken: ganze Breite = dein Schnitt (Rest in --warn-soft), Füllung und Marke bei der Zielzeit (--w 0–100) */
+  .today-bar { position:relative; height:6px; border-radius:var(--radius-pill); background:var(--surface-2); }
+  .today-bar > span { position:absolute; top:0; bottom:0; left:0; border-radius:var(--radius-pill); }
+  .today-bar-lost { width:100%; background:var(--warn-soft); }
+  .today-bar-fill { width:calc(var(--w, 0) * 1%); background:var(--accent); }
+  .today-bar > .today-bar-mark {
+    top:-4px; bottom:auto; left:calc(var(--w, 0) * 1%);
+    width:2px; height:14px; margin-left:-1px; border-radius:1px; background:var(--text);
+  }
+
+  .today-legend {
+    display:flex; flex-wrap:wrap; justify-content:space-between; gap:var(--space-1) var(--space-3);
+    font-size:var(--text-xs); line-height:1.4; color:var(--muted);
+  }
+  .today-strong { color:var(--text); font-weight:var(--weight-semibold); }
+}
