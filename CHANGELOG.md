@@ -4,6 +4,15 @@ Alle nennenswerten Änderungen an Mental Math. Format nach [Keep a Changelog](ht
 
 <!-- Automatisch erzeugt mit `npm run changelog` aus src/releases.ts – nicht von Hand bearbeiten. -->
 
+## [1.13.0] - 2026-10-31
+
+### Erinnerungen
+
+- Neu: Erinnerungen per Push-Benachrichtigung – täglich zu deiner Uhrzeit und an den Wochentagen, die du wählst.
+- „Serie retten“ meldet sich um 20 Uhr, wenn dein Tagesziel noch fehlt und die Serie sonst reißt.
+- Hinweise auf fällige Wiederholungen und sonntags ein Rechentrick, passend zu deinen Schwächen.
+- Keine Erinnerung, wenn du heute schon genug trainiert hast. Einstellen unter Profil → Erinnerungen.
+
 ## [1.12.0] - 2026-10-31
 
 ### Exhibits, 1×1, Englisch & Wiederherstellung

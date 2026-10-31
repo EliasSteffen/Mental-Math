@@ -19,6 +19,7 @@ import { openSheet, type SheetHandle } from '../ui/sheet.ts';
 import type { PasskeyInfo, RecoveryStatus } from '../vendor/auth.ts';
 import * as acct from '../features/account.ts';
 import { getSyncStatus, onSyncStatus, syncNow, syncStatusEntries, wipeCloudData } from '../features/sync.ts';
+import { remindersGroup } from './settings-reminders.ts';
 
 const NAME_MIN = 2;
 const NAME_MAX = 32;
@@ -853,6 +854,7 @@ export function renderSettings(): void {
     largeTitle(t('settings.title')),
     accountCard(),
     groups.gameplay,
+    remindersGroup(),
     groups.general,
     feedbackGroup(s),
     groups.data,

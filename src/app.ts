@@ -7,6 +7,7 @@ import { detectLang, setLang } from './i18n/index.ts';
 import { restoreAccount } from './features/account.ts';
 import { startSync } from './features/sync.ts';
 import { maybeShowWhatsNew } from './features/whats-new.ts';
+import { startPush } from './features/push.ts';
 
 await initStorage();
 
@@ -17,4 +18,5 @@ setLang(detectLang(getSettings().lang));
 startRouter();
 void restoreAccount();
 startSync();
+startPush();
 maybeShowWhatsNew();
