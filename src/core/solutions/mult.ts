@@ -1,5 +1,5 @@
-import type { Task } from '../../types.ts';
-import { fmt, round } from '../numbers.ts';
+import { t } from '../../i18n/index.ts';
+import { fmt } from '../numbers.ts';
 import { dist10 } from './helpers.ts';
 import type { SP, StepFn } from './helpers.ts';
 
@@ -8,7 +8,7 @@ export const multSteps: Record<string, StepFn> = {
     const o = a % 10, res = a * b;
     if (o === 0) {
       return [
-        `${a} endet auf 0: ${a} = ${a / 10} × 10`,
+        t('sol.mult.ends0', { a, a10: a / 10 }),
         `${a / 10} × ${b} = ${fmt((a / 10) * b)}`,
         `${fmt((a / 10) * b)} × 10 = ${fmt(res)}`,
       ];
@@ -16,8 +16,8 @@ export const multSteps: Record<string, StepFn> = {
     const down = o <= 6;
     const base = down ? a - o : a + (10 - o), d = down ? o : 10 - o, op = down ? '+' : '−';
     return [
-      `${a} zerlegen: ${a} = ${base} ${op} ${d}`,
-      `${base} × ${b}: ${base / 10} × ${b} = ${fmt((base / 10) * b)}, eine Null dran → ${fmt(base * b)}`,
+      t('sol.mult.split', { a, base, op, d }),
+      t('sol.mult.tens', { base, b, b10: base / 10, v: fmt((base / 10) * b), w: fmt(base * b) }),
       `${d} × ${b} = ${fmt(d * b)}`,
       `${fmt(base * b)} ${op} ${fmt(d * b)} = ${fmt(res)}`,
     ];
@@ -31,7 +31,7 @@ export const multSteps: Record<string, StepFn> = {
         const k = n - A, q = 100 / A;
         const head = k === 0
           ? `${n} = 100 ÷ ${q}`
-          : `${n} zerlegen: ${n} = ${A} ${k > 0 ? '+' : '−'} ${Math.abs(k)}`;
+          : t('sol.mult.split', { a: n, base: A, op: k > 0 ? '+' : '−', d: Math.abs(k) });
         const mid = `${fmt(m)} × ${A} = ${fmt(m * 100)} ÷ ${q} = ${fmt(m * A)}`;
         if (k === 0) return [head, `${fmt(m)} × 100 = ${fmt(m * 100)}`, `${fmt(m * 100)} ÷ ${q} = ${fmt(res)}`];
         return [
@@ -45,7 +45,7 @@ export const multSteps: Record<string, StepFn> = {
     const o = x % 10, down = o <= 5;
     const base = down ? x - o : x + (10 - o), d = down ? o : 10 - o, op = down ? '+' : '−';
     return [
-      `${x} zerlegen: ${x} = ${base} ${op} ${d}`,
+      t('sol.mult.split', { a: x, base, op, d }),
       base === 100
         ? `${y} × 100 = ${fmt(y * 100)}`
         : `${y} × ${base} = ${y} × ${base / 10} × 10 = ${fmt((y * base) / 10)} × 10 = ${fmt(y * base)}`,
@@ -56,10 +56,10 @@ export const multSteps: Record<string, StepFn> = {
 
   'mult.easy': ({ a, f }: SP) => {
     const res = a * f;
-    if (f === 5) return [`× 5 heißt: × 10 und dann halbieren`, `${fmt(a)} × 10 = ${fmt(a * 10)}`, `${fmt(a * 10)} ÷ 2 = ${fmt(res)}`];
-    if (f === 50) return [`× 50 heißt: × 100 und dann halbieren`, `${fmt(a)} × 100 = ${fmt(a * 100)}`, `${fmt(a * 100)} ÷ 2 = ${fmt(res)}`];
+    if (f === 5) return [t('sol.mult.e5'), `${fmt(a)} × 10 = ${fmt(a * 10)}`, `${fmt(a * 10)} ÷ 2 = ${fmt(res)}`];
+    if (f === 50) return [t('sol.mult.e50'), `${fmt(a)} × 100 = ${fmt(a * 100)}`, `${fmt(a * 100)} ÷ 2 = ${fmt(res)}`];
     return [
-      `× 25 heißt: × 100 und dann durch 4 (zweimal halbieren)`,
+      t('sol.mult.e25'),
       `${fmt(a)} × 100 = ${fmt(a * 100)}`,
       `${fmt(a * 100)} ÷ 2 = ${fmt(a * 50)}`,
       `${fmt(a * 50)} ÷ 2 = ${fmt(res)}`,
@@ -71,7 +71,7 @@ export const multSteps: Record<string, StepFn> = {
     const lo = a - d, hi = a + d, other = a < N ? lo : hi;
     const prod = lo * hi, res = a * a;
     return [
-      `${a} liegt ${d} neben ${N}: ${a}² = (${lo}) × (${hi}) + ${d}² (${a} − ${d} und ${a} + ${d})`,
+      t('sol.mult.sqNear', { a, d, N, lo, hi }),
       N === 100
         ? `${other} × 100 = ${fmt(prod)}`
         : `${other} × ${N} = ${other} × ${N / 10} × 10 = ${fmt(other * (N / 10))} × 10 = ${fmt(prod)}`,

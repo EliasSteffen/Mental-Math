@@ -4,6 +4,7 @@ import { SUBTYPES, LEVEL_NAMES } from '../../core/catalog.ts';
 import { generate, generateForMode } from '../../core/generators/index.ts';
 import { evaluate, weaknesses, levelFor } from '../../core/scoring.ts';
 import { getMethod } from '../../core/methods.ts';
+import { renderExhibit } from '../../ui/exhibit.ts';
 import { modeName } from '../../core/modes.ts';
 import { getAttempts, getSessions, getSettings, addAttempt, getReviews, setReviews } from '../../data/storage.ts';
 import { dailyTasks } from '../../core/daily.ts';
@@ -264,6 +265,7 @@ export function renderTrain(modeIn: Mode, { n: nOverride = null, intro = false, 
       h('div', { class: 'task' },
         // Typ nur zeigen, wenn er nicht schon in der Kopfzeile steht (gemischte Runden)
         SUBTYPES[mode] ? null : h('div', { class: 'task-type' }, sub ? sub.name : task.subtype),
+        renderExhibit(task.params),
         question,
         taskEst ? h('div', { class: 'est-hint' }, t('train.estimateHint')) : null,
         h('div', { class: 'hint' }, task.hint || (!isChoice && unitFactor(task.unit) > 1 ? t('train.unitHint', { unit: task.unit }) : '')),
@@ -295,7 +297,7 @@ export function renderTrain(modeIn: Mode, { n: nOverride = null, intro = false, 
         h('h1', { class: 'page-title' }, SUBTYPES[subId]?.name),
         methodBlock(method),
         steps.length
-          ? h('div', null, h('h3', { class: 'fb-heading' }, t('train.example', { prompt: ex.prompt })), stepsList(steps))
+          ? h('div', null, renderExhibit(ex.params), h('h3', { class: 'fb-heading' }, t('train.example', { prompt: ex.prompt })), stepsList(steps))
           : null,
         start));
     start.focus();

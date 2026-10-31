@@ -29,7 +29,7 @@ Npm-Workspace (`packages/passkey-auth`), gebaut mit `npm run build -w passkey-au
 
 ## SQL-Setup
 
-1. `sql/001_passkey_auth.sql` im Supabase-SQL-Editor ausführen (Tabellen, RLS, Funktionen). Optional danach `sql/tests/rls_test.sql` (läuft in einer Transaktion mit Rollback).
+1. `sql/001_passkey_auth.sql` im Supabase-SQL-Editor ausführen (Tabellen, RLS, Funktionen), danach `sql/003_recovery_codes.sql` (Wiederherstellungscodes). Optional `sql/tests/rls_test.sql` (läuft in einer Transaktion mit Rollback).
 2. Eigenen Signing Key importieren (nur bei Projekten mit ES256): Dashboard, Project Settings, JWT Keys, „Create standby key“, „Import“, privaten JWK einfügen, dann „Rotate keys“. Die Data API akzeptiert nur den **aktuellen** Key, ein Standby-Key reicht nicht. Kontrolle: `<projekt>/auth/v1/.well-known/jwks.json` enthält die `kid`.
 3. Supabase-JWKs tragen `key_ops: ["sign","verify"]`. Das Paket entfernt `key_ops`/`use` beim Import selbst, der JWK kann also unverändert in `AUTH_JWT_KEY` stehen.
 
@@ -69,14 +69,16 @@ const supabase = createPasskeySupabaseClient(auth, PUBLIC_SUPABASE_URL, PUBLIC_S
 const account = createAccountApi(supabase); // Passkeys auflisten/umbenennen/löschen, Konto löschen
 
 await auth.restore();                 // beim Start: Session per Cookie wiederherstellen
-await auth.register('Anna');          // neues Konto + erster Passkey
+const { recoveryCode } = await auth.register('Anna'); // neues Konto + erster Passkey + Wiederherstellungscode (einmalig anzeigen)
 await auth.login();                   // Discoverable Credential, ohne Benutzername
 await auth.addPasskey();              // zweiten Passkey ergänzen
+await auth.createRecoveryCode();      // angemeldet: neuer Code, der alte wird ungültig
+await auth.recover('ABCDE-FGHJK-MNPQR-STVWX'); // alle Passkeys verloren: neuer Passkey per Code, liefert neuen Code
 auth.onChange((s) => console.log(s?.user.username ?? 'abgemeldet'));
 await auth.logout();
 ```
 
-Fehler sind `PasskeyAuthError` mit `code` (`cancelled`, `challenge_expired`, `verification_failed`, `unauthorized`, `last_passkey`, `rate_limited`, `network` …).
+Fehler sind `PasskeyAuthError` mit `code` (`cancelled`, `challenge_expired`, `verification_failed`, `unauthorized`, `last_passkey`, `rate_limited`, `invalid_recovery_code`, `network` …).
 
 ## Endpunkte
 
@@ -92,6 +94,10 @@ Alle `POST`, JSON, `Content-Type: application/json`, Body bis 16 KB, `Origin` er
 | `/logout` | Cookie | Session löschen, Cookie entfernen (immer 204) |
 | `/passkeys/options` | Bearer | Challenge für zusätzlichen Passkey |
 | `/passkeys/verify` | Bearer | Zusätzlichen Passkey speichern |
+| `/recovery/status` | Bearer | Gibt es einen Wiederherstellungscode, seit wann |
+| `/recovery/create` | Bearer | Neuen Code erzeugen (ersetzt den alten), Antwort `{ code }` |
+| `/recovery/options` | - | Code prüfen, Challenge für neuen Passkey (`invalid_recovery_code` bei falschem Code) |
+| `/recovery/verify` | - | Passkey anlegen, Code ersetzen, Session + neuer `recoveryCode` |
 
 ## Umgebungsvariablen
 

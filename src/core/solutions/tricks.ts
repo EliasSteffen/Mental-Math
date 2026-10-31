@@ -1,4 +1,5 @@
 // Lösungswege der Rechentricks (zeigen den Trick mit den echten Zahlen)
+import { t } from '../../i18n/index.ts';
 import { fmt } from '../numbers.ts';
 import type { SP, StepFn } from './helpers.ts';
 
@@ -7,26 +8,23 @@ export const tricksSteps: Record<string, StepFn> = {
     const res = task.expected;
     if (n < 100) {
       const a = Math.floor(n / 10), b = n % 10, s = a + b;
-      const steps = [
-        `×11-Trick: erste und letzte Ziffer bleiben außen, die Quersumme kommt in die Mitte`,
-        `${n} → ${a} | ${a}+${b} | ${b} = ${a} | ${s} | ${b}`,
-      ];
-      if (s > 9) steps.push(`Mitte ${s} ist zweistellig: die ${Math.floor(s / 10)} wandert als Übertrag nach links → ${a + 1} | ${s % 10} | ${b}`);
+      const steps = [t('sol.tr.x11'), `${n} → ${a} | ${a}+${b} | ${b} = ${a} | ${s} | ${b}`];
+      if (s > 9) steps.push(t('sol.tr.x11carry', { s, c: Math.floor(s / 10), a1: a + 1, s1: s % 10, b }));
       steps.push(`${n} × 11 = ${fmt(res)}`);
       return steps;
     }
     const d = String(n).split('').map(Number) as [number, number, number];
     return [
-      `×11 heißt × 10 + × 1: die Zahl um eine Stelle verschoben zu sich selbst addieren`,
-      `Ziffern ${d[0]} | ${d[0]}+${d[1]} | ${d[1]}+${d[2]} | ${d[2]} = ${d[0]} | ${d[0] + d[1]} | ${d[1] + d[2]} | ${d[2]}`,
-      `Alternativ: ${fmt(n * 10)} + ${fmt(n)}`,
-      `Überträge von rechts nach links einrechnen → ${fmt(res)}`,
+      t('sol.tr.x11long'),
+      t('sol.tr.x11digits', { expr: `${d[0]} | ${d[0]}+${d[1]} | ${d[1]}+${d[2]} | ${d[2]} = ${d[0]} | ${d[0] + d[1]} | ${d[1] + d[2]} | ${d[2]}` }),
+      t('sol.tr.x11alt', { a: fmt(n * 10), b: fmt(n) }),
+      t('sol.tr.x11carries', { res: fmt(res) }),
     ];
   },
 
   'tricks.diffsq': ({ a, b, m, d }: SP, task) => [
-    `${a} und ${b} liegen symmetrisch um ${m}: ${m} − ${d} und ${m} + ${d}`,
-    `3. Binomische Formel: (${m} − ${d}) × (${m} + ${d}) = ${m}² − ${d}²`,
+    t('sol.tr.dsSym', { a, b, m, d }),
+    t('sol.tr.dsFormula', { m, d }),
     `${m}² = ${fmt(m * m)}, ${d}² = ${fmt(d * d)}`,
     `${fmt(m * m)} − ${fmt(d * d)} = ${fmt(task.expected)}`,
   ],
@@ -34,39 +32,39 @@ export const tricksSteps: Record<string, StepFn> = {
   'tricks.near100': ({ a, b }: SP, task) => {
     const da = 100 - a, db = 100 - b, h = 100 - da - db;
     return [
-      `Beide Zahlen liegen knapp unter 100: Abstand ${da} (${a} = 100 − ${da}) und ${db} (${b} = 100 − ${db})`,
-      `Hunderter: 100 − ${da} − ${db} = ${h} (oder kreuzweise ${a} − ${db} = ${h}) → ${fmt(h * 100)}`,
-      `Dazu das Produkt der Abstände: ${da} × ${db} = ${da * db}`,
+      t('sol.tr.nDist', { a, b, da, db }),
+      t('sol.tr.nHund', { da, db, h, a, h100: fmt(h * 100) }),
+      t('sol.tr.nProd', { da, db, p: da * db }),
       `${fmt(h * 100)} + ${da * db} = ${fmt(task.expected)}`,
     ];
   },
 
   'tricks.square5': ({ n }: SP, task) => {
-    const t = Math.floor(n / 10);
+    const tens = Math.floor(n / 10);
     return [
-      `Zahl auf 5: Zehnerteil ist ${t} (${n} = ${t}5)`,
-      `${t} × (${t} + 1) = ${t} × ${t + 1} = ${t * (t + 1)}`,
-      `Dahinter immer 25 anhängen: ${t * (t + 1)} | 25`,
+      t('sol.tr.s5', { t: tens, n }),
+      `${tens} × (${tens} + 1) = ${tens} × ${tens + 1} = ${tens * (tens + 1)}`,
+      t('sol.tr.s5app', { p: tens * (tens + 1) }),
       `${n}² = ${fmt(task.expected)}`,
     ];
   },
 
   'tricks.pctswap': ({ p, y }: SP, task) => {
-    const how = y === 50 ? `50 % ist die Hälfte: ${p} ÷ 2` : y === 25 ? `25 % ist ein Viertel: ${p} ÷ 4` : y === 20 ? `20 % ist ein Fünftel: ${p} ÷ 5` : `10 % ist ein Zehntel: ${p} ÷ 10`;
+    const div = y === 50 ? 2 : y === 25 ? 4 : y === 20 ? 5 : 10;
     return [
-      `Tauschregel: ${p} % von ${y} = ${y} % von ${p} (beide sind ${p} × ${y} ÷ 100)`,
-      `${y} % von ${p} ist leichter zu rechnen`,
-      how,
-      `${how.split(': ')[1]} = ${fmt(task.expected)}`,
+      t('sol.tr.psRule', { p, y }),
+      t('sol.tr.psEasier', { p, y }),
+      t(`sol.tr.ps${div === 2 ? 50 : div === 4 ? 25 : div === 5 ? 20 : 10}`, { p }),
+      `${p} ÷ ${div} = ${fmt(task.expected)}`,
     ];
   },
 
   'tricks.subround': ({ a, b }: SP, task) => {
     const k = 10 - (b % 10), r = b + k;
     return [
-      `${fmt(b)} liegt knapp unter ${fmt(r)}: aufrunden um ${k}`,
+      t('sol.tr.srUp', { b: fmt(b), r: fmt(r), k }),
       `${fmt(a)} − ${fmt(r)} = ${fmt(a - r)}`,
-      `Es wurde ${k} zu viel abgezogen: ${k} wieder dazu`,
+      t('sol.tr.srBack', { k }),
       `${fmt(a - r)} + ${k} = ${fmt(task.expected)}`,
     ];
   },

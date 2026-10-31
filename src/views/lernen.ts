@@ -4,6 +4,7 @@ import { CATEGORIES, SUBTYPES, LEVEL_NAMES } from '../core/catalog.ts';
 import { generate } from '../core/generators/index.ts';
 import { subtypeStats, levelFor } from '../core/scoring.ts';
 import { getMethod } from '../core/methods.ts';
+import { renderExhibit } from '../ui/exhibit.ts';
 import { aiExplainMethod, isAiAvailable } from '../features/ai-client.ts';
 import { aiControl } from '../features/ai-view.ts';
 import { getAttempts, getSettings } from '../data/storage.ts';
@@ -35,6 +36,7 @@ function learnCard(sub: Subtype, stat: SkillStats | undefined, open: boolean, lv
     const newBtn = h('button', { type: 'button', class: 'btn small', onclick: drawExample }, t('lernen.newExample'));
     exBody.replaceChildren();
     appendChildren(exBody, [
+      renderExhibit(task.params),
       h('div', { class: 'example-prompt' }, task.prompt),
       choices ? h('ul', { class: 'bullets' }, choices.map((c) => h('li', null, c))) : null,
       task.hint || (!choices && task.unit)

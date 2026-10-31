@@ -1,5 +1,6 @@
 // Gemeinsame Helfer der Lösungswege
 import type { Task } from '../../types.ts';
+import { t } from '../../i18n/index.ts';
 import { fmt, round } from '../numbers.ts';
 
 /** Alle möglichen Aufgabenparameter (je Subtyp nur ein Teil gesetzt); wird in solutionSteps() aus task.params gecastet. */
@@ -9,7 +10,8 @@ export interface SP {
   nach: number; discount: number; m1: number; m2: number; r1: number; r2: number; T: number; base: number;
   I: number; s: number; F: number; v: number | string; R: number; G: number; C: number; B: number; O: number;
   A: number; t: number; V: number; H: number; S: number; E: number; fam: number; x: number; e: number;
-  disp: string; fact: string; a1: number; a2: number; p1: number; p2: number; d1: string; d2: string;
+  disp: string; fact: string;
+  ex: string; ttl: string; lab: string; s1: string; s2: string; sn: string; hd: string; k2: number; a1: number; a2: number; p1: number; p2: number; d1: string; d2: string;
 }
 export type StepFn = (p: SP, task: Task) => string[];
 
@@ -35,61 +37,47 @@ export const near10 = (n: number): number => Math.round(n / 10) * 10;
 export const near5 = (n: number): number => Math.round(n / 5) * 5;
 export const uniq = (xs: number[]): number[] => [...new Set(xs)];
 
+/** Prozentangabe in der UI-Sprache (de „12 %“, en „12%“) */
+export const pc = (x: number | string): string => t('sol.pct', { x: typeof x === 'number' ? fmt(x) : x });
+
 // ---------- 10 %-/1 %-Wege für "p % von y" (auch für Überschläge genutzt) ----------
 export function pctOfSteps(p: number, y: number): string[] {
   const y10 = y / 10, y1 = y / 100, res = (p * y) / 100;
   const F = fmt;
-  if (p === 10) {
-    return [`10 % heißt: durch 10 teilen (Komma eine Stelle nach links)`, `${F(y)} ÷ 10 = ${F(res)}`, `Probe: ${F(res)} × 10 = ${F(y)} → ${F(res)}`];
-  }
-  if (p === 50) {
-    return [`50 % ist die Hälfte`, `${F(y)} ÷ 2 = ${F(res)}`, `Probe: ${F(res)} × 2 = ${F(y)} → ${F(res)}`];
-  }
-  if (p === 25) {
-    return [`25 % ist ein Viertel: zweimal halbieren`, `${F(y)} ÷ 2 = ${F(y / 2)}`, `${F(y / 2)} ÷ 2 = ${F(res)}`];
-  }
-  if (p === 75) {
-    return [
-      `75 % sind drei Viertel: erst ein Viertel, dann mal 3`,
-      `${F(y)} ÷ 2 = ${F(y / 2)}, ${F(y / 2)} ÷ 2 = ${F(y / 4)}`,
-      `3 × ${F(y / 4)} = ${F(res)}`,
-    ];
-  }
-  if (p === 5) {
-    return [`10 % von ${F(y)} = ${F(y10)}`, `5 % ist die Hälfte von 10 %`, `${F(y10)} ÷ 2 = ${F(res)}`];
-  }
+  const of = (q: number, v: number): string => t('sol.pof.of', { p: q, y: F(y), v: F(v) });
+  if (p === 10) return [t('sol.pof.10'), `${F(y)} ÷ 10 = ${F(res)}`, t('sol.pof.check', { res: F(res), k: 10, y: F(y) })];
+  if (p === 50) return [t('sol.pof.50'), `${F(y)} ÷ 2 = ${F(res)}`, t('sol.pof.check', { res: F(res), k: 2, y: F(y) })];
+  if (p === 25) return [t('sol.pof.25'), `${F(y)} ÷ 2 = ${F(y / 2)}`, `${F(y / 2)} ÷ 2 = ${F(res)}`];
+  if (p === 75) return [t('sol.pof.75'), `${F(y)} ÷ 2 = ${F(y / 2)}, ${F(y / 2)} ÷ 2 = ${F(y / 4)}`, `3 × ${F(y / 4)} = ${F(res)}`];
+  if (p === 5) return [of(10, y10), t('sol.pof.5'), `${F(y10)} ÷ 2 = ${F(res)}`];
   if (p % 10 === 0) {
     const k = p / 10;
-    return [`10 % von ${F(y)} = ${F(y10)}`, `${p} % sind ${k} × 10 %`, `${k} × ${F(y10)} = ${F(res)}`];
+    return [of(10, y10), t('sol.pof.k10', { p, k }), `${k} × ${F(y10)} = ${F(res)}`];
   }
   if (p % 10 === 5) {
-    const t = (p - 5) / 10;
+    const tens = (p - 5) / 10;
     return [
-      `10 % von ${F(y)} = ${F(y10)}`,
-      `${p} % = ${t === 1 ? '10 %' : `${t} × 10 %`} + 5 %, und 5 % ist die Hälfte von 10 % = ${F(y10 / 2)}`,
-      `${t === 1 ? F(y10) : `${F(t * y10)}`} + ${F(y10 / 2)} = ${F(res)}`,
+      of(10, y10),
+      t('sol.pof.x5', { p, tens: tens === 1 ? pc(10) : `${tens} × ${pc(10)}`, h: F(y10 / 2) }),
+      `${tens === 1 ? F(y10) : F(tens * y10)} + ${F(y10 / 2)} = ${F(res)}`,
     ];
   }
-  const t = Math.floor(p / 10), o = p % 10;
+  const tens = Math.floor(p / 10), o = p % 10;
   if (o <= 7) {
-    if (t === 0) {
-      return [
-        `1 % von ${F(y)} = ${F(y1)} (Komma zwei Stellen nach links)`,
-        `Plausibel: 10 % wären ${F(y10)}, ${p} % also etwas weniger`,
-        `${p} % = ${p} × ${F(y1)} = ${F(res)}`,
-      ];
+    if (tens === 0) {
+      return [t('sol.pof.one', { y: F(y), v: F(y1) }), t('sol.pof.plaus', { v: F(y10), p }), t('sol.pof.small', { p, v: F(y1), res: F(res) })];
     }
     return [
-      `10 % von ${F(y)} = ${F(y10)}`,
-      `1 % von ${F(y)} = ${F(y1)}, also ${o} % = ${o} × ${F(y1)} = ${F(o * y1)}`,
-      t === 1 ? `${F(y10)} + ${F(o * y1)} = ${F(res)}` : `${t} × ${F(y10)} = ${F(t * y10)}, dazu ${F(o * y1)} → ${F(res)}`,
+      of(10, y10),
+      t('sol.pof.ones', { y: F(y), y1: F(y1), o, v: F(o * y1) }),
+      tens === 1 ? `${F(y10)} + ${F(o * y1)} = ${F(res)}` : t('sol.pof.plus', { t: tens, y10: F(y10), ty: F(tens * y10), v: F(o * y1), res: F(res) }),
     ];
   }
-  const up = 10 - o;
+  const up = 10 - o, P = (tens + 1) * 10;
   return [
-    `${(t + 1) * 10} % von ${F(y)} = ${F(((t + 1) * y) / 10)}`,
-    `1 % von ${F(y)} = ${F(y1)}, also ${up} % = ${up} × ${F(y1)} = ${F(up * y1)}`,
-    `${p} % = ${(t + 1) * 10} % − ${up} % → ${F(((t + 1) * y) / 10)} − ${F(up * y1)} = ${F(res)}`,
+    of(P, (P * y) / 100),
+    t('sol.pof.ones', { y: F(y), y1: F(y1), o: up, v: F(up * y1) }),
+    t('sol.pof.minus', { p, P, up, a: F((P * y) / 100), b: F(up * y1), res: F(res) }),
   ];
 }
 
@@ -111,14 +99,14 @@ export function bestPair(
 export function roundNote(pairs: Array<[number, number]>, div = false): string {
   // pairs: [[orig, gerundet]]; Produkt: gegenläufig runden hebt Fehler auf, Quotient: gleichläufig
   const ch = pairs.filter(([o, r]) => o !== r);
-  if (!ch.length) return 'Die Zahlen sind schon handlich';
-  const dirs = ch.map(([o, r]) => (r > o ? 'auf' : 'ab'));
+  if (!ch.length) return t('sol.rn.none');
+  const dirs = ch.map(([o, r]) => (r > o ? 'up' : 'down'));
   let why = '';
   if (ch.length === 2) {
-    if (!div && dirs[0] !== dirs[1]) why = ' – einmal auf, einmal ab, damit sich der Fehler aufhebt';
-    if (div && dirs[0] === dirs[1]) why = ` – beide ${dirs[0]}, dann hebt sich der Fehler beim Teilen weitgehend auf`;
+    if (!div && dirs[0] !== dirs[1]) why = t('sol.rn.opp');
+    if (div && dirs[0] === dirs[1]) why = t(dirs[0] === 'up' ? 'sol.rn.bothUp' : 'sol.rn.bothDown');
   }
-  return `Runden${why}: ${ch.map(([o, r]) => `${fmt(o)} ≈ ${fmt(r)}`).join(', ')}`;
+  return t('sol.rn.round', { why, list: ch.map(([o, r]) => `${fmt(o)} ≈ ${fmt(r)}`).join(', ') });
 }
 
 export const dist10 = (n: number): number => Math.min(n % 10, 10 - (n % 10));

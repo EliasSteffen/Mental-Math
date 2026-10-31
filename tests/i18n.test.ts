@@ -92,7 +92,8 @@ test('Katalog, Modi, Empfehlung, Daily folgen der Sprache', () => {
   assert.equal(modeName('mult.2x1'), 'Multiplikation · 2-stellig × 1-stellig');
   setLang('en');
   assert.equal(SUBTYPES['mult.2x1']?.name, '2-digit × 1-digit');
-  assert.equal(CATEGORIES[0]?.name, 'Multiplication');
+  assert.equal(CATEGORIES.find((c) => c.id === 'mult')?.name, 'Multiplication');
+  assert.equal(CATEGORIES[0]?.name, 'Times tables');
   assert.equal(LEVEL_NAMES[3], 'Hard');
   assert.equal(modeName('weak'), 'Weak spots');
   assert.equal(modeName('mult.2x1'), 'Multiplication · 2-digit × 1-digit');

@@ -1,6 +1,8 @@
 import type { Task } from '../../types.ts';
+import { t } from '../../i18n/index.ts';
+import { lw } from '../l10n.ts';
 import { fmt, round } from '../numbers.ts';
-import { pow10, R, strip } from './helpers.ts';
+import { pc, pow10, R, strip } from './helpers.ts';
 import type { SP, StepFn } from './helpers.ts';
 
 export const bigSteps: Record<string, StepFn> = {
@@ -10,51 +12,50 @@ export const bigSteps: Record<string, StepFn> = {
     const e = uv + z;
     const out = ua === 'Mrd.' ? 9 : ua === 'Mio.' ? 6 : 3;
     return [
-      `Ziffern: ${fmt(m)} × ${b0} = ${fmt(X)}`,
-      `Nullen: ${u} = ${pow10(uv)}, ${fmt(b)} = ${b0} × ${pow10(z)} → ${pow10(uv)} × ${pow10(z)} = ${pow10(e)}`,
+      t('sol.big.digitsMul', { a: fmt(m), b: b0, c: fmt(X) }),
+      t('sol.big.zerosMul', { u: lw(u), pu: pow10(uv), b: fmt(b), b0, pz: pow10(z), pe: pow10(e) }),
       `${fmt(X)} × ${pow10(e)} = ${fmt(full)}`,
-      `In ${ua}: ${fmt(full)} = ${fmt(R(full / 10 ** out))} ${ua}`,
+      t('sol.big.in', { ua: lw(ua), full: fmt(full), v: fmt(R(full / 10 ** out)) }),
     ];
   },
 
   'big.div': ({ D, d, ua }: SP, task: Task) => {
     const Ds = strip(D), ds = strip(d);
     const p = Ds.z - ds.z, ratio = R(Ds.m / ds.m), A = R(ratio * 10 ** p);
-    const label = task.prompt.split(' ÷ ')[0];
+    const label = task.prompt.split(' ÷ ')[0] ?? '';
     const out = ua === 'Mio.' ? 6 : 3;
     return [
-      `Ziffern: ${Ds.m} ÷ ${ds.m} = ${fmt(ratio)}`,
-      `Nullen: ${label} = ${Ds.m} × ${pow10(Ds.z)}, ${fmt(d)} = ${ds.m} × ${pow10(ds.z)} → ${pow10(Ds.z)} ÷ ${pow10(ds.z)} = ${pow10(p)}`,
+      t('sol.big.digitsDiv', { a: Ds.m, b: ds.m, c: fmt(ratio) }),
+      t('sol.big.zerosDiv', { label, Dm: Ds.m, pD: pow10(Ds.z), d: fmt(d), dm: ds.m, pd: pow10(ds.z), pp: pow10(p) }),
       `${fmt(ratio)} × ${pow10(p)} = ${fmt(A)}`,
-      `In ${ua}: ${fmt(A)} = ${fmt(R(A / 10 ** out))} ${ua}`,
+      t('sol.big.in', { ua: lw(ua), full: fmt(A), v: fmt(R(A / 10 ** out)) }),
     ];
   },
 
   'big.percapita': ({ T, base }: SP, task: Task) => {
     const N = T * 1000, e = task.expected;
     const head = [
-      `Einheiten kürzen: Mrd. ÷ Mio. = Tsd. (${pow10(9)} ÷ ${pow10(6)} = ${pow10(3)})`,
-      `${fmt(T)} Mrd. = ${fmt(N)} Mio. → ${fmt(N)} ÷ ${base} (Ergebnis in € pro Kopf)`,
+      t('sol.big.pcUnits', { a: pow10(9), b: pow10(6), c: pow10(3) }),
+      t('sol.big.pcConv', { T: fmt(T), N: fmt(N), base }),
     ];
     if (base === 450) {
       const v = (T * 20) / 9;
       return [
         ...head,
-        `${fmt(N)} ÷ 450 = ${fmt(T)} × 1.000 ÷ 450 = ${fmt(T)} × 20 ÷ 9`,
-        `${fmt(T)} × 20 = ${fmt(T * 20)}, dann ÷ 9 ≈ ${fmt(round(v, 1))}`,
-        `Exakt: ${fmt(e)} €`,
+        `${fmt(N)} ÷ 450 = ${fmt(T)} × ${fmt(1000)} ÷ 450 = ${fmt(T)} × 20 ÷ 9`,
+        t('sol.big.pc450', { t: fmt(T), t20: fmt(T * 20), v: fmt(round(v, 1)) }),
+        t('sol.big.pcExact', { e: fmt(e) }),
       ];
     }
-    const t = ({ 84: [80, -0.05, '5 %', 'ist 5 % größer als 80 → Ergebnis rund 5 % kleiner'],
-      41: [40, -0.025, '2,5 %', 'ist 2,5 % größer als 40 → Ergebnis rund 2,5 % kleiner'],
-      46: [50, 0.09, '9 %', 'ist 8 % kleiner als 50 → Ergebnis rund 9 % größer'] } as Record<number, [number, number, string, string]>)[base];
-    const [rb, factor, pc, why] = t ?? [1, 0, '', ''];
+    // [gerundeter Nenner, Korrekturfaktor, Korrektur in %, Begründung]
+    const row = ({ 84: [80, -0.05, 5, 'sol.big.why84'], 41: [40, -0.025, 2.5, 'sol.big.why41'], 46: [50, 0.09, 9, 'sol.big.why46'] } as Record<number, [number, number, number, `sol.${string}`]>)[base];
+    const [rb, factor, pcNum, why] = row ?? [1, 0, 0, 'sol.big.why84'];
     const v = N / rb, w = round(v * (1 + factor), 1), c = round(Math.abs(v * factor), 1);
     return [
       ...head,
-      `Glatt runden: ${base} ≈ ${rb} → ${fmt(N)} ÷ ${rb} = ${fmt(v)}`,
-      `Korrektur: ${base} ${why}: ${pc} von ${fmt(v)} = ${fmt(c)} → ${fmt(v)} ${factor < 0 ? '−' : '+'} ${fmt(c)} ≈ ${fmt(w)}`,
-      `Exakt: ${fmt(e)} €`,
+      t('sol.big.pcRound', { base, rb, N: fmt(N), v: fmt(v) }),
+      t('sol.big.pcCorr', { base, why: t(why), pc: pc(pcNum), v: fmt(v), c: fmt(c), op: factor < 0 ? '−' : '+', w: fmt(w) }),
+      t('sol.big.pcExact', { e: fmt(e) }),
     ];
   },
 

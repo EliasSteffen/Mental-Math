@@ -189,12 +189,12 @@ test('mulberry32 / seedFromString deterministisch', () => {
   assert.notEqual(seedFromString('2026-10-30'), seedFromString('2026-10-31'));
 });
 
-test('dailyTasks: 15 deterministische Aufgaben, Level 2, sichtbare Kategorien reihum', () => {
+test('dailyTasks: 15 deterministische Aufgaben, Level 2, sichtbare Kategorien ohne Drills reihum', () => {
   const a = dailyTasks('2026-10-30'), b = dailyTasks('2026-10-30'), c = dailyTasks('2026-10-31');
   assert.equal(a.length, 15);
   assert.deepEqual(a, b);
   assert.notDeepEqual(a.map((t) => t.prompt), c.map((t) => t.prompt));
-  const vis = CATEGORIES.filter((x) => !x.hidden);
+  const vis = CATEGORIES.filter((x) => !x.hidden && !x.drill);
   a.forEach((t, i) => {
     assert.equal(t.level, 2);
     assert.equal(t.mode, 'daily');

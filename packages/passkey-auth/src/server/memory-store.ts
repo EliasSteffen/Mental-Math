@@ -12,6 +12,7 @@ export class MemoryAuthStore implements AuthStore {
   private readonly users = new Map<string, string>();
   private readonly passkeys = new Map<string, StoredPasskey>();
   private readonly sessions = new Map<string, SessionRow>();
+  private readonly recovery = new Map<string, { hash: string; createdAt: number }>(); // userId → Code-Hash
   private seq = 0;
 
   constructor(opts: { now?: () => number } = {}) {
@@ -96,6 +97,28 @@ export class MemoryAuthStore implements AuthStore {
   async deleteSession(tokenHash: string): Promise<void> {
     this.sessions.delete(tokenHash);
     return Promise.resolve();
+  }
+
+  async setRecoveryCode(userId: string, codeHash: string): Promise<void> {
+    if (!this.users.has(userId)) throw new PasskeyAuthError('unauthorized', 'unknown_user', 401);
+    for (const [u, r] of this.recovery) {
+      if (u !== userId && r.hash === codeHash) throw new Error('recovery hash collision');
+    }
+    this.recovery.set(userId, { hash: codeHash, createdAt: this.now() });
+    return Promise.resolve();
+  }
+
+  async findRecoveryUser(codeHash: string): Promise<AuthUser | null> {
+    for (const [userId, r] of this.recovery) {
+      const username = this.users.get(userId);
+      if (r.hash === codeHash && username !== undefined) return Promise.resolve({ id: userId, username });
+    }
+    return Promise.resolve(null);
+  }
+
+  async getRecoveryInfo(userId: string): Promise<{ createdAt: number } | null> {
+    const r = this.recovery.get(userId);
+    return Promise.resolve(r ? { createdAt: r.createdAt } : null);
   }
 
   /** Nur für Tests: Anzahl der Zeilen je Tabelle. */

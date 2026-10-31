@@ -3,7 +3,7 @@ import type { DailyResult, Level, Task } from '../types.ts';
 import { t } from '../i18n/index.ts';
 import { fmt, pick } from './numbers.ts';
 import type { Rng } from './numbers.ts';
-import { SUBTYPES, activeCategories } from './catalog.ts';
+import { SUBTYPES, mixCategories } from './catalog.ts';
 import { generate } from './generators/index.ts';
 
 export const DAILY_COUNT = 15;
@@ -31,10 +31,10 @@ export function seedFromString(s: string): number {
   return h >>> 0;
 }
 
-/** 15 deterministische Aufgaben (Level 2) aus allen sichtbaren Kategorien, reihum in CATEGORIES-Reihenfolge */
+/** 15 deterministische Aufgaben (Level 2) aus allen sichtbaren Kategorien ohne Drills, reihum in CATEGORIES-Reihenfolge */
 export function dailyTasks(dateKey: string): Task[] {
   const rng = mulberry32(seedFromString(`daily:${dateKey}`));
-  const cats = activeCategories(null);
+  const cats = mixCategories(null);
   const out: Task[] = [];
   for (let i = 0; i < DAILY_COUNT; i++) {
     const cat = cats[i % cats.length];

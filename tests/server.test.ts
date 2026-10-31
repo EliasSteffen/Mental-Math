@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { validateExplainRequest, buildPrompt, callGemini, handleExplain, _resetRateLimits } from '../server/explain.ts';
 import type { ExplainTaskValue, ExplainValue, FetchImpl } from '../server/explain.ts';
 import { METHODS } from '../src/core/methods.ts';
+import { methods as METHODS_EN } from '../src/i18n/locales/en/methods.ts';
 
 beforeEach(() => _resetRateLimits());
 
@@ -175,4 +176,17 @@ test('Rate-Limit: 16. Anfrage pro Minute → 429 rate_limited', async () => {
   assert.deepEqual(await res.json(), { error: 'rate_limited' });
   const later = await handleExplain(mkReq(goodTask()), { GOOGLE_API_KEY: 'k' }, { fetchImpl: okFetch(), now: () => 1_000_000 + 61_000 });
   assert.equal(later.status, 200);
+});
+
+test('validate/buildPrompt: Sprache', () => {
+  assert.equal((val(goodTask()) as ExplainTaskValue).lang, 'de');
+  assert.equal(val({ ...goodTask(), lang: 'en' }).lang, 'en');
+  assert.deepEqual(validateExplainRequest({ ...goodTask(), lang: 'fr' }), { ok: false, error: 'invalid' });
+  assert.deepEqual(validateExplainRequest({ kind: 'method', subtype: 'pct.of', lang: 1 }), { ok: false, error: 'invalid' });
+  const en = buildPrompt(val({ ...goodTask(), expected: 1918, lang: 'en' }));
+  assert.match(en.system, /Answer in English/);
+  assert.match(en.user, /Correct answer: 1,918/);
+  assert.ok(en.user.includes(METHODS_EN['mult.2x2']!.idea));
+  const de = buildPrompt(val({ ...goodTask(), expected: 1918 }));
+  assert.match(de.user, /Richtige Antwort: 1\.918/);
 });

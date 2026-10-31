@@ -730,6 +730,12 @@ body.has-keypad .answer input { padding-top:10px; padding-bottom:10px; }
 .acct-name { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
 .acct-name strong { overflow-wrap:anywhere; }
 .acct-sub { margin:4px 0 0; font-size:0.9375rem; }
+.acct-warn { color:var(--warn); }
+.acct-code { display:block; margin:12px 0; padding:12px; border:1px dashed var(--border); border-radius:12px; background:var(--surface-2);
+  font:600 1.05rem/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing:0.04em; text-align:center; word-break:break-all; user-select:all; }
+.acct-lost { margin-top:4px; }
+.acct-lost > summary { cursor:pointer; color:var(--muted); font-size:0.875rem; }
+.acct-recover { display:flex; flex-direction:column; gap:8px; margin-top:8px; }
 .acct-pks { list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:10px; }
 .acct-pk { display:flex; flex-direction:column; gap:8px; padding:10px 12px; border:1px solid var(--border); border-radius:var(--radius-md); background:var(--surface-2); min-width:0; }
 .acct-pk-info { min-width:0; overflow-wrap:anywhere; }

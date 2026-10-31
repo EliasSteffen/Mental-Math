@@ -9,4 +9,5 @@ export function createPasskeyAuth(o: PasskeyAuthOptions = {}): PasskeyAuthClient
 export { PasskeyAuthError, isAuthErrorCode } from '../shared/errors.ts';
 export { normalizeUsername, USERNAME_MIN, USERNAME_MAX } from '../shared/username.ts';
 export { createWebAuthn } from './webauthn.ts';
+export { normalizeRecoveryCode, formatRecoveryCode } from '../shared/recovery.ts';
 export type * from '../shared/types.ts';

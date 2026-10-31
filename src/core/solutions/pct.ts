@@ -1,5 +1,6 @@
 import type { Task } from '../../types.ts';
-import { fmt, round } from '../numbers.ts';
+import { t } from '../../i18n/index.ts';
+import { fmt } from '../numbers.ts';
 import { gcd, sg, R, pctOfSteps } from './helpers.ts';
 import type { SP, StepFn } from './helpers.ts';
 
@@ -9,10 +10,13 @@ export const pctSteps: Record<string, StepFn> = {
   'pct.change': ({ alt, neu }: SP, task: Task) => {
     const diff = Math.abs(neu - alt), up = neu > alt, a10 = alt / 10, steps = R(diff / a10);
     return [
-      `Änderung: ${fmt(neu)} − ${fmt(alt)} = ${up ? '+' : '−'}${fmt(diff)} Mio. € (${up ? 'gestiegen' : 'gesunken'})`,
-      `Bezug ist immer der alte Wert ${fmt(alt)} (nicht der neue)`,
-      `10 % von ${fmt(alt)} = ${fmt(a10)}`,
-      `${fmt(diff)} ÷ ${fmt(a10)} = ${fmt(steps)} ${steps === 1 ? 'Zehnerschritt' : 'Zehnerschritte'} → ${fmt(steps)} × 10 % = ${fmt(task.expected)} %${up ? '' : ' (Rückgang)'}`,
+      t(up ? 'sol.pct.diffUp' : 'sol.pct.diffDown', { neu: fmt(neu), alt: fmt(alt), diff: fmt(diff) }),
+      t('sol.pct.base', { alt: fmt(alt) }),
+      t('sol.pof.of', { p: 10, y: fmt(alt), v: fmt(a10) }),
+      t('sol.pct.result', {
+        diff: fmt(diff), a10: fmt(a10), s: fmt(steps), unit: t(steps === 1 ? 'sol.pct.step1' : 'sol.pct.stepN'),
+        e: fmt(task.expected), down: up ? '' : t('sol.pct.down'),
+      }),
     ];
   },
 
@@ -20,31 +24,35 @@ export const pctSteps: Record<string, StepFn> = {
     const X = discount ? 100 - r : 100 + r, g = gcd(X, 100), num = X / g, den = 100 / g;
     const part = R(nach / num);
     return [
-      `${discount ? `Nach ${fmt(r)} % Rabatt` : `Nach ${fmt(r)} % Aufschlag`} sind ${fmt(nach)} € genau ${X} % vom Ursprungspreis (${discount ? `nicht ${fmt(r)} % wieder draufrechnen!` : `nicht ${fmt(r)} % einfach abziehen!`})`,
-      `${X} % = ${num}/${den}: ${fmt(nach)} € entsprechen ${num} gleichen Teilen, der Ursprungspreis hat ${den} Teile`,
-      `1 Teil = ${fmt(nach)} ÷ ${num} = ${fmt(part)} €`,
-      `Ursprungspreis = alle ${den} Teile = ${den} × ${fmt(part)} = ${fmt(task.expected)} €`,
+      t(discount ? 'sol.pct.revDisc' : 'sol.pct.revInc', { r: fmt(r), nach: fmt(nach), X }),
+      t('sol.pct.revParts', { X, num, den, nach: fmt(nach) }),
+      t('sol.pct.revPart', { nach: fmt(nach), num, part: fmt(part) }),
+      t('sol.pct.revWhole', { den, part: fmt(part), e: fmt(task.expected) }),
     ];
   },
 
   'pct.points': ({ m1, m2 }: SP, task: Task) => {
     const d = m2 - m1, g = gcd(d, m1), n = d / g, dd = m1 / g;
     return [
-      `Differenz: ${m2} % − ${m1} % = ${d} Prozentpunkte (das ist noch kein Prozent-Anstieg)`,
-      `Bezug ist der alte Wert ${m1} %: ${d} ÷ ${m1}`,
-      dd === 1 ? `${d}/${m1} = ${n}: der Zuwachs ist genau ${n === 1 ? 'so groß wie' : `${n}-mal so groß wie`} der alte Wert` : g > 1 ? `Kürzen: ${d}/${m1} = ${n}/${dd}` : `${d}/${m1} lässt sich nicht kürzen`,
-      dd === 1 ? `${n} × 100 % = ${fmt(task.expected)} %` : `In Prozent: ${n} × 100 = ${n * 100}, ${n * 100} ÷ ${dd} = ${fmt(task.expected)} %`,
+      t('sol.pct.ptDiff', { m1, m2, d }),
+      t('sol.pct.ptBase', { m1, d }),
+      dd === 1
+        ? t(n === 1 ? 'sol.pct.ptSame' : 'sol.pct.ptTimes', { d, m1, n })
+        : t(g > 1 ? 'sol.pct.ptReduce' : 'sol.pct.ptNoReduce', { d, m1, n, dd }),
+      dd === 1
+        ? t('sol.pct.ptFinal1', { n, e: fmt(task.expected) })
+        : t('sol.pct.ptFinal', { n, n100: n * 100, dd, e: fmt(task.expected) }),
     ];
   },
 
   'pct.chain': ({ r1, r2 }: SP, task: Task) => {
-    const f = (r: number) => fmt(R(1 + r / 100));
-    const s = r1 + r2, t = R((r1 * r2) / 100);
+    const f = (r: number): string => fmt(R(1 + r / 100));
+    const s = r1 + r2, x = R((r1 * r2) / 100);
     return [
-      `Faktoren: ${sg(r1)} % → ${f(r1)}, ${sg(r2)} % → ${f(r2)} (nie einfach die Prozente addieren)`,
-      `Prozente addieren: ${fmt(r1)} ${r2 < 0 ? '−' : '+'} ${fmt(Math.abs(r2))} = ${fmt(s)} %`,
-      `Wechselwirkung: ${fmt(r1)} % × ${fmt(r2)} % = (${fmt(r1)} × ${fmt(r2)}) ÷ 100 = ${sg(t)} %`,
-      `${fmt(s)} ${t < 0 ? '−' : '+'} ${fmt(Math.abs(t))} = ${fmt(task.expected)} %`,
+      t('sol.pct.chainFactors', { r1: sg(r1), f1: f(r1), r2: sg(r2), f2: f(r2) }),
+      t('sol.pct.chainAdd', { a: fmt(r1), op: r2 < 0 ? '−' : '+', b: fmt(Math.abs(r2)), s: fmt(s) }),
+      t('sol.pct.chainCross', { a: fmt(r1), b: fmt(r2), x: sg(x) }),
+      t('sol.pct.chainFinal', { s: fmt(s), op: x < 0 ? '−' : '+', x: fmt(Math.abs(x)), e: fmt(task.expected) }),
     ];
   },
 

@@ -3,7 +3,7 @@ import { getSettings, setSettings, resetAll, exportJSON, getAttempts, getSession
 import { importJSON } from '../data/transfer.ts';
 import { applyTheme } from '../ui/theme.ts';
 import { toast } from '../ui/toast.ts';
-import { confirmDialog } from '../ui/modal.ts';
+import { confirmDialog, openModal } from '../ui/modal.ts';
 import { openChangelog, fmtIsoDate } from '../features/whats-new.ts';
 import { BUILD_INFO } from '../generated/build-info.ts';
 import { detectLang, setLang, t } from '../i18n/index.ts';
@@ -11,7 +11,7 @@ import { icon } from '../ui/charts.ts';
 import { CATEGORIES } from '../core/catalog.ts';
 import { app, h, appendChildren } from '../ui/dom.ts';
 import { rerender, addCleanup } from '../router.ts';
-import type { PasskeyInfo } from '../vendor/auth.ts';
+import type { PasskeyInfo, RecoveryStatus } from '../vendor/auth.ts';
 import * as acct from '../features/account.ts';
 import { getSyncStatus, onSyncStatus, syncNow, syncStatusEntries, wipeCloudData } from '../features/sync.ts';
 
@@ -218,6 +218,26 @@ async function runBusy(btn: HTMLButtonElement, fn: () => Promise<void>): Promise
 
 const acctDate = (iso: string): string => fmtIsoDate(iso.slice(0, 10));
 
+/** Zeigt einen neuen Wiederherstellungscode einmalig an: Kopieren + Bestätigen. */
+function showRecoveryCode(code: string, replaced = false): void {
+  const copy = (): void => {
+    void navigator.clipboard?.writeText(code).then(
+      () => toast(t('account.recovery.copied'), { kind: 'success' }),
+      () => { /* Zwischenablage gesperrt: der Code lässt sich markieren */ });
+  };
+  openModal({
+    title: t('account.recovery.modalTitle'),
+    body: h('div', { class: 'acct-recovery' },
+      replaced ? h('p', null, t('account.recovery.modalUsed')) : null,
+      h('code', { class: 'acct-code' }, code),
+      h('p', { class: 'small muted' }, t('account.recovery.modalText'))),
+    actions: [
+      { label: t('account.recovery.copy'), onClick: copy, closes: false },
+      { label: t('account.recovery.done'), primary: true },
+    ],
+  });
+}
+
 /** Inline-Formular zum Umbenennen (Name oder Passkey). */
 function inlineEdit(initial: string, label: string, validate: (v: string) => string | null, onSave: (v: string) => Promise<boolean>, onCancel: () => void): HTMLFormElement {
   const input: HTMLInputElement = h('input', { type: 'text', value: initial, maxlength: NAME_MAX, 'aria-label': label, autocomplete: 'off' });
@@ -244,7 +264,13 @@ function accountSignedOut(box: HTMLElement): void {
   const err = h('div', { class: 'small acct-err', role: 'alert' });
   const create: HTMLButtonElement = h('button', { type: 'button', class: 'btn primary' }, t('account.create'));
   const login: HTMLButtonElement = h('button', { type: 'button', class: 'btn' }, t('account.login'));
-  const both = [create, login];
+  const recInput: HTMLInputElement = h('input', {
+    type: 'text', maxlength: 40, placeholder: t('account.recovery.placeholder'), autocomplete: 'off',
+    autocapitalize: 'characters', spellcheck: 'false', 'aria-label': t('account.recovery.inputLabel'),
+  });
+  const recErr = h('div', { class: 'small acct-err', role: 'alert' });
+  const recBtn: HTMLButtonElement = h('button', { type: 'submit', class: 'btn' }, t('account.recovery.submit'));
+  const both = [create, login, recBtn];
   const busy = async (btn: HTMLButtonElement, fn: () => Promise<void>): Promise<void> => {
     for (const b of both) b.disabled = true;
     await runBusy(btn, fn);
@@ -257,15 +283,35 @@ function accountSignedOut(box: HTMLElement): void {
     input.setAttribute('aria-invalid', String(bad));
     if (bad) { input.focus(); return; }
     void busy(create, async () => {
-      await acct.register(v);
+      const code = await acct.register(v);
       toast(t('account.registered'), { kind: 'success', durationMs: 6000 });
+      if (code) showRecoveryCode(code);
+      else toast(t('account.recovery.missing'), { kind: 'error', durationMs: 8000 });
     });
   });
   login.addEventListener('click', () => { void busy(login, async () => { await acct.login(); toast(t('account.loggedIn'), { kind: 'success' }); }); });
 
+  // Passkey verloren: mit dem Wiederherstellungscode einen neuen anlegen (Format prüft der Client genauer)
+  const recForm: HTMLFormElement = h('form', { class: 'acct-recover' },
+    h('p', { class: 'small muted' }, t('account.recovery.lostIntro')),
+    h('label', { class: 'field' }, h('span', null, t('account.recovery.inputLabel')), recInput), recErr, recBtn);
+  recForm.addEventListener('submit', (ev) => {
+    ev.preventDefault();
+    const bad = recInput.value.replace(/[\s-]/g, '').length !== 20;
+    recErr.textContent = bad ? t('account.recovery.invalidFormat') : '';
+    recInput.setAttribute('aria-invalid', String(bad));
+    if (bad) { recInput.focus(); return; }
+    void busy(recBtn, async () => {
+      const code = await acct.recover(recInput.value);
+      toast(t('account.recovery.recovered'), { kind: 'success' });
+      if (code) showRecoveryCode(code, true);
+    });
+  });
+
   const controls = h('div', { class: 'acct-controls' },
     h('label', { class: 'field' }, h('span', null, t('account.nameLabel')), input), err, create,
-    h('div', { class: 'acct-divider' }, h('span', null, t('account.or'))), login);
+    h('div', { class: 'acct-divider' }, h('span', null, t('account.or'))), login,
+    h('details', { class: 'acct-lost' }, h('summary', null, t('account.recovery.lost')), recForm));
   const hint = h('p', { class: 'small muted' }, t('account.unsupported'));
   appendChildren(box, [h('p', { class: 'small muted' }, t('account.intro')), controls]);
   void acct.support().then((info) => { if (!info.webauthn && controls.isConnected) controls.replaceWith(hint); }).catch(() => { /* Button-Aktionen melden Fehler selbst */ });
@@ -287,11 +333,16 @@ function accountSignedIn(box: HTMLElement, username: string): void {
   let editingName = false;
   let editingId: string | null = null;
   let passkeys: PasskeyInfo[] | null = null;
+  let recovery: RecoveryStatus | null = null;
   const body = h('div', { class: 'acct-body' });
   box.append(body);
 
   const reload = async (): Promise<void> => {
-    try { passkeys = await acct.listPasskeys(); } catch (e) { toast(t(`account.err.${acct.errorCode(e)}`), { kind: 'error' }); passkeys = passkeys ?? []; }
+    const [pk, rs] = await Promise.allSettled([acct.listPasskeys(), acct.recoveryStatus()]);
+    if (pk.status === 'fulfilled') passkeys = pk.value;
+    else { toast(t(`account.err.${acct.errorCode(pk.reason)}`), { kind: 'error' }); passkeys = passkeys ?? []; }
+    // Status unbekannt (z. B. Migration fehlt): wie „kein Code“ behandeln, Erstellen meldet dann den Fehler
+    recovery = rs.status === 'fulfilled' ? rs.value : recovery ?? { exists: false, createdAt: null };
     draw();
   };
 
@@ -356,9 +407,25 @@ function accountSignedIn(box: HTMLElement, username: string): void {
         void runBusy(del, async () => { await acct.deleteAccount(); toast(t('account.accountDeleted'), { kind: 'info' }); });
       });
     } }, t('account.deleteAccount'));
+    const recBtn: HTMLButtonElement = h('button', { type: 'button', class: 'btn', onclick: () => {
+      const run = (): void => {
+        void runBusy(recBtn, async () => { showRecoveryCode(await acct.createRecoveryCode()); await reload(); });
+      };
+      if (!recovery?.exists) { run(); return; }
+      void confirmDialog(t('account.recovery.renewConfirm'), { title: t('account.recovery.renewTitle'), confirmLabel: t('account.recovery.renew') })
+        .then((yes) => { if (yes) run(); });
+    } }, t(recovery?.exists ? 'account.recovery.renew' : 'account.recovery.create'));
+    const recStatus = recovery === null ? t('account.loading')
+      : recovery.exists && recovery.createdAt ? t('account.recovery.statusSet', { date: acctDate(recovery.createdAt) })
+        : t('account.recovery.statusNone');
     appendChildren(body, [nameRow, syncLine(), syncBtn, h('h3', { class: 'acct-sub' }, t('account.passkeys')), list,
       h('p', { class: 'small muted' }, t('account.addPasskeyHint')),
-      h('div', { class: 'btn-row' }, add, out), h('div', { class: 'btn-row' }, del)]);
+      h('div', { class: 'btn-row' }, add, out),
+      h('h3', { class: 'acct-sub' }, t('account.recovery.title')),
+      h('p', { class: recovery && !recovery.exists ? 'small acct-warn' : 'small muted' }, recStatus),
+      h('p', { class: 'small muted' }, t('account.recovery.hint')),
+      h('div', { class: 'btn-row' }, recBtn),
+      h('div', { class: 'btn-row' }, del)]);
   }
   draw();
   void reload();

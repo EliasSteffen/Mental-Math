@@ -3,6 +3,7 @@ import { t } from '../i18n/index.ts';
 import type { Category, CategoryId, Level, Subtype } from '../types.ts';
 
 export const CATEGORIES: Category[] = [
+  { id: 'table', get name() { return t('core.cat.table.name'); }, get description() { return t('core.cat.table.desc'); }, drill: true },
   { id: 'mult', get name() { return t('core.cat.mult.name'); }, get description() { return t('core.cat.mult.desc'); } },
   { id: 'div', get name() { return t('core.cat.div.name'); }, get description() { return t('core.cat.div.desc'); } },
   { id: 'big', get name() { return t('core.cat.big.name'); }, get description() { return t('core.cat.big.desc'); } },
@@ -14,12 +15,15 @@ export const CATEGORIES: Category[] = [
   { id: 'units', get name() { return t('core.cat.units.name'); }, get description() { return t('core.cat.units.desc'); } },
   { id: 'mag', get name() { return t('core.cat.mag.name'); }, get description() { return t('core.cat.mag.desc'); } },
   { id: 'tricks', get name() { return t('core.cat.tricks.name'); }, get description() { return t('core.cat.tricks.desc'); } },
+  { id: 'exhibit', get name() { return t('core.cat.exhibit.name'); }, get description() { return t('core.cat.exhibit.desc'); } },
   { id: 'custom', get name() { return t('core.cat.custom.name'); }, get description() { return t('core.cat.custom.desc'); }, hidden: true },
 ];
 
 type Meta = [id: string, targetMs: number, weight: number];
 
 const META: Meta[] = [
+  ['table.mul', 3000, 0.5],
+  ['table.div', 4000, 0.5],
   ['mult.2x1', 5000, 1],
   ['mult.2x2', 20000, 2],
   ['mult.easy', 8000, 1],
@@ -63,6 +67,10 @@ const META: Meta[] = [
   ['tricks.square5', 6000, 1],
   ['tricks.pctswap', 6000, 1],
   ['tricks.subround', 6000, 1],
+  ['exhibit.share', 15000, 1.5],
+  ['exhibit.growth', 15000, 1.5],
+  ['exhibit.mix', 20000, 1.5],
+  ['exhibit.rel', 25000, 2],
   ['custom.mul', 10000, 1],
   ['custom.square', 8000, 1],
 ];
@@ -95,4 +103,11 @@ export function activeCategories(enabled?: readonly CategoryId[] | null): Catego
   if (!Array.isArray(enabled)) return visible;
   const list = visible.filter((c) => enabled.includes(c.id));
   return list.length ? list : visible;
+}
+
+/** Kategorien für gemischte Runden („Alle“, Daily): aktive ohne Drills; nur Drills aktiv → die Drills. */
+export function mixCategories(enabled?: readonly CategoryId[] | null): Category[] {
+  const active = activeCategories(enabled);
+  const mix = active.filter((c) => !c.drill);
+  return mix.length ? mix : active;
 }

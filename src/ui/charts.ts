@@ -6,7 +6,7 @@ const SVG_NS = 'http://www.w3.org/2000/svg';
 
 type SvgAttrValue = string | number | boolean | null | undefined;
 
-function svgEl(tag: string, attrs: Record<string, SvgAttrValue> = {}): SVGElement {
+export function svgEl(tag: string, attrs: Record<string, SvgAttrValue> = {}): SVGElement {
   const el = document.createElementNS(SVG_NS, tag);
   for (const [k, v] of Object.entries(attrs)) {
     if (v === null || v === undefined || v === false) continue;

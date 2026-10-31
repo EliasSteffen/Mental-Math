@@ -1,0 +1,16 @@
+# Worker mit dem Durable Object für das globale Rate-Limit der KI-Erklärungen (siehe README → KI-Erklärungen).
+# Deploy: GitHub-Workflow „Deploy Rate Limiter“ oder `npx wrangler deploy` in diesem Ordner.
+name = "mental-math-rate-limiter"
+main = "src/index.ts"
+compatibility_date = "2025-09-01"
+# Keine öffentliche *.workers.dev-Adresse: das Durable Object ist nur über das Pages-Binding RATE_LIMITER erreichbar
+workers_dev = false
+
+[[durable_objects.bindings]]
+name = "RATE_LIMITER"
+class_name = "RateLimiter"
+
+# SQLite-Backend: auf dem kostenlosen Workers-Plan verfügbar
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["RateLimiter"]

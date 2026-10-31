@@ -3,8 +3,8 @@
 
 // ---------- Katalog ----------
 export type CategoryId =
-  | 'mult' | 'div' | 'big' | 'pct' | 'frac' | 'growth' | 'biz' | 'est' | 'units' | 'mag'
-  | 'tricks' | 'custom';
+  | 'table' | 'mult' | 'div' | 'big' | 'pct' | 'frac' | 'growth' | 'biz' | 'est' | 'units' | 'mag'
+  | 'tricks' | 'exhibit' | 'custom';
 
 export interface Category {
   id: CategoryId;
@@ -12,6 +12,8 @@ export interface Category {
   description: string;
   /** Versteckt = nicht im Raster, nicht in „Alle“, nicht in Empfehlungen (z. B. 'custom'). */
   hidden?: boolean;
+  /** Drill = im Raster wählbar, aber nicht Teil gemischter Runden („Alle“, Daily), z. B. das kleine 1×1. */
+  drill?: boolean;
 }
 
 export type SubtypeId = string; // z. B. 'pct.of' – Prüfung zur Laufzeit über SUBTYPES

@@ -16,8 +16,9 @@ const sub = (id: string): Subtype => {
 const FRACTIONAL_OK = new Set(['pct.change', 'biz.tco']);
 const lastOk = (t: Task, steps: string[]): boolean => (steps[steps.length - 1] ?? '').includes(t.kind === 'choice' ? (t.choices[t.expected] ?? '') : fmt(t.expected));
 
-test('12 Kategorien (davon 1 versteckt), jede mit mindestens 2 Typen', () => {
-  assert.equal(CATEGORIES.length, 12);
+test('14 Kategorien (davon 1 versteckt, 1 Drill), jede mit mindestens 2 Typen', () => {
+  assert.equal(CATEGORIES.length, 14);
+  assert.deepEqual(CATEGORIES.filter((c) => c.drill).map((c) => c.id), ['table']);
   assert.deepEqual(CATEGORIES.filter((c) => c.hidden).map((c) => c.id), ['custom']);
   for (const c of CATEGORIES) {
     const n = Object.values(SUBTYPES).filter((s) => s.category === c.id).length;

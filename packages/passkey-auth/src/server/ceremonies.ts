@@ -2,11 +2,12 @@
 import type { verifyAuthenticationResponse, verifyRegistrationResponse } from '@simplewebauthn/server';
 import type {
   AuthenticationOptionsJSON, AuthenticatorTransport, AuthStore, AuthUser, ChallengePurpose,
-  NewPasskey, OptionsRes, RegistrationOptionsJSON, ServerConfig, SessionRes,
+  NewPasskey, OptionsRes, RecoveryCodeRes, RecoveryStatus, RegistrationOptionsJSON, ServerConfig, SessionRes,
 } from '../shared/types.ts';
 import { PasskeyAuthError } from '../shared/errors.ts';
 import { fromBase64Url, toBase64Url } from '../shared/base64url.ts';
 import { normalizeUsername } from '../shared/username.ts';
+import { generateRecoveryCode, normalizeRecoveryCode } from '../shared/recovery.ts';
 import { uuidToBytes } from './ids.ts';
 import { clearCookie, parseCookies, serializeCookie } from './cookies.ts';
 import { hashToken, newRefreshToken } from './tokens.ts';
@@ -79,7 +80,30 @@ async function issueSession(c: Ctx, user: AuthUser, rotatedFrom?: string): Promi
   };
 }
 
+/** Neuen Wiederherstellungscode erzeugen und als Hash speichern (ersetzt einen vorhandenen). */
+async function newRecoveryCode(c: Ctx, userId: string): Promise<string> {
+  const code = generateRecoveryCode(c.randomBytes);
+  await c.store.setRecoveryCode(userId, await hashToken(normalizeRecoveryCode(code) ?? code));
+  return code;
+}
+
+/** Wie newRecoveryCode, aber ohne die Anmeldung scheitern zu lassen (z. B. Migration 003 fehlt): dann ohne Code. */
+async function tryRecoveryCode(c: Ctx, userId: string): Promise<string | undefined> {
+  try {
+    return await newRecoveryCode(c, userId);
+  } catch (e) {
+    console.error('passkey-auth: recovery code not stored', e);
+    return undefined;
+  }
+}
+
+function withRecovery(r: Reply, code: string | undefined): Reply {
+  if (code !== undefined && r.body) (r.body as SessionRes).recoveryCode = code;
+  return r;
+}
+
 const bad = (): PasskeyAuthError => new PasskeyAuthError('invalid_request');
+const badCode = (): PasskeyAuthError => new PasskeyAuthError('invalid_recovery_code');
 const failed = (): PasskeyAuthError => new PasskeyAuthError('verification_failed');
 const expired = (): PasskeyAuthError => new PasskeyAuthError('challenge_expired');
 
@@ -137,7 +161,8 @@ export async function registerVerify(c: Ctx): Promise<Reply> {
   const pk = await verifyNewPasskey(c, response, ch.challenge);
   const user: AuthUser = { id: ch.userId, username: ch.username };
   await c.store.createUserWithPasskey(user, pk);
-  return issueSession(c, user);
+  const code = await tryRecoveryCode(c, user.id);
+  return withRecovery(await issueSession(c, user), code);
 }
 
 export async function loginOptions(c: Ctx): Promise<Reply> {
@@ -225,6 +250,50 @@ export async function passkeysVerify(c: Ctx): Promise<Reply> {
   return { status: 204 };
 }
 
+export async function recoveryStatus(c: Ctx): Promise<Reply> {
+  const who = await bearer(c);
+  const info = await c.store.getRecoveryInfo(who.userId);
+  const body: RecoveryStatus = { exists: info !== null, createdAt: info ? new Date(info.createdAt).toISOString() : null };
+  return { status: 200, body };
+}
+
+export async function recoveryCreate(c: Ctx): Promise<Reply> {
+  const who = await bearer(c);
+  const body: RecoveryCodeRes = { code: await newRecoveryCode(c, who.userId) };
+  return { status: 200, body };
+}
+
+export async function recoverOptions(c: Ctx): Promise<Reply> {
+  const code = normalizeRecoveryCode(c.body['code']);
+  if (!code) throw badCode();
+  const user = await c.store.findRecoveryUser(await hashToken(code));
+  if (!user) throw badCode();
+  const { flowId, challenge } = await newChallenge(c, 'recover', user.id, user.username);
+  const exclude = await c.store.listCredentialIds(user.id);
+  const res: OptionsRes<RegistrationOptionsJSON> = {
+    flowId, options: registrationOptions(c, challenge, user.id, user.username, exclude),
+  };
+  return { status: 200, body: res };
+}
+
+export async function recoverVerify(c: Ctx): Promise<Reply> {
+  const flowId = c.body['flowId'];
+  const response = parseRegistrationResponse(c.body['response']);
+  const code = normalizeRecoveryCode(c.body['code']);
+  if (!isFlowId(flowId) || !response) throw bad();
+  if (!code) throw badCode();
+  const ch = await c.store.consumeChallenge(flowId, 'recover');
+  if (!ch || !ch.userId) throw expired();
+  // Der Code muss noch gültig sein und zum User der Challenge gehören (inzwischen ersetzt → abgelehnt)
+  const user = await c.store.findRecoveryUser(await hashToken(code));
+  if (!user || user.id !== ch.userId) throw badCode();
+  const pk = await verifyNewPasskey(c, response, ch.challenge);
+  await c.store.addPasskey(user.id, pk);
+  // Benutzter Code wird sofort ersetzt; der neue geht einmalig an den Client
+  const next = await tryRecoveryCode(c, user.id);
+  return withRecovery(await issueSession(c, user), next);
+}
+
 export const routes: Record<string, (c: Ctx) => Promise<Reply>> = {
   '/register/options': registerOptions,
   '/register/verify': registerVerify,
@@ -234,5 +303,9 @@ export const routes: Record<string, (c: Ctx) => Promise<Reply>> = {
   '/logout': logout,
   '/passkeys/options': passkeysOptions,
   '/passkeys/verify': passkeysVerify,
+  '/recovery/status': recoveryStatus,
+  '/recovery/create': recoveryCreate,
+  '/recovery/options': recoverOptions,
+  '/recovery/verify': recoverVerify,
 };
 
