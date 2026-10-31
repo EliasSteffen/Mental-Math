@@ -5,6 +5,16 @@ const DATE = '2026-10-30';
 
 export const RELEASES: Release[] = [
   {
+    version: '1.13.0', date: '2026-10-31',
+    title: { de: 'Erinnerungen', en: 'Reminders' },
+    highlights: [
+      { de: 'Neu: Erinnerungen per Push-Benachrichtigung – täglich zu deiner Uhrzeit und an den Wochentagen, die du wählst.', en: 'New: push notification reminders – daily at your chosen time, on the days you pick.' },
+      { de: '„Serie retten“ meldet sich um 20 Uhr, wenn dein Tagesziel noch fehlt und die Serie sonst reißt.', en: '"Save your streak" checks in at 8 pm if your daily goal is still open and your streak would end.' },
+      { de: 'Hinweise auf fällige Wiederholungen und sonntags ein Rechentrick, passend zu deinen Schwächen.', en: 'Nudges for due reviews, plus a math trick on Sundays that targets your weak spots.' },
+      { de: 'Keine Erinnerung, wenn du heute schon genug trainiert hast. Einstellen unter Profil → Erinnerungen.', en: 'No reminder if you have already trained enough today. Set it up under Profile → Reminders.' },
+    ],
+  },
+  {
     version: '1.12.0', date: '2026-10-31',
     title: { de: 'Exhibits, 1×1, Englisch & Wiederherstellung', en: 'Exhibits, times tables, English & recovery' },
     highlights: [

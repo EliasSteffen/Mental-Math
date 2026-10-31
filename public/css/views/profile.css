@@ -45,6 +45,18 @@
   .prof-meta > div { display:flex; flex-wrap:wrap; gap:0 var(--space-2); min-width:0; }
   .prof-meta dd { min-width:0; overflow-wrap:anywhere; }
 
+  /* ---------- Erinnerungen (Push) ---------- */
+  .prof-remind { display:flex; flex-direction:column; gap:var(--space-2); }
+  .prof-remind:empty { display:none; }
+  .prof-remind > .prof-note:empty { display:none; }
+  /* Uhrzeit: so breit wie der Inhalt, rechts in der Zeile (spezifischer als .prof-input mit width:100%) */
+  .prof-input.prof-time { flex:none; width:auto; min-width:7.5em; margin-left:auto; text-align:center; }
+  /* Sieben Wochentage, gleich breit; unter 360 px enger */
+  .prof-days > button { padding-inline:0; font-size:var(--text-sm); }
+  @media (max-width: 359px) {
+    .prof-days > button { font-size:var(--text-xs); }
+  }
+
   /* ---------- Sheets (Konto, Kategorien) ---------- */
   .prof-sheet-text { font-size:var(--text-sm); line-height:1.5; color:var(--muted); }
   .prof-subhead {

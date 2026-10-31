@@ -59,6 +59,72 @@ sw.addEventListener('activate', (event) => {
   })());
 });
 
+/* ---------- Push-Erinnerungen (Texte kommen fertig vom Server, siehe server/push-messages.ts) ---------- */
+
+interface PushPayload { title: string; body: string; url: string; tag: string }
+
+/** Nur Pfade dieser Origin als Ziel zulassen (auch „/\host“ o. ä. darf die Origin nicht wechseln) */
+function safePath(v: unknown): string {
+  if (typeof v !== 'string' || !v.startsWith('/')) return '/';
+  try {
+    const u = new URL(v.slice(0, 200), sw.location.origin);
+    return u.origin === sw.location.origin ? `${u.pathname}${u.search}${u.hash}` : '/';
+  } catch {
+    return '/';
+  }
+}
+
+function parsePush(data: PushMessageData | null): PushPayload {
+  const fallback: PushPayload = { title: 'Mental Math', body: '', url: '/', tag: 'mm-reminder' };
+  if (!data) return fallback;
+  try {
+    const p = data.json() as Record<string, unknown>;
+    const str = (v: unknown, max: number): string => (typeof v === 'string' ? v.slice(0, max) : '');
+    return { title: str(p.title, 100) || fallback.title, body: str(p.body, 300), url: safePath(p.url), tag: str(p.tag, 40) || fallback.tag };
+  } catch {
+    return fallback;
+  }
+}
+
+sw.addEventListener('push', (event) => {
+  const p = parsePush(event.data);
+  // renotify: Eine neue Erinnerung meldet sich auch dann, wenn die alte (gleiches Tag) noch in der Mitteilungszentrale liegt
+  const options: NotificationOptions & { renotify?: boolean } = {
+    body: p.body, tag: p.tag, renotify: true, icon: '/icons/icon-192.png', data: { url: p.url },
+  };
+  event.waitUntil(sw.registration.showNotification(p.title, options));
+});
+
+sw.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const target = new URL(safePath((event.notification.data as { url?: unknown } | null)?.url), sw.location.origin).href;
+  event.waitUntil((async () => {
+    const windows = await sw.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    const open = windows.find((c) => new URL(c.url).origin === sw.location.origin);
+    if (!open) {
+      await sw.clients.openWindow(target);
+      return;
+    }
+    await open.focus();
+    await open.navigate(target).catch(() => null);
+  })());
+});
+
+// Der Browser hat das Abo erneuert: neuen Endpoint melden (der alte Endpoint weist das Abo aus)
+sw.addEventListener('pushsubscriptionchange', (event) => {
+  const e = event as ExtendableEvent & { oldSubscription?: PushSubscription | null; newSubscription?: PushSubscription | null };
+  e.waitUntil((async () => {
+    const old = e.oldSubscription ?? null;
+    const key = old?.options.applicationServerKey ?? null;
+    const sub = e.newSubscription ?? (key ? await sw.registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key }) : null);
+    if (!old || !sub) return;
+    await fetch('/api/push/renew', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ oldEndpoint: old.endpoint, subscription: sub.toJSON() }),
+    });
+  })().catch(() => undefined));
+});
+
 sw.addEventListener('fetch', (event) => {
   const req = event.request;
   if (req.method !== 'GET') return;

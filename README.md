@@ -130,24 +130,52 @@ Pages Functions können keine eigenen Durable Objects definieren. Deshalb stellt
 3. Binding anlegen: *Workers & Pages → mental-math → Settings → Bindings → Add → Durable Object*, Variable `RATE_LIMITER`, Namespace `mental-math-rate-limiter_RateLimiter` – für Production (und bei Bedarf Preview), danach neu deployen.
 4. Optional zusätzlich: eine WAF-Rate-Limiting-Regel für `/api/` auf der Zone `elias-steffen.de` (Free Plan: 1 Regel, 10-Sekunden-Fenster).
 
+## Erinnerungen (Push-Benachrichtigungen)
+
+Unter *Profil → Erinnerungen* schaltet man Push-Benachrichtigungen pro Gerät ein. Ein Konto ist dafür nicht nötig.
+
+| Erinnerung | Wann | Entfällt, wenn … |
+|---|---|---|
+| **Täglich** | zur gewählten Uhrzeit an den gewählten Wochentagen | das Tagesziel heute schon erreicht ist (abschaltbar) |
+| **Serie retten** | um 20 Uhr | das Tagesziel erreicht ist oder keine Serie läuft |
+| **Wiederholungen** | sobald Leitner-Wiederholungen fällig sind, zwischen 9 und 20 Uhr, höchstens einmal am Tag | nichts fällig ist |
+| **Lern-Hinweis** | sonntags um 10 Uhr: ein Rechentrick, bevorzugt zu einer Schwäche | – |
+
+Zusätzlich gilt: keine Erinnerung, wenn die App in den letzten 20 Minuten offen war; zwischen zwei Benachrichtigungen liegen mindestens 90 Minuten (außer bei der täglichen). Uhrzeiten gelten in der Zeitzone des Geräts, auch über die Zeitumstellung hinweg.
+
+**So funktioniert es:** Die App abonniert Web Push (VAPID) und meldet Einstellungen, Zeitzone und einen knappen Lernstand (Serie, Tagesziel erreicht, fällige Wiederholungen, bis zu 3 schwache Aufgabentypen) an `/api/push` (`functions/api/push/[[path]].ts` → `server/push.ts`). Ein Supabase-Cron (`pg_cron` + `pg_net`) ruft jede Minute `/api/push/tick` auf; der Server holt die fälligen Abos, entscheidet (`src/core/reminders.ts`), verschlüsselt die Nachricht (RFC 8291, `server/push-crypto.ts`) und schickt sie an den Push-Dienst des Browsers. Der Service Worker zeigt sie an und öffnet beim Antippen die passende Seite. Das Gerät erzeugt eine zufällige ID und ein Geheimnis; gespeichert wird nur dessen SHA-256-Hash. Ausschalten löscht das Abo auf dem Server.
+
+**Einrichten (einmalig):** Voraussetzung ist dasselbe Supabase-Projekt wie für das Konto, also die Pages-Secrets `SUPABASE_URL` und `SUPABASE_SERVICE_ROLE_KEY`. Dann im Supabase-SQL-Editor nacheinander ausführen:
+
+1. `sql/004_push.sql` – Tabellen `push_subscriptions` und `push_config` (nur `service_role`), Funktionen für den Takt
+2. `sql/005_push_cron.sql` – aktiviert `pg_cron` und `pg_net` und plant den Aufruf jede Minute
+
+Mehr ist nicht nötig: Die VAPID-Schlüssel erzeugt der Server beim ersten Aufruf selbst und legt sie in `push_config` ab; das Token, mit dem der Cron `/api/push/tick` aufruft, erzeugt das SQL-Skript. Bis die Skripte gelaufen sind, blendet die App die Erinnerungen aus.
+
+- **Adresse des Takts:** Standard ist `https://mental-math.pages.dev/api/push/tick` (gleiche Production-Deployment wie die eigene Domain, aber ohne deren Bot-Schutz, der Aufrufe von Supabase sonst blockieren könnte). Anderes Pages-Projekt: `update public.push_config set tick_url = 'https://<projekt>.pages.dev/api/push/tick' where id = 1;`
+- **iPhone/iPad** (ab iOS 16.4): Web Push gibt es nur in der installierten App – erst *Teilen → Zum Home-Bildschirm*, dann in der App einschalten.
+- **Optional:** Pages-Variable `PUSH_SUBJECT` (`mailto:…` oder `https://…`) als Kontakt für die Push-Dienste; Standard ist die eigene Origin.
+- **Takt prüfen:** `select status, return_message, start_time from cron.job_run_details order by start_time desc limit 5;` und `select status_code, content::text from net._http_response order by created desc limit 5;` – erwartet ist `200` mit `{"claimed":…,"sent":…}`.
+- **Takt stoppen:** `select cron.unschedule('mental-math-push');`
+
 ## Daten
 
 Fortschritt und Statistiken liegen lokal in IndexedDB. Ohne Konto bleibt alles auf dem Gerät, es gibt kein Tracking. Mit Konto (Passkey) werden die Trainingsdaten über Supabase zwischen deinen Geräten synchronisiert. In den Einstellungen lassen sich die Daten als JSON exportieren, importieren oder löschen.
 
 **Wiederherstellungscode:** Beim Anlegen des Kontos zeigt die App einmalig einen Code (20 Zeichen). Wer alle Passkeys verliert, legt damit unter *Einstellungen → Daten & Account → Passkey verloren?* einen neuen Passkey an; danach gibt es einen neuen Code. Gespeichert wird nur ein SHA-256-Hash.
 
-**Supabase-SQL (einmalig, in dieser Reihenfolge im SQL-Editor):** `packages/passkey-auth/sql/001_passkey_auth.sql`, `packages/offline-sync/sql/offline_sync_guard.sql`, `sql/002_training_data.sql`, `packages/passkey-auth/sql/003_recovery_codes.sql`. Alle Skripte sind idempotent.
+**Supabase-SQL (einmalig, in dieser Reihenfolge im SQL-Editor):** `packages/passkey-auth/sql/001_passkey_auth.sql`, `packages/offline-sync/sql/offline_sync_guard.sql`, `sql/002_training_data.sql`, `packages/passkey-auth/sql/003_recovery_codes.sql`, für Erinnerungen außerdem `sql/004_push.sql` und `sql/005_push_cron.sql`. Alle Skripte sind idempotent.
 
 ## Struktur
 
 ```
 src/
   types.ts          zentrale Typen
-  core/             DOM-frei: numbers, rng, units, catalog, generators/, solutions/,
+  core/             DOM-frei: numbers, rng, units, catalog, generators/, solutions/, reminders,
                     methods, scoring, review, progress, modes, daily, chain
   data/storage.ts   localStorage (Schema + Migration)
   ui/               dom, charts, icons, keypad, fx, theme, toast
-  features/         ai-client, activity, pwa
+  features/         ai-client, activity, pwa, push (Erinnerungen)
   views/            home, lernen, analyse, settings, daily, chain, train/
   router.ts  app.ts
   sw.ts             Service Worker (→ dist/sw.js)
@@ -158,6 +186,9 @@ scripts/            Build-Skripte (laufen mit node): clean.ts, copy-static.ts, p
 functions/api/explain.ts    ← Cloudflare Pages Function (KI-Endpoint, bleibt im Repo-Root)
 server/explain.ts           ← Validierung, Prompt (de/en), Gemini-Aufruf
 server/rate-limit.ts        ← Rate-Limit-Logik (In-Memory-Fallback + Durable-Object-Client)
+functions/api/push/[[path]].ts ← Push-Erinnerungen (Abo, Einstellungen, Test, Cron-Takt)
+server/push*.ts             ← Push-Handler, Web-Push-Verschlüsselung + VAPID, Texte, Supabase-Speicher
+sql/                        ← Supabase-SQL der App (Trainingsdaten, Push + Cron)
 workers/rate-limiter/       ← Worker mit dem Durable Object RateLimiter (eigener Deploy-Workflow)
 tests/                      ← node --test (*.test.ts)
 docs/                       ← SPEC, ARCHITECTURE, PLAN-v5
