@@ -21,7 +21,10 @@ function fakeModule(restoreResult: AuthSession | null = null): VendorModuleLike 
   let cb: ((s: AuthSession | null) => void) | null = null;
   const auth = {
     support: async () => ({ webauthn: true, platform: true, conditional: false }),
-    register: async () => { cb?.(session); return session; },
+    register: async () => { cb?.(session); return { ...session, recoveryCode: 'AAAAA-BBBBB-CCCCC-DDDDD' }; },
+    recover: async () => { cb?.(session); return { ...session, recoveryCode: 'EEEEE-FFFFF-GGGGG-HHHHH' }; },
+    createRecoveryCode: async () => 'JJJJJ-KKKKK-MMMMM-NNNNN',
+    recoveryStatus: async () => ({ exists: true, createdAt: '2026-10-31T12:00:00.000Z' }),
     login: async () => { cb?.(session); return session; },
     addPasskey: async () => {},
     restore: async () => { restored += 1; return restoreResult; },
@@ -102,4 +105,16 @@ test('errorCode-Mapping', () => {
   assert.equal(acct.errorCode({ code: 'bogus' }), 'server_error');
   assert.equal(acct.errorCode(new Error('x')), 'server_error');
   assert.equal(acct.errorCode(null), 'server_error');
+});
+
+test('Wiederherstellungscode: register/recover liefern den Code, recover meldet an', async () => {
+  acct._setModuleForTests(fakeModule(), ON);
+  assert.equal(await acct.register('Anna'), 'AAAAA-BBBBB-CCCCC-DDDDD');
+  await acct.logout();
+  assert.equal(acct.getAccountState().status, 'signed-out');
+  assert.equal(await acct.recover('aaaaa bbbbb ccccc ddddd'), 'EEEEE-FFFFF-GGGGG-HHHHH');
+  assert.deepEqual(acct.getAccountState(), { status: 'signed-in', user });
+  assert.equal(await acct.createRecoveryCode(), 'JJJJJ-KKKKK-MMMMM-NNNNN');
+  assert.deepEqual(await acct.recoveryStatus(), { exists: true, createdAt: '2026-10-31T12:00:00.000Z' });
+  assert.equal(acct.errorCode({ code: 'invalid_recovery_code' }), 'invalid_recovery_code');
 });

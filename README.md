@@ -1,8 +1,10 @@
 # Kopfrechner
 
-Minimalistischer Kopfrechen-Trainer für Case Interviews (Consulting). Er ist in TypeScript geschrieben (Build per `tsc`, keine Laufzeit-Dependencies) und speichert alle Daten nur lokal im Browser.
+Minimalistischer Kopfrechen-Trainer für Case Interviews (Consulting). Er ist in TypeScript geschrieben (Build per `tsc`) und speichert alle Daten lokal im Browser; mit Konto (Passkey) optional zusätzlich synchronisiert.
 
-- **8 Kategorien** + „Alle Kategorien“: Multiplikation, Division, Große Zahlen, Prozente, Brüche, Wachstum, Business (Payback, Break-even, TCO, FTE, SLA …), Überschlag
+- **13 Kategorien** + „Alle Kategorien“: Kleines 1×1 (Drill, nicht in gemischten Runden), Multiplikation, Division, Große Zahlen, Prozente, Brüche, Wachstum, Business (Payback, Break-even, TCO, FTE, SLA …), Überschlag, Einheiten, Größenordnungen, Rechentricks, Exhibits
+- **Exhibits**: Balken-, Säulen- und Tabellen-Schaubilder lesen und daraus rechnen (Anteil, Wachstum, gewichteter Durchschnitt, relativ vs. absolut)
+- **Deutsch und Englisch** – auch Lernbereich, Lösungswege und KI-Erklärungen
 - **Score pro Aufgabe** aus Ergebnis, Zeit im Verhältnis zur Zielzeit und Schwierigkeit
 - **Skill pro Kategorie und Aufgabentyp** (0–100) aus Genauigkeit und Tempo der letzten Versuche
 - **Schwächen-Erkennung** mit Diagnose (Nullen-Fehler, ungenau, zu langsam) und Tipps, dazu ein Modus „Schwächen trainieren“
@@ -11,7 +13,7 @@ Minimalistischer Kopfrechen-Trainer für Case Interviews (Consulting). Er ist in
 Details: [docs/SPEC.md](docs/SPEC.md)
 
 - **Lösungsweg mit den Zahlen der Aufgabe** nach jeder Antwort, dazu „Wie geht das?“ als Hilfe vor dem Antworten (halbe Punkte)
-- **Lernbereich** (`#/lernen`): Methode, Vorgehen, Trick und typische Fehler für alle 30 Aufgabentypen, mit Beispiel zum Mitrechnen
+- **Lernbereich** (`#/lernen`): Methode, Vorgehen, Trick und typische Fehler für alle Aufgabentypen, mit Beispiel zum Mitrechnen
 - **Optionale KI-Erklärungen** (Google Gemini, nur auf Knopfdruck) – siehe unten
 - **Tagesziel & Serie** (Minuten pro Tag, einstellbar), Aktivitäts-Heatmap, Level/XP
 - **Schwierigkeitsstufen** Leicht/Mittel/Schwer – automatisch nach Skill oder fest
@@ -107,15 +109,34 @@ Alternativ im Dashboard unter *Workers & Pages → mental-math → Settings → 
 
 **Schutz vor Missbrauch des Free Tiers:**
 - Der Endpoint nimmt nur strukturierte Aufgabendaten an (bekannter Aufgabentyp, kurze Felder), keinen Freitext. Er taugt also nicht als allgemeiner Chat-Proxy.
-- Er prüft den `Origin`-Header und begrenzt die Anfragen pro IP (15 pro Minute, 200 pro Tag; Best Effort pro Worker-Instanz).
+- Er prüft den `Origin`-Header und begrenzt die Anfragen: 60 pro Minute insgesamt, pro IP 15 pro Minute und 200 pro Tag. Gezählt wird global über ein Durable Object (siehe unten); ohne dieses Binding nur pro Worker-Instanz (Best Effort).
+- Die App schickt die UI-Sprache mit (`de`/`en`); die KI antwortet in dieser Sprache.
 - Der Browser speichert Antworten zwischen (`localStorage`), sodass die gleiche Frage kein zweites Mal Kontingent kostet.
 - Im Google-Cloud-Projekt des Keys sollte **kein Billing aktiv** sein. Dann kann im schlimmsten Fall nur das Gratis-Kontingent ausgehen, Kosten entstehen keine. Zusätzlich lohnt es sich, den Key in der Google Cloud Console auf die „Generative Language API“ zu beschränken.
 
 **Lokal:** `npm run dev:ai` liest `GOOGLE_API_KEY` automatisch aus `.env`. `.env` und `.dev.vars` stehen in `.gitignore` und dürfen nie committet werden.
 
+### Globales Rate-Limit (Durable Object, einmalig einrichten)
+
+Pages Functions können keine eigenen Durable Objects definieren. Deshalb stellt ein kleiner Worker (`workers/rate-limiter`, Name `mental-math-rate-limiter`, ohne öffentliche Route) das Durable Object `RateLimiter` bereit. `/api/explain` nutzt es über das Binding `RATE_LIMITER`; fehlt das Binding oder ist das Objekt nicht erreichbar, greift das Limit pro Instanz.
+
+1. API-Token zusätzlich mit **Account · Workers Scripts · Edit** ausstatten (Dashboard → *My Profile → API Tokens*).
+2. Worker deployen: *Actions → Deploy Rate Limiter → Run workflow* (läuft danach automatisch bei Änderungen unter `workers/rate-limiter/`), oder lokal:
+
+   ```bash
+   npx wrangler deploy --config workers/rate-limiter/wrangler.toml
+   ```
+
+3. Binding anlegen: *Workers & Pages → mental-math → Settings → Bindings → Add → Durable Object*, Variable `RATE_LIMITER`, Namespace `mental-math-rate-limiter_RateLimiter` – für Production (und bei Bedarf Preview), danach neu deployen.
+4. Optional zusätzlich: eine WAF-Rate-Limiting-Regel für `/api/` auf der Zone `elias-steffen.de` (Free Plan: 1 Regel, 10-Sekunden-Fenster).
+
 ## Daten
 
-Fortschritt und Statistiken liegen nur im `localStorage` deines Browsers (Schlüssel `kopfrechner.v1`). Es gibt keinen Server und kein Tracking. Auf der Analyse-Seite lassen sich die Daten als JSON exportieren oder zurücksetzen. Verschiedene Geräte und Browser haben jeweils eigene Daten.
+Fortschritt und Statistiken liegen lokal in IndexedDB. Ohne Konto bleibt alles auf dem Gerät, es gibt kein Tracking. Mit Konto (Passkey) werden die Trainingsdaten über Supabase zwischen deinen Geräten synchronisiert. In den Einstellungen lassen sich die Daten als JSON exportieren, importieren oder löschen.
+
+**Wiederherstellungscode:** Beim Anlegen des Kontos zeigt die App einmalig einen Code (20 Zeichen). Wer alle Passkeys verliert, legt damit unter *Einstellungen → Daten & Account → Passkey verloren?* einen neuen Passkey an; danach gibt es einen neuen Code. Gespeichert wird nur ein SHA-256-Hash.
+
+**Supabase-SQL (einmalig, in dieser Reihenfolge im SQL-Editor):** `packages/passkey-auth/sql/001_passkey_auth.sql`, `packages/offline-sync/sql/offline_sync_guard.sql`, `sql/002_training_data.sql`, `packages/passkey-auth/sql/003_recovery_codes.sql`. Alle Skripte sind idempotent.
 
 ## Struktur
 
@@ -135,7 +156,9 @@ dist/               ← Build-Ausgabe, nicht versioniert, wird ausgeliefert
   js/ sw.js precache.json + kopierte public/-Dateien
 scripts/            Build-Skripte (laufen mit node): clean.ts, copy-static.ts, precache.ts (→ dist/precache.json)
 functions/api/explain.ts    ← Cloudflare Pages Function (KI-Endpoint, bleibt im Repo-Root)
-server/explain.ts           ← Validierung, Prompt, Gemini-Aufruf, Rate-Limit
+server/explain.ts           ← Validierung, Prompt (de/en), Gemini-Aufruf
+server/rate-limit.ts        ← Rate-Limit-Logik (In-Memory-Fallback + Durable-Object-Client)
+workers/rate-limiter/       ← Worker mit dem Durable Object RateLimiter (eigener Deploy-Workflow)
 tests/                      ← node --test (*.test.ts)
 docs/                       ← SPEC, ARCHITECTURE, PLAN-v5
 .github/workflows/deploy.yml  ← CI/CD: Tests + Build + Deploy auf Cloudflare Pages

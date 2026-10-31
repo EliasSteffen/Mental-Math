@@ -7,6 +7,7 @@ import { CATEGORIES, SUBTYPES, LEVEL_NAMES } from '../../core/catalog.ts';
 import { generate, generateForMode } from '../../core/generators/index.ts';
 import { evaluate, weaknesses, levelFor } from '../../core/scoring.ts';
 import { getMethod } from '../../core/methods.ts';
+import { renderExhibit } from '../../ui/exhibit.ts';
 import { modeName } from '../../core/modes.ts';
 import { getAttempts, getSessions, getSettings, addAttempt, getReviews, setReviews } from '../../data/storage.ts';
 import { dailyTasks } from '../../core/daily.ts';
@@ -255,6 +256,7 @@ export function renderTrain(modeIn: Mode, { n: nOverride = null, intro = false, 
       notice && ctx.index === 0 ? h('p', { class: 'train-notice' }, notice) : null,
       h('p', { class: 'train-cat' }, `${cat ? cat.name : task.category} · ${sub ? sub.name : task.subtype}`),
       precise ? h('p', { class: 'train-meta num' }, `${LEVEL_NAMES[task.level] ?? LEVEL_NAMES[2]} · ${t('common.pointsValue', { n: ctx.points })}`) : null,
+      renderExhibit(task.params),
       h('h1', { class: long ? 'train-q is-long' : 'train-q num' }, task.prompt),
       taskEst ? h('p', { class: 'train-pill' }, t('train.estimateHint')) : null,
       hint ? h('p', { class: 'train-hint' }, hint) : null,
@@ -359,7 +361,7 @@ export function renderTrain(modeIn: Mode, { n: nOverride = null, intro = false, 
       h('div', { class: 'stage is-start train-intro' },
         largeTitle(sub ? sub.name : subId, cat?.name),
         methodBlock(method),
-        exSteps.length ? group(t('train.example', { prompt: ex.prompt }), card([steps(exSteps)])) : null),
+        exSteps.length ? group(t('train.example', { prompt: ex.prompt }), card([renderExhibit(ex.params), steps(exSteps)])) : null),
       introDock);
     start.focus({ preventScroll: true });
   }

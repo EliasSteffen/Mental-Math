@@ -1,6 +1,7 @@
-// Lösungswege fürs Kopfrechnen: solutionSteps(task) → string[] (3–6 kurze deutsche Schritte)
+// Lösungswege fürs Kopfrechnen: solutionSteps(task) → string[] (3–6 kurze Schritte in der UI-Sprache, Texte im Namespace 'sol')
 import type { Task } from '../../types.ts';
 import type { SP, StepFn } from './helpers.ts';
+import { tableSteps } from './table.ts';
 import { multSteps } from './mult.ts';
 import { divSteps } from './div.ts';
 import { bigSteps } from './big.ts';
@@ -12,10 +13,11 @@ import { estSteps } from './est.ts';
 import { unitsSteps } from './units.ts';
 import { magSteps } from './mag.ts';
 import { tricksSteps } from './tricks.ts';
+import { exhibitSteps } from './exhibit.ts';
 import { customSteps } from './custom.ts';
 
 const S: Record<string, StepFn> = {
-  ...multSteps, ...divSteps, ...bigSteps, ...pctSteps, ...fracSteps, ...growthSteps, ...bizSteps, ...estSteps, ...unitsSteps, ...magSteps, ...tricksSteps, ...customSteps,
+  ...tableSteps, ...multSteps, ...divSteps, ...bigSteps, ...pctSteps, ...fracSteps, ...growthSteps, ...bizSteps, ...estSteps, ...unitsSteps, ...magSteps, ...tricksSteps, ...exhibitSteps, ...customSteps,
 };
 
 export function solutionSteps(task: Task | null | undefined): string[] {

@@ -3,7 +3,7 @@ import type {
   Activity, ApmPoint, Attempt, CategoryId, DailyPoint, HeatCell, Mode, PersonalBest, Recommendation, Reviews, Session, StreakInfo, XpInfo,
 } from '../types.ts';
 import { t } from '../i18n/index.ts';
-import { SUBTYPES, activeCategories } from './catalog.ts';
+import { SUBTYPES, activeCategories, mixCategories } from './catalog.ts';
 import { weaknesses } from './scoring.ts';
 import { dueReviews } from './review.ts';
 
@@ -129,7 +129,8 @@ export function recommendation(
     };
   }
   const seen = new Set((attempts || []).map((a) => a.subtype));
-  for (const c of cats) {
+  // Neues nur aus den Kategorien gemischter Runden vorschlagen (keine Drills wie das 1×1)
+  for (const c of mixCategories(enabledCategories)) {
     const s = Object.values(SUBTYPES).find((x) => x.category === c.id && !seen.has(x.id));
     if (s) return { kind: 'new', mode: s.id, subtype: s.id, title: s.name, reason: t('core.rec.new.reason') };
   }

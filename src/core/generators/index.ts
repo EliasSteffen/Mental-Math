@@ -2,8 +2,9 @@
 import type { CategoryId, CustomRange, GenerateOptions, Level, Mode, SubtypeId, Task } from '../../types.ts';
 import { round, pick } from '../numbers.ts';
 import type { Rng } from '../numbers.ts';
-import { CATEGORIES, SUBTYPES, LEVEL_WEIGHT, activeCategories } from '../catalog.ts';
+import { CATEGORIES, SUBTYPES, LEVEL_WEIGHT, activeCategories, mixCategories } from '../catalog.ts';
 import type { Gen } from './helpers.ts';
+import { tableGen } from './table.ts';
 import { multGen } from './mult.ts';
 import { divGen } from './div.ts';
 import { bigGen } from './big.ts';
@@ -15,13 +16,14 @@ import { estGen } from './est.ts';
 import { unitsGen } from './units.ts';
 import { magGen } from './mag.ts';
 import { tricksGen } from './tricks.ts';
+import { exhibitGen } from './exhibit.ts';
 import { customTask } from './custom.ts';
 
 export { parseU, uMul, uDiv, uInv, uMap, uStr, uRaw, p10 } from '../units.ts';
-export { CATEGORIES, SUBTYPES, LEVEL_NAMES, LEVEL_WEIGHT, activeCategories } from '../catalog.ts';
+export { CATEGORIES, SUBTYPES, LEVEL_NAMES, LEVEL_WEIGHT, activeCategories, mixCategories } from '../catalog.ts';
 
 const GEN: Record<string, Gen> = {
-  ...multGen, ...divGen, ...bigGen, ...pctGen, ...fracGen, ...growthGen, ...bizGen, ...estGen, ...unitsGen, ...magGen, ...tricksGen,
+  ...tableGen, ...multGen, ...divGen, ...bigGen, ...pctGen, ...fracGen, ...growthGen, ...bizGen, ...estGen, ...unitsGen, ...magGen, ...tricksGen, ...exhibitGen,
 };
 
 const LEVEL_TIME: Record<Level, number> = { 1: 1, 2: 1, 3: 1.3 };
@@ -58,7 +60,8 @@ export function generateForMode(
 ): Task {
   const cats = activeCategories(enabledCategories);
   const catIds = new Set<string>(cats.map((c) => c.id));
-  const any = (): SubtypeId => pick(subtypesOf(pick(cats, rng).id), rng);
+  const mix = mixCategories(enabledCategories);
+  const any = (): SubtypeId => pick(subtypesOf(pick(mix, rng).id), rng);
   const filtered = (list: ModeContext['weakSubtypes']): string[] =>
     (list || []).map(idOf).filter((w): w is string => {
       const s = w === undefined ? undefined : SUBTYPES[w];

@@ -264,3 +264,38 @@ test('12: Benutzername wird normalisiert; doppelte Namen sind erlaubt', async ()
   assert.notEqual(a.user.id, b.user.id);
   assert.equal(s.store.snapshot().users, 2);
 });
+
+test('13: register liefert Wiederherstellungscode; recover auf neuem Gerät legt Passkey an und ersetzt den Code', async () => {
+  const s = await setup();
+  const reg = await s.auth.register('Anna');
+  assert.match(reg.recoveryCode ?? '', /^[0-9A-HJKMNP-TV-Z]{5}(-[0-9A-HJKMNP-TV-Z]{5}){3}$/);
+  assert.equal((s.auth.getSession() as { recoveryCode?: string } | null)?.recoveryCode, undefined, 'Code nicht in der Session');
+  await s.auth.logout();
+  s.ctl.soft = createSoftAuthenticator({ origin: ORIGIN }); // neues Gerät, alter Passkey ist weg
+  const rec = await s.auth.recover((reg.recoveryCode ?? '').toLowerCase().replace(/-/g, ' '));
+  assert.equal(rec.user.id, reg.user.id);
+  assert.ok(rec.recoveryCode && rec.recoveryCode !== reg.recoveryCode, 'neuer Code nach Benutzung');
+  assert.equal(s.store.snapshot().passkeys, 2);
+  await s.auth.logout();
+  assert.equal((await s.auth.login()).user.id, reg.user.id, 'Login mit dem neuen Passkey');
+  await s.auth.logout();
+  await rejectsWith(s.auth.recover(reg.recoveryCode ?? ''), 'invalid_recovery_code');
+});
+
+test('14: recover mit ungültigem Code; Code neu erzeugen macht den alten ungültig; Status nur angemeldet', async () => {
+  const s = await setup();
+  await rejectsWith(s.auth.recover('nope'), 'invalid_recovery_code');
+  await rejectsWith(s.auth.recover('ABCDE-FGHJK-MNPQR-STVWX'), 'invalid_recovery_code');
+  const reg = await s.auth.register('Ben');
+  const st = await s.auth.recoveryStatus();
+  assert.equal(st.exists, true);
+  assert.equal(st.createdAt, new Date(s.clock.t).toISOString());
+  const fresh = await s.auth.createRecoveryCode();
+  assert.notEqual(fresh, reg.recoveryCode);
+  await s.auth.logout();
+  await rejectsWith(s.auth.recoveryStatus(), 'unauthorized');
+  await rejectsWith(s.auth.createRecoveryCode(), 'unauthorized');
+  await rejectsWith(s.auth.recover(reg.recoveryCode ?? ''), 'invalid_recovery_code');
+  s.ctl.soft = createSoftAuthenticator({ origin: ORIGIN });
+  assert.equal((await s.auth.recover(fresh)).user.id, reg.user.id);
+});

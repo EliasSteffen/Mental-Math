@@ -49,7 +49,7 @@ const firstRow = (data: unknown): Row | null => {
   return isRow(r) ? r : null;
 };
 
-const isPurpose = (v: string): v is ChallengePurpose => v === 'register' || v === 'login' || v === 'add';
+const isPurpose = (v: string): v is ChallengePurpose => v === 'register' || v === 'login' || v === 'add' || v === 'recover';
 
 export function createSupabaseAuthStore(admin: SupabaseClient): AuthStore {
   const pkParams = (pk: NewPasskey) => ({
@@ -180,6 +180,34 @@ export function createSupabaseAuthStore(admin: SupabaseClient): AuthStore {
     async deleteSession(tokenHash) {
       const { error } = await admin.from('auth_sessions').delete().eq('token_hash', tokenHash);
       if (error) fail(error, 'deleteSession');
+    },
+
+    // Wiederherstellungscodes (sql/003_recovery_codes.sql)
+    async setRecoveryCode(userId, codeHash) {
+      const { error } = await admin.rpc('pa_set_recovery_code', { p_user_id: userId, p_code_hash: codeHash });
+      if (error) fail(error, 'setRecoveryCode');
+    },
+
+    async findRecoveryUser(codeHash) {
+      const { data, error } = await admin
+        .from('auth_recovery')
+        .select('user_id, users(username)')
+        .eq('code_hash', codeHash)
+        .maybeSingle();
+      if (error) fail(error, 'findRecoveryUser');
+      if (data === null || data === undefined) return null;
+      if (!isRow(data)) throw new Error('supabase: bad row');
+      const u: unknown = Array.isArray(data.users) ? data.users[0] : data.users;
+      if (!isRow(u)) throw new Error('supabase: bad row: users');
+      return { id: str(data, 'user_id'), username: str(u, 'username') };
+    },
+
+    async getRecoveryInfo(userId) {
+      const { data, error } = await admin.from('auth_recovery').select('created_at').eq('user_id', userId).maybeSingle();
+      if (error) fail(error, 'getRecoveryInfo');
+      if (data === null || data === undefined) return null;
+      if (!isRow(data)) throw new Error('supabase: bad row');
+      return { createdAt: Date.parse(str(data, 'created_at')) };
     },
   };
 }

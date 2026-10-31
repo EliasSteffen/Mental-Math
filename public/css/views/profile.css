@@ -119,6 +119,22 @@
   .prof-confirm-text { font-size:var(--text-sm); line-height:1.5; }
   .prof-sheet-actions { display:flex; flex-direction:column; gap:var(--space-2); margin-top:var(--space-3); }
 
+  /* Wiederherstellungscode: Status im Konto-Sheet, „Passkey verloren?“, einmalige Anzeige im Dialog */
+  .prof-recovery { display:flex; flex-direction:column; gap:var(--space-2); min-width:0; }
+  .prof-warn { color:var(--warn); }
+  .prof-code {
+    display:block; padding:var(--space-3); border:1px dashed var(--border); border-radius:var(--radius-key);
+    background:var(--surface-2); color:var(--text);
+    font:var(--weight-semibold) var(--text-md)/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+    letter-spacing:0.04em; text-align:center; word-break:break-all; user-select:all;
+  }
+  .prof-lost > summary {
+    display:flex; align-items:center; min-height:var(--hit-min); cursor:pointer;
+    font-size:var(--text-sm); color:var(--muted); list-style:none;
+  }
+  .prof-lost > summary::-webkit-details-marker { display:none; }
+  .prof-lost[open] > summary { color:var(--text); }
+
   @media (hover: hover) {
     button.prof-acct:hover { background-color:var(--press); }
   }

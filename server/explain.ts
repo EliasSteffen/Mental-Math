@@ -2,6 +2,10 @@
 import { SUBTYPES, CATEGORIES } from '../src/core/catalog.ts';
 import { getMethod } from '../src/core/methods.ts';
 import type { Params, ParamValue } from '../src/types.ts';
+import { locale } from '../src/i18n/index.ts';
+import type { Lang } from '../src/i18n/index.ts';
+import { durableLimiter, memoryLimiter } from './rate-limit.ts';
+import type { DoNamespace, RateLimiter } from './rate-limit.ts';
 
 const DEFAULT_MODEL = 'gemini-flash-lite-latest';
 const MAX_BODY = 4000;
@@ -10,7 +14,7 @@ const JSON_HEADERS: Record<string, string> = {
   'Cache-Control': 'no-store',
 };
 
-export interface ExplainMethodValue { kind: 'method'; subtype: string }
+export interface ExplainMethodValue { kind: 'method'; subtype: string; lang?: Lang }
 export interface ExplainTaskValue {
   kind: 'task';
   subtype: string;
@@ -19,11 +23,13 @@ export interface ExplainTaskValue {
   expected: number;
   unit: string;
   given: number | null;
+  /** Antwortsprache der KI (Standard: de) */
+  lang?: Lang;
 }
 export type ExplainValue = ExplainMethodValue | ExplainTaskValue;
 export type ExplainValidation = { ok: true; value: ExplainValue } | { ok: false; error: 'invalid' };
 
-export interface ExplainEnv { GOOGLE_API_KEY?: string; GEMINI_MODEL?: string }
+export interface ExplainEnv { GOOGLE_API_KEY?: string; GEMINI_MODEL?: string; RATE_LIMITER?: DoNamespace }
 export type FetchImpl = (input: string, init?: RequestInit) => Promise<Response>;
 export interface ExplainDeps { fetchImpl?: FetchImpl; now?: () => number }
 
@@ -37,7 +43,9 @@ export function validateExplainRequest(body: unknown): ExplainValidation {
   const { kind, subtype } = b;
   if (kind !== 'task' && kind !== 'method') return INVALID;
   if (typeof subtype !== 'string' || !Object.prototype.hasOwnProperty.call(SUBTYPES, subtype)) return INVALID;
-  if (kind === 'method') return { ok: true, value: { kind, subtype } };
+  const lang = b['lang'] === undefined ? 'de' : b['lang'];
+  if (lang !== 'de' && lang !== 'en') return INVALID;
+  if (kind === 'method') return { ok: true, value: { kind, subtype, lang } };
 
   const { prompt, params, expected, unit, given } = b;
   if (!isStr(prompt, 160) || prompt.length === 0) return INVALID;
@@ -58,56 +66,76 @@ export function validateExplainRequest(body: unknown): ExplainValidation {
     if (!(isNum(v) || isStr(v, 40))) return INVALID;
     cleanParams[k] = v;
   }
-  return { ok: true, value: { kind, subtype, prompt, params: cleanParams, expected, unit: u, given: g } };
+  return { ok: true, value: { kind, subtype, prompt, params: cleanParams, expected, unit: u, given: g, lang } };
 }
 
-const nf = new Intl.NumberFormat('de-DE', { maximumFractionDigits: 4 });
-const num = (x: number): string => nf.format(x);
+// Prompt-Texte je Sprache: Anweisungen ans Modell und Beschriftungen der Aufgabendaten
+const PROMPT: Record<Lang, Record<'coach' | 'steps' | 'format' | 'close' | 'task' | 'method' | 'type' | 'cat' | 'ask' | 'choice'
+  | 'right' | 'wrong' | 'params' | 'general' | 'pref' | 'idea' | 'stepsL' | 'trick', string>> = {
+  de: {
+    coach: 'Du bist ein Mathe-Coach für Consulting-Case-Interviews.',
+    steps: 'Erkläre den Rechenweg fürs Kopfrechnen mit den konkreten Zahlen, in nummerierten Schritten.',
+    format: 'Nutze deutsches Zahlenformat (Punkt als Tausendertrenner, Komma als Dezimaltrenner), kein LaTeX, keine Überschriften.',
+    close: 'Schließe mit einem kurzen Plausibilitätscheck und einem Merksatz.',
+    task: 'Antworte mit höchstens 120 Wörtern. Wenn die Antwort des Nutzers falsch war, nenne zuerst kurz den wahrscheinlichen Denkfehler (z. B. einen Nullen-Fehler).',
+    method: 'Antworte mit höchstens 180 Wörtern, für jemanden, dem dieser Aufgabentyp schwerfällt, und gib 2 eigene Mini-Beispiele.',
+    type: 'Aufgabentyp', cat: 'Kategorie', ask: 'Aufgabe', choice: 'Auswahl-Aufgabe mit den Optionen', right: 'Richtige Antwort',
+    wrong: 'Antwort des Nutzers (falsch)', params: 'Parameter', general: 'Erkläre die Methode für diesen Aufgabentyp allgemein.',
+    pref: 'Bevorzugte Methode der App (bitte darauf aufbauen):', idea: 'Idee', stepsL: 'Schritte', trick: 'Trick',
+  },
+  en: {
+    coach: 'You are a maths coach for consulting case interviews.',
+    steps: 'Explain the mental-maths solution with the concrete numbers, in numbered steps.',
+    format: 'Answer in English. Use English number format (comma as thousands separator, point as decimal separator), no LaTeX, no headings.',
+    close: 'Finish with a short sanity check and a one-line takeaway.',
+    task: 'Answer in at most 120 words. If the user’s answer was wrong, first briefly name the likely mistake (e.g. a zeros error).',
+    method: 'Answer in at most 180 words, for someone who finds this task type hard, and give 2 mini examples of your own.',
+    type: 'Task type', cat: 'Category', ask: 'Task', choice: 'Multiple-choice task with the options', right: 'Correct answer',
+    wrong: 'User’s answer (wrong)', params: 'Parameters', general: 'Explain the method for this task type in general.',
+    pref: 'The app’s preferred method (please build on it):', idea: 'Idea', stepsL: 'Steps', trick: 'Trick',
+  },
+};
 
 export function buildPrompt(value: ExplainValue): { system: string; user: string } {
   const sub = SUBTYPES[value.subtype];
   if (!sub) throw new Error(`unknown subtype ${value.subtype}`);
   const cat = CATEGORIES.find((c) => c.id === sub.category);
-  const method = getMethod(value.subtype);
-  const system = [
-    'Du bist ein Mathe-Coach für Consulting-Case-Interviews.',
-    'Erkläre den Rechenweg fürs Kopfrechnen mit den konkreten Zahlen, in nummerierten Schritten.',
-    'Nutze deutsches Zahlenformat (Punkt als Tausendertrenner, Komma als Dezimaltrenner), kein LaTeX, keine Überschriften.',
-    'Schließe mit einem kurzen Plausibilitätscheck und einem Merksatz.',
-    value.kind === 'task'
-      ? 'Antworte mit höchstens 120 Wörtern. Wenn die Antwort des Nutzers falsch war, nenne zuerst kurz den wahrscheinlichen Denkfehler (z. B. einen Nullen-Fehler).'
-      : 'Antworte mit höchstens 180 Wörtern, für jemanden, dem dieser Aufgabentyp schwerfällt, und gib 2 eigene Mini-Beispiele.',
-  ].join('\n');
+  const lang: Lang = value.lang === 'en' ? 'en' : 'de';
+  const L = PROMPT[lang];
+  const nf = new Intl.NumberFormat(locale(lang), { maximumFractionDigits: 4 });
+  const num = (x: number): string => nf.format(x);
+  const method = getMethod(value.subtype, lang);
+  const system = [L.coach, L.steps, L.format, L.close, value.kind === 'task' ? L.task : L.method].join('\n');
 
-  const lines = [`Aufgabentyp: ${sub.name}`, `Kategorie: ${cat ? cat.name : sub.category}`];
+  const lines = [`${L.type}: ${sub.name}`, `${L.cat}: ${cat ? cat.name : sub.category}`];
   if (value.kind === 'task') {
-    lines.push(`Aufgabe: ${value.prompt}`);
+    lines.push(`${L.ask}: ${value.prompt}`);
     const p: Params = value.params || {};
     const opts = [0, 1, 2, 3].map((i) => p['c' + i]).filter((x): x is string => typeof x === 'string');
     const isChoice = typeof p['c0'] === 'string';
     const unit = value.unit ? ' ' + value.unit : '';
     if (isChoice) {
-      lines.push('Auswahl-Aufgabe mit den Optionen: ' + opts.map((o, i) => `${i + 1}) ${o}`).join(' | '));
-      lines.push(`Richtige Antwort: ${opts[value.expected] ?? num(value.expected)}`);
+      lines.push(`${L.choice}: ` + opts.map((o, i) => `${i + 1}) ${o}`).join(' | '));
+      lines.push(`${L.right}: ${opts[value.expected] ?? num(value.expected)}`);
       if (value.given !== null && value.given !== undefined) {
-        lines.push(`Antwort des Nutzers (falsch): ${opts[value.given] ?? num(value.given)}`);
+        lines.push(`${L.wrong}: ${opts[value.given] ?? num(value.given)}`);
       }
     } else {
-      lines.push(`Richtige Antwort: ${num(value.expected)}${unit}`);
+      lines.push(`${L.right}: ${num(value.expected)}${unit}`);
       if (value.given !== null && value.given !== undefined) {
-        lines.push(`Antwort des Nutzers (falsch): ${num(value.given)}${unit}`);
+        lines.push(`${L.wrong}: ${num(value.given)}${unit}`);
       }
     }
     const entries = Object.entries(p).filter(([k]) => !(isChoice && /^c[0-3]$/.test(k)));
-    if (entries.length) lines.push('Parameter: ' + entries.map(([k, v]: [string, ParamValue]) => `${k}=${v}`).join(', '));
+    if (entries.length) lines.push(`${L.params}: ` + entries.map(([k, v]: [string, ParamValue]) => `${k}=${v}`).join(', '));
   } else {
-    lines.push('Erkläre die Methode für diesen Aufgabentyp allgemein.');
+    lines.push(L.general);
   }
   if (method) {
-    lines.push('Bevorzugte Methode der App (bitte darauf aufbauen):');
-    lines.push(`Idee: ${method.idea}`);
-    if (Array.isArray(method.steps)) lines.push('Schritte: ' + method.steps.join(' | '));
-    if (method.trick) lines.push(`Trick: ${method.trick}`);
+    lines.push(L.pref);
+    lines.push(`${L.idea}: ${method.idea}`);
+    if (Array.isArray(method.steps)) lines.push(`${L.stepsL}: ` + method.steps.join(' | '));
+    if (method.trick) lines.push(`${L.trick}: ${method.trick}`);
   }
   return { system, user: lines.join('\n') };
 }
@@ -160,35 +188,12 @@ export async function callGemini(args: {
   return { text, model };
 }
 
-// ---- Rate-Limit (best effort, pro Isolate) ----
-const ipHits = new Map<string, number[]>(); // ip -> Zeitstempel (letzte 24 h)
-let globalHits: number[] = [];
+// ---- Rate-Limit: global per Durable Object (Binding RATE_LIMITER), sonst pro Isolate ----
+const memory = memoryLimiter();
 export function _resetRateLimits(): void {
-  ipHits.clear();
-  globalHits = [];
+  memory.reset();
 }
-
-function rateLimited(ip: string, t: number): boolean {
-  const DAY = 86400000;
-  const MIN = 60000;
-  globalHits = globalHits.filter((x) => t - x < MIN);
-  const arr = (ipHits.get(ip) || []).filter((x) => t - x < DAY);
-  const lastMin = arr.filter((x) => t - x < MIN).length;
-  if (globalHits.length >= 60 || lastMin >= 15 || arr.length >= 200) {
-    ipHits.set(ip, arr);
-    return true;
-  }
-  arr.push(t);
-  globalHits.push(t);
-  ipHits.set(ip, arr);
-  if (ipHits.size > 5000) {
-    for (const [k, v] of ipHits) {
-      const last = v[v.length - 1];
-      if (last === undefined || t - last >= DAY) ipHits.delete(k);
-    }
-  }
-  return false;
-}
+const limiterFor = (env: ExplainEnv): RateLimiter => (env.RATE_LIMITER ? durableLimiter(env.RATE_LIMITER, memory) : memory);
 
 const json = (status: number, obj: unknown): Response =>
   new Response(JSON.stringify(obj), { status, headers: JSON_HEADERS });
@@ -217,7 +222,7 @@ export async function handleExplain(
   if (!originOk(request)) return json(403, { error: 'forbidden' });
 
   const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
-  if (rateLimited(ip, now())) return json(429, { error: 'rate_limited' });
+  if (await limiterFor(env).limited(ip, now())) return json(429, { error: 'rate_limited' });
 
   let raw: string;
   try {

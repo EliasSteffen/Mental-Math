@@ -16,7 +16,7 @@ const MAX_BODY = 16384;
 const STATUS: Record<AuthErrorCode, number> = {
   invalid_username: 400, invalid_request: 400, challenge_expired: 400, verification_failed: 400,
   unknown_credential: 400, unauthorized: 401, last_passkey: 409, rate_limited: 429,
-  not_supported: 400, cancelled: 400, network: 400, server_error: 500, already_registered: 409,
+  not_supported: 400, cancelled: 400, network: 400, server_error: 500, already_registered: 409, invalid_recovery_code: 400,
 };
 
 function respond(r: Reply): Response {

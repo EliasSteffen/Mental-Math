@@ -1,5 +1,5 @@
 // Konto per Passkey: Zustand + lazy geladenes Auth-Modul (src/vendor/auth.ts wird erst bei Bedarf importiert).
-import type { AccountApi, AuthErrorCode, AuthSession, AuthUser, PasskeyAuthClient, PasskeyInfo, SupportInfo } from '../vendor/auth.ts';
+import type { AccountApi, AuthErrorCode, AuthSession, AuthUser, PasskeyAuthClient, PasskeyInfo, RecoveryStatus, SupportInfo } from '../vendor/auth.ts';
 import type { RemoteSyncProvider, SupabaseSyncSchema } from 'offline-sync';
 import { APP_SUPABASE_SCHEMA } from '../data/remote/supabase-schema.ts';
 import { PUBLIC_CONFIG } from '../generated/public-config.ts';
@@ -22,7 +22,7 @@ const HINT_KEY = 'mm:v3:auth.hint';
 const CODES: readonly AuthErrorCode[] = [
   'invalid_username', 'invalid_request', 'challenge_expired', 'verification_failed',
   'unknown_credential', 'unauthorized', 'last_passkey', 'rate_limited',
-  'not_supported', 'cancelled', 'network', 'server_error', 'already_registered',
+  'not_supported', 'cancelled', 'network', 'server_error', 'already_registered', 'invalid_recovery_code',
 ];
 
 let configGetter: () => { supabaseUrl: string; supabaseKey: string } = () => PUBLIC_CONFIG;
@@ -102,7 +102,20 @@ export async function createSyncProvider(): Promise<RemoteSyncProvider | null> {
 }
 
 export async function support(): Promise<SupportInfo> { return (await load()).auth.support(); }
-export async function register(username: string): Promise<void> { onSession(await (await load()).auth.register(username)); }
+/** Konto anlegen; liefert den einmalig sichtbaren Wiederherstellungscode (null, wenn der Server keinen speichern konnte). */
+export async function register(username: string): Promise<string | null> {
+  const s = await (await load()).auth.register(username);
+  onSession(s);
+  return s.recoveryCode ?? null;
+}
+/** Alle Passkeys verloren: mit dem Code einen neuen Passkey anlegen und anmelden; liefert den neuen Code. */
+export async function recover(code: string): Promise<string | null> {
+  const s = await (await load()).auth.recover(code);
+  onSession(s);
+  return s.recoveryCode ?? null;
+}
+export async function createRecoveryCode(): Promise<string> { return (await load()).auth.createRecoveryCode(); }
+export async function recoveryStatus(): Promise<RecoveryStatus> { return (await load()).auth.recoveryStatus(); }
 export async function login(): Promise<void> { onSession(await (await load()).auth.login()); }
 export async function addPasskey(): Promise<void> { await (await load()).auth.addPasskey(); }
 export async function logout(): Promise<void> { await (await load()).auth.logout(); onSession(null); }

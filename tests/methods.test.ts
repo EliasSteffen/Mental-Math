@@ -2,12 +2,14 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { METHODS, getMethod } from '../src/core/methods.ts';
 import { SUBTYPES } from '../src/core/generators/index.ts';
+import { methods as en } from '../src/i18n/locales/en/methods.ts';
+import { setLang } from '../src/i18n/index.ts';
 
 const filled = (s: unknown): boolean => typeof s === 'string' && s.trim().length > 0;
 
 test('jeder Subtyp hat eine Methode, keine überzähligen Schlüssel', () => {
   const ids = Object.keys(SUBTYPES).sort();
-  assert.equal(ids.length, 45);
+  assert.equal(ids.length, 51);
   assert.deepEqual(Object.keys(METHODS).sort(), ids);
 });
 
@@ -26,4 +28,24 @@ test('getMethod liefert Methode oder null', () => {
   assert.equal(getMethod('pct.reverse'), METHODS['pct.reverse']);
   assert.equal(getMethod('gibt.es.nicht'), null);
   assert.equal(getMethod(undefined as unknown as string), null);
+});
+
+test('englische Methoden: gleiche Schlüssel, vollständig, ohne deutsche Reste', () => {
+  assert.deepEqual(Object.keys(en).sort(), Object.keys(METHODS).sort());
+  const german = /\b(und|oder|nicht|der|das|mit|Mio\.|Mrd\.|Tsd\.)\b/;
+  for (const [id, m] of Object.entries(en)) {
+    assert.ok(filled(m.idea) && filled(m.trick), id);
+    assert.ok(m.steps.length >= 3 && m.steps.length <= 5 && m.steps.every(filled), `${id}: steps`);
+    assert.ok(m.pitfalls.length >= 1 && m.pitfalls.length <= 3 && m.pitfalls.every(filled), `${id}: pitfalls`);
+    for (const text of [m.idea, m.trick, ...m.steps, ...m.pitfalls]) assert.ok(!german.test(text), `${id}: deutscher Rest in "${text}"`);
+  }
+});
+
+test('getMethod folgt der UI-Sprache, explizite Sprache und Fallback', () => {
+  setLang('en');
+  assert.equal(getMethod('pct.reverse'), en['pct.reverse']);
+  assert.equal(getMethod('pct.reverse', 'de'), METHODS['pct.reverse']);
+  setLang('de');
+  assert.equal(getMethod('pct.reverse', 'en'), en['pct.reverse']);
+  assert.equal(getMethod('gibt.es.nicht', 'en'), null);
 });

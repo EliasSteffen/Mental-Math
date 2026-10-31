@@ -1,4 +1,5 @@
 // Lösungswege fürs Eigene Training (Zerlegen)
+import { t } from '../../i18n/index.ts';
 import { fmt } from '../numbers.ts';
 import type { SP, StepFn } from './helpers.ts';
 import { strip } from './helpers.ts';
@@ -20,8 +21,8 @@ export const customSteps: Record<string, StepFn> = {
     const x = Math.max(a, b), y = Math.min(a, b);
     if (x < 10) {
       return [
-        `${a} × ${b} aus dem Einmaleins`,
-        `Stütze: ${a} × ${b} = ${a} × 10 − ${a} × ${10 - b} = ${a * 10} − ${a * (10 - b)}`,
+        t('sol.cu.table', { a, b }),
+        t('sol.cu.prop', { a, b, c: 10 - b, x: a * 10, y: a * (10 - b) }),
         `${a} × ${b} = ${fmt(res)}`,
       ];
     }
@@ -29,15 +30,15 @@ export const customSteps: Record<string, StepFn> = {
     if (parts.length === 1) {
       const { m, z } = strip(x);
       return [
-        `${fmt(x)} × ${y}: zuerst ohne die Nullen rechnen`,
+        t('sol.cu.noZeros', { x: fmt(x), y }),
         `${m} × ${y} = ${fmt(m * y)}`,
-        `${z} ${z === 1 ? 'Null' : 'Nullen'} anhängen → ${fmt(res)}`,
+        t(z === 1 ? 'sol.cu.zeros1' : 'sol.cu.zerosN', { z, res: fmt(res) }),
       ];
     }
     return [
-      `Zerlege ${fmt(x)} in ${parts.map((p) => fmt(p)).join(' + ')}`,
-      `Teilprodukte: ${parts.map((p) => `${fmt(p)} × ${y} = ${fmt(p * y)}`).join(', ')}`,
-      `Addieren: ${parts.map((p) => fmt(p * y)).join(' + ')}`,
+      t('sol.cu.split', { x: fmt(x), parts: parts.map((p) => fmt(p)).join(' + ') }),
+      t('sol.cu.parts', { list: parts.map((p) => `${fmt(p)} × ${y} = ${fmt(p * y)}`).join(', ') }),
+      t('sol.cu.add', { list: parts.map((p) => fmt(p * y)).join(' + ') }),
       `${fmt(a)} × ${fmt(b)} = ${fmt(res)}`,
     ];
   },
@@ -47,20 +48,20 @@ export const customSteps: Record<string, StepFn> = {
     if (n < 10) {
       return [
         `${n}² = ${n} × ${n}`,
-        `Stütze: ${n} × ${n} = ${n} × 10 − ${n} × ${10 - n} = ${n * 10} − ${n * (10 - n)}`,
+        t('sol.cu.prop', { a: n, b: n, c: 10 - n, x: n * 10, y: n * (10 - n) }),
         `${n}² = ${fmt(res)}`,
       ];
     }
     if (n % 10 === 0) {
       return [
-        `${n} = ${n / 10} × 10, also ${n}² = ${n / 10}² × 100`,
+        t('sol.cu.sq10', { n, m: n / 10 }),
         `${n / 10}² = ${fmt((n / 10) ** 2)}`,
         `${fmt((n / 10) ** 2)} × 100 = ${fmt(res)}`,
       ];
     }
     const down = n % 10 <= 5, k = down ? n % 10 : 10 - (n % 10), r = down ? n - k : n + k, o = down ? n + k : n - k;
     return [
-      `Zum nächsten Zehner: ${n} ist ${k} ${down ? 'über' : 'unter'} ${r}`,
+      t(down ? 'sol.cu.nearAbove' : 'sol.cu.nearBelow', { n, k, r }),
       `${n}² = ${r} × ${o} + ${k}²`,
       `${r} × ${o} = ${fmt(r * o)}, ${k}² = ${k * k}`,
       `${fmt(r * o)} + ${k * k} = ${fmt(res)}`,

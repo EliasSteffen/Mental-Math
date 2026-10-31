@@ -24,7 +24,7 @@ function dispNum(a: number, p: number, style: Style): string {
 }
 
 type Fact = [label: string, value: string, a: number, n: number, level: number];
-const FACTS: Fact[] = [
+export const FACTS: Fact[] = [
   ['Einwohner Deutschland', '84 Mio.', 8.4, 7, 1], ['Sekunden pro Tag', '86.400', 8.64, 4, 1],
   ['Stunden pro Jahr', '8.760', 8.76, 3, 1], ['Tage pro Jahr', '365', 3.65, 2, 1],
   ['Einwohner Welt', '8,2 Mrd.', 8.2, 9, 1], ['Minuten pro Tag', '1.440', 1.44, 3, 1],

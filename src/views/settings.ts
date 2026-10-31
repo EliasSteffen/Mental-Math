@@ -6,7 +6,7 @@ import { getSettings, setSettings, resetAll, exportJSON, getAttempts, getSession
 import { importJSON } from '../data/transfer.ts';
 import { applyTheme, THEMES, themeLabel } from '../ui/theme.ts';
 import { toast } from '../ui/toast.ts';
-import { confirmDialog } from '../ui/modal.ts';
+import { confirmDialog, openModal } from '../ui/modal.ts';
 import { openChangelog, fmtIsoDate } from '../features/whats-new.ts';
 import { BUILD_INFO } from '../generated/build-info.ts';
 import { detectLang, setLang, t } from '../i18n/index.ts';
@@ -16,7 +16,7 @@ import { app, h, appendChildren, type Child } from '../ui/dom.ts';
 import { rerender, addCleanup } from '../router.ts';
 import { button, group, icon, largeTitle, list, row, segmented, stepper, switchRow, type SwitchControl } from '../ui/kit.ts';
 import { openSheet, type SheetHandle } from '../ui/sheet.ts';
-import type { PasskeyInfo } from '../vendor/auth.ts';
+import type { PasskeyInfo, RecoveryStatus } from '../vendor/auth.ts';
 import * as acct from '../features/account.ts';
 import { getSyncStatus, onSyncStatus, syncNow, syncStatusEntries, wipeCloudData } from '../features/sync.ts';
 
@@ -449,6 +449,53 @@ function confirmStrip(text: string, confirmLabel: string, onConfirm: (btn: HTMLB
 
 const subhead = (text: string): HTMLElement => h('h3', { class: 'prof-subhead' }, text);
 
+/** Zeigt einen neuen Wiederherstellungscode einmalig an: Kopieren + Bestätigen (Top-Layer, auch über dem Sheet). */
+function showRecoveryCode(code: string, replaced = false): void {
+  const copy = (): void => {
+    void navigator.clipboard?.writeText(code).then(
+      () => toast(t('account.recovery.copied'), { kind: 'success' }),
+      () => { /* Zwischenablage gesperrt: der Code lässt sich markieren */ });
+  };
+  openModal({
+    title: t('account.recovery.modalTitle'),
+    body: h('div', { class: 'prof-recovery' },
+      replaced ? h('p', { class: 'prof-sheet-text' }, t('account.recovery.modalUsed')) : null,
+      h('code', { class: 'prof-code' }, code),
+      h('p', { class: 'prof-sheet-text' }, t('account.recovery.modalText'))),
+    actions: [
+      { label: t('account.recovery.copy'), onClick: copy, closes: false },
+      { label: t('account.recovery.done'), primary: true },
+    ],
+  });
+}
+
+/** „Passkey verloren?“: mit dem Wiederherstellungscode einen neuen Passkey anlegen (Format prüft der Client genauer). */
+function recoverForm(busy: (btn: HTMLButtonElement, fn: () => Promise<void>) => Promise<void>, submit: HTMLButtonElement): HTMLElement {
+  const inputId = nextId('recovery');
+  const input: HTMLInputElement = h('input', {
+    class: 'prof-input', id: inputId, type: 'text', maxlength: 40, placeholder: t('account.recovery.placeholder'),
+    autocomplete: 'off', autocapitalize: 'characters', spellcheck: 'false', enterkeyhint: 'go',
+  });
+  const err = h('p', { class: 'prof-err', role: 'alert' });
+  const form: HTMLFormElement = h('form', { class: 'prof-form', novalidate: true },
+    h('p', { class: 'prof-sheet-text' }, t('account.recovery.lostIntro')),
+    h('label', { class: 'prof-field', for: inputId }, t('account.recovery.inputLabel')), input, err, submit);
+  form.addEventListener('submit', (ev) => {
+    ev.preventDefault();
+    const bad = input.value.replace(/[\s-]/g, '').length !== 20;
+    err.textContent = bad ? t('account.recovery.invalidFormat') : '';
+    input.setAttribute('aria-invalid', String(bad));
+    if (bad) { input.focus(); return; }
+    // Erfolg → angemeldet, das Sheet schließt sich; der neue Code erscheint danach im Dialog
+    void busy(submit, async () => {
+      const code = await acct.recover(input.value);
+      toast(t('account.recovery.recovered'), { kind: 'success' });
+      if (code) showRecoveryCode(code, true);
+    });
+  });
+  return h('details', { class: 'prof-lost' }, h('summary', null, t('account.recovery.lost')), form);
+}
+
 /** Sheet-Inhalt abgemeldet: Konto erstellen oder mit Passkey anmelden (bisherige Logik). */
 function signedOutContent(ctx: SheetCtx): Child[] {
   const inputId = nextId('name');
@@ -459,7 +506,8 @@ function signedOutContent(ctx: SheetCtx): Child[] {
   const err = h('p', { class: 'prof-err', role: 'alert' });
   const create = button({ label: t('account.create'), kind: 'primary', full: true, cta: false, type: 'submit' });
   const login = button({ label: t('account.login'), icon: 'key', full: true });
-  const both = [create, login];
+  const recover = button({ label: t('account.recovery.submit'), full: true, type: 'submit' });
+  const both = [create, login, recover];
   const busy = async (btn: HTMLButtonElement, fn: () => Promise<void>): Promise<void> => {
     for (const b of both) b.disabled = true;
     await runBusy(btn, fn, (m) => ctx.say(m, 'bad'));
@@ -476,15 +524,18 @@ function signedOutContent(ctx: SheetCtx): Child[] {
     if (bad) { input.focus(); return; }
     // Erfolg → Kontozustand wechselt, das Sheet schließt sich; der Toast erscheint danach auf der Seite
     void busy(create, async () => {
-      await acct.register(v);
+      const code = await acct.register(v);
       toast(t('account.registered'), { kind: 'success', durationMs: 6000 });
+      if (code) showRecoveryCode(code);
+      else toast(t('account.recovery.missing'), { kind: 'error', durationMs: 8000 });
     });
   });
   login.addEventListener('click', () => {
     void busy(login, async () => { await acct.login(); toast(t('account.loggedIn'), { kind: 'success' }); });
   });
 
-  const controls = h('div', { class: 'prof-signin' }, form, h('p', { class: 'prof-or' }, h('span', null, t('account.or'))), login);
+  const controls = h('div', { class: 'prof-signin' }, form, h('p', { class: 'prof-or' }, h('span', null, t('account.or'))), login,
+    recoverForm(busy, recover));
   void acct.support().then((info) => {
     if (!info.webauthn && controls.isConnected) controls.replaceWith(h('p', { class: 'prof-sheet-text' }, t('account.unsupported')));
   }).catch(() => { /* Button-Aktionen melden Fehler selbst */ });
@@ -498,6 +549,7 @@ function signedInContent(ctx: SheetCtx, username: string): { nodes: Child[]; onU
   let editingId: string | null = null;
   let confirmId: string | null = null;
   let passkeys: PasskeyInfo[] | null = null;
+  let recovery: RecoveryStatus | null = null;
   const onError = (m: string): void => ctx.say(m, 'bad');
 
   // Name
@@ -548,8 +600,13 @@ function signedInContent(ctx: SheetCtx, username: string): { nodes: Child[]; onU
   // Passkeys
   const pkList = h('div', { class: 'list', role: 'list', 'aria-label': t('account.passkeys') });
   const reload = async (): Promise<void> => {
-    try { passkeys = await acct.listPasskeys(); } catch (e) { onError(t(`account.err.${acct.errorCode(e)}`)); passkeys = passkeys ?? []; }
+    const [pk, rs] = await Promise.allSettled([acct.listPasskeys(), acct.recoveryStatus()]);
+    if (pk.status === 'fulfilled') passkeys = pk.value;
+    else { onError(t(`account.err.${acct.errorCode(pk.reason)}`)); passkeys = passkeys ?? []; }
+    // Status unbekannt (z. B. Migration fehlt): wie „kein Code“ behandeln, Erstellen meldet dann den Fehler
+    recovery = rs.status === 'fulfilled' ? rs.value : recovery ?? { exists: false, createdAt: null };
     drawPasskeys();
+    drawRecovery(false);
   };
   const focusPk = (id: string): void => { pkList.querySelector<HTMLElement>(`[data-pk="${CSS.escape(id)}"] button:not(:disabled)`)?.focus(); };
 
@@ -612,6 +669,31 @@ function signedInContent(ctx: SheetCtx, username: string): { nodes: Child[]; onU
     void runBusy(add, async () => { await acct.addPasskey(); ctx.say(t('account.passkeyAdded'), 'good'); await reload(); }, onError);
   });
 
+  // Wiederherstellungscode: Status, Erstellen bzw. Erneuern (Erneuern macht den alten Code ungültig → Bestätigung)
+  const recBox = h('div', { class: 'prof-recovery' });
+  function drawRecovery(confirming: boolean): void {
+    const status = recovery === null ? t('account.loading')
+      : recovery.exists && recovery.createdAt ? t('account.recovery.statusSet', { date: acctDate(recovery.createdAt) })
+        : t('account.recovery.statusNone');
+    const create = (btn: HTMLButtonElement): void => {
+      void runBusy(btn, async () => { showRecoveryCode(await acct.createRecoveryCode()); await reload(); }, onError);
+    };
+    let action: HTMLElement;
+    if (confirming) {
+      action = confirmStrip(t('account.recovery.renewConfirm'), t('account.recovery.renew'), create,
+        () => { drawRecovery(false); recBox.querySelector<HTMLElement>('button')?.focus(); });
+    } else {
+      const btn = button({ label: t(recovery?.exists ? 'account.recovery.renew' : 'account.recovery.create'), icon: 'key', full: true });
+      btn.disabled = recovery === null;
+      btn.addEventListener('click', () => { if (recovery?.exists) drawRecovery(true); else create(btn); });
+      action = btn;
+    }
+    recBox.replaceChildren(
+      h('p', { class: recovery && !recovery.exists ? 'prof-sheet-text prof-warn' : 'prof-sheet-text' }, status),
+      h('p', { class: 'prof-sheet-text' }, t('account.recovery.hint')),
+      action);
+  }
+
   // Abmelden / Konto löschen (Erfolg → Kontozustand wechselt, das Sheet schließt sich)
   const footer = h('div', { class: 'prof-sheet-actions' });
   function drawFooter(confirming: boolean): void {
@@ -632,6 +714,7 @@ function signedInContent(ctx: SheetCtx, username: string): { nodes: Child[]; onU
   drawHead();
   drawSync();
   drawPasskeys();
+  drawRecovery(false);
   drawFooter(false);
   void reload();
 
@@ -640,6 +723,7 @@ function signedInContent(ctx: SheetCtx, username: string): { nodes: Child[]; onU
       head,
       subhead(t('account.syncTitle')), h('div', { class: 'list' }, h('div', { class: 'prof-sync-line' }, h('span', { class: 'prof-pk-icon' }, icon('sync', 22)), syncText)), syncBtn,
       subhead(t('account.passkeys')), pkList, h('p', { class: 'prof-sheet-text' }, t('account.addPasskeyHint')), add,
+      subhead(t('account.recovery.title')), recBox,
       footer,
     ],
     onUser: (next) => {

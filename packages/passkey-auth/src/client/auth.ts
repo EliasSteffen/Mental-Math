@@ -1,10 +1,11 @@
 import type {
   AuthSession, AuthenticationOptionsJSON, AuthenticationResponseJSON, OptionsRes,
-  PasskeyAuthClient, PasskeyAuthOptions, RegistrationOptionsJSON, RegistrationResponseJSON,
-  SessionRes, VerifyReq, WebAuthnApi,
+  PasskeyAuthClient, PasskeyAuthOptions, RecoverVerifyReq, RecoveryCodeRes, RecoveryStatus, RegistrationOptionsJSON,
+  RegistrationResponseJSON, SessionRes, SessionWithRecovery, VerifyReq, WebAuthnApi,
 } from '../shared/types.ts';
 import { PasskeyAuthError } from '../shared/errors.ts';
 import { normalizeUsername } from '../shared/username.ts';
+import { normalizeRecoveryCode } from '../shared/recovery.ts';
 import { createApi } from './api.ts';
 
 const REFRESH_MARGIN_MS = 60_000;
@@ -35,6 +36,9 @@ export function createAuthCore(o: PasskeyAuthOptions & { webauthn: WebAuthnApi }
     session = null;
     emit();
   };
+
+  // Der Code wird nur durchgereicht, nie in der gespeicherten Session gehalten
+  const withCode = (s: AuthSession, code: string | undefined): SessionWithRecovery => (code ? { ...s, recoveryCode: code } : s);
 
   const retryDelay = o.refreshRetryDelayMs ?? 400;
   const is401 = (e: unknown): boolean => e instanceof PasskeyAuthError && e.status === 401;
@@ -71,7 +75,8 @@ export function createAuthCore(o: PasskeyAuthOptions & { webauthn: WebAuthnApi }
         '/register/options', { username: n.value });
       const response = await webauthn.create(options, opts?.signal);
       const body: VerifyReq<RegistrationResponseJSON> = { flowId, response };
-      return setSession(await api.post<SessionRes>('/register/verify', body));
+      const r = await api.post<SessionRes>('/register/verify', body);
+      return withCode(setSession(r), r.recoveryCode);
     },
 
     async login(opts) {
@@ -92,6 +97,28 @@ export function createAuthCore(o: PasskeyAuthOptions & { webauthn: WebAuthnApi }
       const response = await webauthn.create(options, opts?.signal);
       const body: VerifyReq<RegistrationResponseJSON> = { flowId, response };
       await api.post<void>('/passkeys/verify', body, token);
+    },
+
+    async recover(code, opts) {
+      const n = normalizeRecoveryCode(code);
+      if (!n) throw new PasskeyAuthError('invalid_recovery_code');
+      const { flowId, options } = await api.post<OptionsRes<RegistrationOptionsJSON>>('/recovery/options', { code: n });
+      const response = await webauthn.create(options, opts?.signal);
+      const body: RecoverVerifyReq = { flowId, response, code: n };
+      const r = await api.post<SessionRes>('/recovery/verify', body);
+      return withCode(setSession(r), r.recoveryCode);
+    },
+
+    async createRecoveryCode() {
+      const token = await getAccessToken();
+      if (token === null) throw new PasskeyAuthError('unauthorized');
+      return (await api.post<RecoveryCodeRes>('/recovery/create', {}, token)).code;
+    },
+
+    async recoveryStatus() {
+      const token = await getAccessToken();
+      if (token === null) throw new PasskeyAuthError('unauthorized');
+      return api.post<RecoveryStatus>('/recovery/status', {}, token);
     },
 
     restore: refresh,

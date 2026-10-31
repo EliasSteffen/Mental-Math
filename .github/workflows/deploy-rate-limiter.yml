@@ -1,0 +1,39 @@
+# Deployt den Worker mit dem Durable Object für das globale KI-Rate-Limit (workers/rate-limiter).
+# Getrennt vom Pages-Deploy: Der API-Token braucht zusätzlich „Account · Workers Scripts · Edit“ (siehe README).
+name: Deploy Rate Limiter
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - workers/rate-limiter/**
+      - server/rate-limit.ts
+      - .github/workflows/deploy-rate-limiter.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-rate-limiter
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: node --test tests/rate-limit.test.ts
+      - uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: workers/rate-limiter
+          wranglerVersion: '4.156.0'
+          command: deploy

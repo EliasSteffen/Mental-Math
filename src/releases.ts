@@ -5,6 +5,17 @@ const DATE = '2026-10-30';
 
 export const RELEASES: Release[] = [
   {
+    version: '1.12.0', date: '2026-10-31',
+    title: { de: 'Exhibits, 1×1, Englisch & Wiederherstellung', en: 'Exhibits, times tables, English & recovery' },
+    highlights: [
+      { de: 'Neu: Exhibits – Diagramme und Tabellen lesen und daraus rechnen wie im Case (Anteile, Wachstum, gewichteter Durchschnitt, relativ vs. absolut).', en: 'New: exhibits – read charts and tables and calculate from them like in a case (shares, growth, weighted average, relative vs. absolute).' },
+      { de: 'Neu: Kleines 1×1 als schneller Drill, getrennt von den gemischten Runden.', en: 'New: times tables as a quick drill, kept separate from mixed rounds.' },
+      { de: 'Lernbereich, Lösungswege und KI-Erklärungen gibt es jetzt auch auf Englisch.', en: 'The learning area, worked solutions and AI explanations are now available in English too.' },
+      { de: 'Wiederherstellungscode: Wer alle Passkeys verliert, kommt damit wieder in sein Konto.', en: 'Recovery code: if you lose all your passkeys, it gets you back into your account.' },
+      { de: 'KI-Erklärungen sind jetzt geräteübergreifend gegen Missbrauch begrenzt.', en: 'AI explanations now have a global limit against abuse.' },
+    ],
+  },
+  {
     version: '1.11.0', date: '2026-10-31',
     title: { de: 'Ruhiger Fokus', en: 'Calm focus' },
     highlights: [

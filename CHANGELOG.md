@@ -4,6 +4,16 @@ Alle nennenswerten Änderungen an Mental Math. Format nach [Keep a Changelog](ht
 
 <!-- Automatisch erzeugt mit `npm run changelog` aus src/releases.ts – nicht von Hand bearbeiten. -->
 
+## [1.12.0] - 2026-10-31
+
+### Exhibits, 1×1, Englisch & Wiederherstellung
+
+- Neu: Exhibits – Diagramme und Tabellen lesen und daraus rechnen wie im Case (Anteile, Wachstum, gewichteter Durchschnitt, relativ vs. absolut).
+- Neu: Kleines 1×1 als schneller Drill, getrennt von den gemischten Runden.
+- Lernbereich, Lösungswege und KI-Erklärungen gibt es jetzt auch auf Englisch.
+- Wiederherstellungscode: Wer alle Passkeys verliert, kommt damit wieder in sein Konto.
+- KI-Erklärungen sind jetzt geräteübergreifend gegen Missbrauch begrenzt.
+
 ## [1.11.0] - 2026-10-31
 
 ### Ruhiger Fokus

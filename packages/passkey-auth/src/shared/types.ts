@@ -4,7 +4,7 @@
 export type AuthErrorCode =
   | 'invalid_username' | 'invalid_request' | 'challenge_expired' | 'verification_failed'
   | 'unknown_credential' | 'unauthorized' | 'last_passkey' | 'rate_limited'
-  | 'not_supported' | 'cancelled' | 'network' | 'server_error' | 'already_registered';
+  | 'not_supported' | 'cancelled' | 'network' | 'server_error' | 'already_registered' | 'invalid_recovery_code';
 
 /** Fehler-Body aller Endpunkte: HTTP-Status 4xx/5xx + { error: { code } }. */
 export interface ErrorBody { error: { code: AuthErrorCode; message?: string } }
@@ -97,10 +97,24 @@ export interface AuthenticationResponseJSON {
 // POST /logout             Cookie                                        → 204 + Cookie gelöscht
 // POST /passkeys/options   Authorization: Bearer <accessToken>, body {}  → OptionsRes<RegistrationOptionsJSON>
 // POST /passkeys/verify    Bearer, body VerifyReq<RegistrationResponseJSON> → 204
+// POST /recovery/status    Bearer, body {}                               → RecoveryStatus
+// POST /recovery/create    Bearer, body {}                               → RecoveryCodeRes (ersetzt den alten Code)
+// POST /recovery/options   body RecoverOptionsReq                        → OptionsRes<RegistrationOptionsJSON> | invalid_recovery_code
+// POST /recovery/verify    body RecoverVerifyReq                         → SessionRes (mit neuem recoveryCode) + Set-Cookie
 export interface RegisterOptionsReq { username: string }
 export interface OptionsRes<T> { flowId: string; options: T }
 export interface VerifyReq<R> { flowId: string; response: R }
-export interface SessionRes { user: AuthUser; accessToken: string; expiresAt: number }
+export interface SessionRes {
+  user: AuthUser; accessToken: string; expiresAt: number;
+  /** Nur nach Registrierung und Wiederherstellung: neuer Wiederherstellungscode, wird genau einmal ausgeliefert */
+  recoveryCode?: string;
+}
+export interface RecoveryStatus { exists: boolean; createdAt: string | null /* ISO */ }
+export interface RecoveryCodeRes { code: string }
+export interface RecoverOptionsReq { code: string }
+export interface RecoverVerifyReq extends VerifyReq<RegistrationResponseJSON> { code: string }
+/** Session plus einmalig sichtbarer Wiederherstellungscode (fehlt, wenn der Server ihn nicht speichern konnte) */
+export type SessionWithRecovery = AuthSession & { recoveryCode?: string };
 
 // ---------- Client ----------
 export interface SupportInfo { webauthn: boolean; platform: boolean; conditional: boolean }
@@ -122,9 +136,14 @@ export interface PasskeyAuthOptions {
 
 export interface PasskeyAuthClient {
   support(): Promise<SupportInfo>;
-  register(username: string, o?: { signal?: AbortSignal }): Promise<AuthSession>;
+  register(username: string, o?: { signal?: AbortSignal }): Promise<SessionWithRecovery>;
   login(o?: { conditional?: boolean; signal?: AbortSignal }): Promise<AuthSession>;
   addPasskey(o?: { signal?: AbortSignal }): Promise<void>;
+  /** Alle Passkeys verloren: mit dem Wiederherstellungscode einen neuen Passkey anlegen und anmelden */
+  recover(code: string, o?: { signal?: AbortSignal }): Promise<SessionWithRecovery>;
+  /** Angemeldet: neuen Code erzeugen (der alte wird ungültig) */
+  createRecoveryCode(): Promise<string>;
+  recoveryStatus(): Promise<RecoveryStatus>;
   restore(): Promise<AuthSession | null>;
   logout(): Promise<void>;
   getAccessToken(): Promise<string | null>;
@@ -133,12 +152,12 @@ export interface PasskeyAuthClient {
 }
 
 // ---------- Server-Persistenz ----------
-export type ChallengePurpose = 'register' | 'login' | 'add';
+export type ChallengePurpose = 'register' | 'login' | 'add' | 'recover';
 export interface ChallengeRecord {
   id: string;                 // = flowId (UUID)
   challenge: Base64URL;
   purpose: ChallengePurpose;
-  userId: string | null;      // register: neue UUID; add: eingeloggter User; login: null
+  userId: string | null;      // register: neue UUID; add: eingeloggter User; recover: User des Codes; login: null
   username: string | null;    // nur register
   expiresAt: number;          // ms epoch
 }
@@ -167,6 +186,10 @@ export interface AuthStore {
   /** Atomar: alte Session (gültig) löschen, neue anlegen; liefert den User oder null. */
   rotateSession(oldHash: string, newHash: string, expiresAt: number): Promise<AuthUser | null>;
   deleteSession(tokenHash: string): Promise<void>;
+  /** Wiederherstellungscode setzen oder ersetzen (ein Code pro User, nur der Hash) */
+  setRecoveryCode(userId: string, codeHash: string): Promise<void>;
+  findRecoveryUser(codeHash: string): Promise<AuthUser | null>;
+  getRecoveryInfo(userId: string): Promise<{ createdAt: number } | null>;
 }
 
 // ---------- Server ----------

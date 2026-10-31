@@ -9,6 +9,7 @@ type Role = 'service_role' | 'authenticated' | 'anon';
 
 const SIM = readFileSync(join(import.meta.dirname, 'helpers/supabase-sim.sql'), 'utf8');
 const SCHEMA = readFileSync(join(import.meta.dirname, '../sql/001_passkey_auth.sql'), 'utf8');
+const RECOVERY = readFileSync(join(import.meta.dirname, '../sql/003_recovery_codes.sql'), 'utf8');
 
 const A = '00000000-0000-4000-8000-00000000000a';
 const B = '00000000-0000-4000-8000-00000000000b';
@@ -222,6 +223,53 @@ describe('passkey-auth SQL', () => {
       const b = await tx.query('select 1 from public.users where id = $1', [B]);
       assert.equal(b.rows.length, 1);
       await tx.rollback();
+    });
+  });
+});
+
+describe('passkey-auth SQL: Wiederherstellungscodes (003)', () => {
+  before(async () => {
+    db = new PGlite();
+    await db.exec(SIM);
+    await db.exec(SCHEMA);
+    await db.exec(RECOVERY);
+    await db.exec(RECOVERY); // Idempotenz
+    await seedBase();
+  });
+
+  it('service_role: setzt und ersetzt den Code (ein Code pro User), Hash ist eindeutig', async () => {
+    await as('service_role', null, async (tx) => {
+      await tx.query('select public.pa_set_recovery_code($1, $2)', [A, 'h1']);
+      await tx.query('select public.pa_set_recovery_code($1, $2)', [A, 'h2']);
+      const r = await tx.query<{ code_hash: string }>('select code_hash from public.auth_recovery where user_id = $1', [A]);
+      assert.deepEqual(r.rows.map((x) => x.code_hash), ['h2']);
+      await tx.exec('savepoint s');
+      await rejects(tx.query('select public.pa_set_recovery_code($1, $2)', [B, 'h2']), /duplicate key|unique/i);
+      await tx.exec('rollback to savepoint s');
+    });
+  });
+
+  it('authenticated/anon: kein Zugriff auf Tabelle und Funktion', async () => {
+    for (const role of ['authenticated', 'anon'] as const) {
+      await as(role, role === 'authenticated' ? A : null, async (tx) => {
+        await tx.exec('savepoint s');
+        await rejects(tx.query('select * from public.auth_recovery'), /permission denied/i);
+        await tx.exec('rollback to savepoint s');
+        await rejects(tx.query('select public.pa_set_recovery_code($1, $2)', [A, 'x']), /permission denied/i);
+      });
+    }
+  });
+
+  it('Challenge-Zweck recover ist erlaubt, unbekannte Zwecke nicht; Konto löschen entfernt den Code', async () => {
+    await as('service_role', null, async (tx) => {
+      await tx.query(`insert into public.auth_challenges (challenge, purpose, user_id, expires_at) values ($1, $2, $3, now() + interval '5 minutes')`, ['c', 'recover', A]);
+      await tx.exec('savepoint s');
+      await rejects(tx.query('insert into public.auth_challenges (challenge, purpose, expires_at) values ($1, $2, now())', ['c', 'other']), /check constraint/i);
+      await tx.exec('rollback to savepoint s');
+      await tx.query('select public.pa_set_recovery_code($1, $2)', [B, 'hb']);
+      await tx.query('delete from public.users where id = $1', [B]);
+      const n = await tx.query<{ n: number }>('select count(*)::int as n from public.auth_recovery where user_id = $1', [B]);
+      assert.equal(n.rows[0]?.n, 0);
     });
   });
 });

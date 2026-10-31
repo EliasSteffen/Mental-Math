@@ -6,6 +6,7 @@ import { CATEGORIES, LEVEL_NAMES, SUBTYPES, activeCategories } from '../core/cat
 import { generate } from '../core/generators/index.ts';
 import { categoryStats, levelFor, subtypeStats } from '../core/scoring.ts';
 import { getMethod } from '../core/methods.ts';
+import { renderExhibit } from '../ui/exhibit.ts';
 import { aiExplainMethod, isAiAvailable } from '../features/ai-client.ts';
 import { aiControl } from '../features/ai-view.ts';
 import { getAttempts, getSettings } from '../data/storage.ts';
@@ -115,6 +116,7 @@ function statusLine(sub: Subtype, score: number | null | undefined, count: numbe
 
 /** Beispielaufgabe mit aufklappbarem Lösungsweg; „Neues Beispiel“ würfelt neu (Fokus bleibt auf dem Button). */
 function exampleGroup(sub: Subtype, lvl: Level): HTMLElement | null {
+  const exhibit = h('div', { class: 'learn-exhibit' });
   const prompt = h('p', { class: 'learn-prompt', 'aria-live': 'polite' });
   const rest = h('div', { class: 'learn-example-rest' });
 
@@ -131,6 +133,9 @@ function exampleGroup(sub: Subtype, lvl: Level): HTMLElement | null {
       ? String(task.choices[task.expected] ?? '')
       : `${fmt(task.expected)}${task.unit ? ' ' + task.unit : ''}`;
     const note = [task.hint, !choices && task.unit ? t('lernen.answerIn', { unit: task.unit }) : ''].filter(Boolean).join(' · ');
+    exhibit.replaceChildren();
+    appendChildren(exhibit, [renderExhibit(task.params)]);
+    exhibit.hidden = !exhibit.firstChild;
     prompt.textContent = task.prompt;
     rest.replaceChildren();
     appendChildren(rest, [
@@ -147,7 +152,7 @@ function exampleGroup(sub: Subtype, lvl: Level): HTMLElement | null {
 
   const again = button({ label: t('lernen.newExample'), kind: 'link', icon: 'refresh', onClick: () => { draw(); } });
   again.classList.add('learn-again');
-  return group(t('lernen.example'), card([prompt, rest, again]));
+  return group(t('lernen.example'), card([exhibit, prompt, rest, again]));
 }
 
 function renderDetail(sub: Subtype): void {

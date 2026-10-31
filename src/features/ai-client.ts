@@ -1,5 +1,6 @@
 // Client für /api/explain + sicherer Mini-Markdown-Parser (kein HTML, nur Datenstruktur)
 import type { AiBlock, AiInline, AiResult, SubtypeId, Task } from '../types.ts';
+import { getLang } from '../i18n/index.ts';
 
 const CACHE_KEY = 'kopfrechner.ai.v1';
 const OFF_KEY = 'kopfrechner.ai.off';
@@ -113,12 +114,13 @@ export function aiExplainTask(task: Task, given: number | null | undefined): Pro
     expected: task.expected,
     unit: task.unit || '',
     given: g,
+    lang: getLang(),
   };
-  return request(payload, `t|${task.subtype}|${task.prompt}|${g === null ? '' : g}`);
+  return request(payload, `${getLang()}|t|${task.subtype}|${task.prompt}|${g === null ? '' : g}`);
 }
 
 export function aiExplainMethod(subtypeId: SubtypeId): Promise<AiResult> {
-  return request({ kind: 'method', subtype: subtypeId }, `m|${subtypeId}`);
+  return request({ kind: 'method', subtype: subtypeId, lang: getLang() }, `${getLang()}|m|${subtypeId}`);
 }
 
 // ---- Mini-Markdown → Blocks ----
