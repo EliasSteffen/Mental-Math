@@ -1,12 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<!-- Export für App Store Connect (TestFlight), von .github/workflows/ios.yml genutzt; __TEAM_ID__ ersetzt der Workflow. -->
+<!-- Signierter Export (.ipa) für App Store Connect, von .github/workflows/ios.yml genutzt; __TEAM_ID__ ersetzt der Workflow.
+     Hochgeladen wird danach mit scripts/asc-upload.ts (App Store Connect API), nicht von Xcode. -->
 <plist version="1.0">
 <dict>
 	<key>method</key>
 	<string>app-store-connect</string>
 	<key>destination</key>
-	<string>upload</string>
+	<string>export</string>
 	<key>teamID</key>
 	<string>__TEAM_ID__</string>
 	<key>signingStyle</key>

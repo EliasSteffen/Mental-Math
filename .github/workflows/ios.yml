@@ -85,12 +85,18 @@ jobs:
         if: steps.release.outputs.upload == 'true'
         shell: bash
         env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
           ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
           CERT_P12: ${{ secrets.IOS_CERT_P12_BASE64 }}
           CERT_PASSWORD: ${{ secrets.IOS_CERT_PASSWORD }}
         run: |
-          mkdir -p "$RUNNER_TEMP/asc"
-          printf '%s\n' "$ASC_KEY_P8" > "$RUNNER_TEMP/asc/AuthKey.p8"
+          # Der Upload-Teil von Xcode liest die Schlüssel-ID aus dem Dateinamen: AuthKey_<KEY_ID>.p8,
+          # zusätzlich am Standardort ~/.appstoreconnect/private_keys
+          mkdir -p "$RUNNER_TEMP/asc" "$HOME/.appstoreconnect/private_keys"
+          key="$RUNNER_TEMP/asc/AuthKey_$ASC_KEY_ID.p8"
+          printf '%s\n' "$ASC_KEY_P8" > "$key"
+          cp "$key" "$HOME/.appstoreconnect/private_keys/"
+          echo "ASC_KEY_PATH=$key" >> "$GITHUB_ENV"
           if [ -n "$CERT_P12" ]; then
             keychain="$RUNNER_TEMP/signing.keychain-db"
             pass=$(openssl rand -hex 16)
@@ -104,6 +110,14 @@ jobs:
             rm "$RUNNER_TEMP/cert.p12"
           fi
 
+      # Bricht früh und mit klarer Meldung ab, wenn der Schlüssel nicht passt oder die App in App Store Connect fehlt
+      - name: App Store Connect prüfen (Schlüssel, App)
+        if: steps.release.outputs.upload == 'true'
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+        run: node scripts/asc-check.ts
+
       - name: Archivieren (Release)
         if: steps.release.outputs.upload == 'true'
         env:
@@ -116,12 +130,14 @@ jobs:
           xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Release
           -destination 'generic/platform=iOS' -archivePath "$RUNNER_TEMP/App.xcarchive"
           -allowProvisioningUpdates
-          -authenticationKeyPath "$RUNNER_TEMP/asc/AuthKey.p8"
+          -authenticationKeyPath "$ASC_KEY_PATH"
           -authenticationKeyID "$ASC_KEY_ID" -authenticationKeyIssuerID "$ASC_ISSUER_ID"
           DEVELOPMENT_TEAM="$TEAM_ID" MARKETING_VERSION="$VERSION" CURRENT_PROJECT_VERSION="$BUILD"
           -quiet archive
 
-      - name: Zu App Store Connect hochladen (TestFlight)
+      # Xcode signiert nur und exportiert die .ipa; hochgeladen wird über die App Store Connect API
+      # (Xcodes eigener Upload-Dienst lehnt den Team-Schlüssel mit „Cannot verify client's JWT headers“ ab).
+      - name: Signierte .ipa exportieren
         if: steps.release.outputs.upload == 'true'
         shell: bash
         env:
@@ -130,14 +146,33 @@ jobs:
           TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
         run: |
           sed "s/__TEAM_ID__/$TEAM_ID/" ios/ExportOptions.plist > "$RUNNER_TEMP/ExportOptions.plist"
-          xcodebuild -exportArchive -archivePath "$RUNNER_TEMP/App.xcarchive" \
+          if ! xcodebuild -exportArchive -archivePath "$RUNNER_TEMP/App.xcarchive" \
             -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" -exportPath "$RUNNER_TEMP/export" \
             -allowProvisioningUpdates \
-            -authenticationKeyPath "$RUNNER_TEMP/asc/AuthKey.p8" \
-            -authenticationKeyID "$ASC_KEY_ID" -authenticationKeyIssuerID "$ASC_ISSUER_ID"
-          echo "### Hochgeladen: Version ${{ steps.release.outputs.version }} (Build ${{ github.run_number }})" >> "$GITHUB_STEP_SUMMARY"
-          echo "Nach der Verarbeitung (ca. 10–30 Minuten) in App Store Connect → TestFlight bzw. als Build der nächsten Version wählbar." >> "$GITHUB_STEP_SUMMARY"
+            -authenticationKeyPath "$ASC_KEY_PATH" \
+            -authenticationKeyID "$ASC_KEY_ID" -authenticationKeyIssuerID "$ASC_ISSUER_ID"; then
+            # Fehlerzeilen aus Xcodes Verteilungsprotokoll (ohne Tokens; das Repo ist öffentlich, daher kein Artefakt)
+            find "${TMPDIR:-/tmp}" -path '*.xcdistributionlogs/*' -name '*.log' -print0 2>/dev/null \
+              | xargs -0 grep -hiE 'error|fail|status code|statusCode|denied|forbidden|unauthori' 2>/dev/null \
+              | grep -viE 'bearer|eyJ' | cut -c1-400 | tail -n 40 || true
+            exit 1
+          fi
+          ls -la "$RUNNER_TEMP/export"
+
+      - name: Zu App Store Connect hochladen (TestFlight)
+        if: steps.release.outputs.upload == 'true'
+        shell: bash
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          VERSION: ${{ steps.release.outputs.version }}
+          BUILD: ${{ github.run_number }}
+        run: |
+          ipa=$(ls "$RUNNER_TEMP"/export/*.ipa | head -n 1)
+          node scripts/asc-upload.ts "$ipa" "$VERSION" "$BUILD"
+          echo "### Hochgeladen: Version $VERSION (Build $BUILD)" >> "$GITHUB_STEP_SUMMARY"
+          echo "Der Build erscheint nach der Verarbeitung in App Store Connect → TestFlight und ist dort als Build der Version wählbar." >> "$GITHUB_STEP_SUMMARY"
 
       - name: Schlüssel entfernen
         if: always()
-        run: rm -rf "$RUNNER_TEMP/asc" "$RUNNER_TEMP/signing.keychain-db"
+        run: rm -rf "$RUNNER_TEMP/asc" "$RUNNER_TEMP/signing.keychain-db" "$HOME/.appstoreconnect/private_keys"
