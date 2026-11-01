@@ -65,11 +65,20 @@ export class SyncEngine {
     return this.inflight;
   }
 
+  /**
+   * Cloud-Daten löschen und Lösch-Markierung setzen. Liefert `deleteAll` eine Zahl, hat der Server die Markierung
+   * im selben Aufruf geschrieben (atomar); sonst folgt sie als zweiter Aufruf.
+   */
   async wipeRemote(): Promise<void> {
     if (!this.provider) return;
-    await this.provider.deleteAll();
-    const at = this.now();
-    await this.provider.upsertDocs([{ name: WIPE_DOC, data: { at }, updatedAt: at, deviceId: this.o.deviceId() }]);
+    const res = await this.provider.deleteAll();
+    let at: number;
+    if (typeof res === 'number' && Number.isFinite(res)) {
+      at = res;
+    } else {
+      at = this.now();
+      await this.provider.upsertDocs([{ name: WIPE_DOC, data: { at }, updatedAt: at, deviceId: this.o.deviceId() }]);
+    }
     this.repo.setAppliedWipe(at);
     this.repo.setCursor(null);
   }
@@ -182,6 +191,8 @@ export class SyncEngine {
       this.repo.putDoc(rname, { ...cur, [id]: data }, false);
       return true;
     }
+    // hybride Uhr (merge-basierte Dokumente): höchsten Remote-Stand merken, auch wenn merge nichts ändert
+    if (!spec.updatedAt) this.repo.noteDocClock(spec.name, d.updatedAt);
     const local = this.repo.getDoc<Obj>(spec.name) ?? {};
     const merged = spec.merge(local, data, { localUpdatedAt: spec.updatedAt?.(local) ?? null, remoteUpdatedAt: d.updatedAt });
     if (stableEqual(merged, local)) return false;
@@ -191,6 +202,16 @@ export class SyncEngine {
   }
 
   // ----- Push -----
+  /**
+   * updatedAt für den Upload. Eigene updatedAt-Funktion: deren Wert (null → jetzt). Sonst hybride Uhr:
+   * mindestens 1 ms über dem höchsten gesehenen Remote-Stand, damit der Server-Trigger (verwirft nicht größere
+   * Stände) ein gemergtes Dokument auch bei nachgehender Geräteuhr annimmt.
+   */
+  private docUpdatedAt(spec: DocSpec, local: Obj): number {
+    if (spec.updatedAt) return spec.updatedAt(local) ?? this.now();
+    return Math.max(this.now(), this.repo.getDocClock(spec.name) + 1);
+  }
+
   private docUnit(spec: DocSpec): RemoteDoc | null {
     const local = this.repo.getDoc<Obj>(spec.name);
     if (!isObj(local)) return null;
@@ -198,7 +219,7 @@ export class SyncEngine {
     return {
       name: spec.perDevice ? `${spec.name}:${dev}` : spec.name,
       data: (spec.toRemote ?? ((x: Obj) => x))(local),
-      updatedAt: spec.updatedAt?.(local) ?? this.now(),
+      updatedAt: this.docUpdatedAt(spec, local),
       deviceId: dev,
     };
   }
@@ -206,7 +227,7 @@ export class SyncEngine {
   private unitFor(t: Pick<ChangeRecord, 'target' | 'id'>): Unit | null {
     if (t.target === WIPE_DOC) return null;
     if (this.collections.has(t.target)) {
-      const item = this.repo.list<SyncMeta>(t.target, true).find((x) => x.id === t.id);
+      const item = this.repo.getById<SyncMeta>(t.target, t.id); // Index statt Suchlauf je Outbox-Eintrag
       return item ? { kind: 'rec', collection: t.target, item: item as SyncRecord } : null;
     }
     const spec = this.docs.find((s) => s.name === t.target);
@@ -245,9 +266,15 @@ export class SyncEngine {
     }
   }
 
+  /**
+   * Outbox (bzw. bei `fullPushNeeded` alles) hochladen. Das Vollabgleich-Flag wird erst nach erfolgreichem Senden
+   * aller Pakete gelöscht und nur, wenn währenddessen kein neuer angefordert wurde (`fullPushGen`); ein Abbruch
+   * (Fehler, Tab beendet) lässt es stehen.
+   */
   private async push(provider: RemoteSyncProvider, c: Counters): Promise<void> {
     const st = this.repo.getSyncState();
     const full = st.fullPushNeeded;
+    const gen = st.fullPushGen;
     const snapshot = [...st.pending];
     const maxSeq = snapshot.reduce((m, p) => Math.max(m, p.seq), 0);
     const items: Entry[] = [];
@@ -270,27 +297,24 @@ export class SyncEngine {
       }
       this.repo.ackChanges(orphanSeqs);
     }
-    if (full) this.repo.clearFullPush();
-    try {
-      const size = this.o.chunkSize ?? 200;
-      const buckets = new Map<string, Entry[]>();
-      for (const e of items) {
-        const key = e.unit.kind === 'rec' ? `rec:${e.unit.collection}` : 'doc';
-        const b = buckets.get(key);
-        if (b) b.push(e);
-        else buckets.set(key, [e]);
+    const size = this.o.chunkSize ?? 200;
+    const buckets = new Map<string, Entry[]>();
+    for (const e of items) {
+      const key = e.unit.kind === 'rec' ? `rec:${e.unit.collection}` : 'doc';
+      const b = buckets.get(key);
+      if (b) b.push(e);
+      else buckets.set(key, [e]);
+    }
+    for (const g of buckets.values()) {
+      for (let i = 0; i < g.length; i += size) {
+        const chunk = g.slice(i, i + size);
+        await this.sendChunk(provider, chunk.map((x) => x.unit), c);
+        if (!full) this.repo.ackChanges(chunk.flatMap((x) => x.seqs));
       }
-      for (const g of buckets.values()) {
-        for (let i = 0; i < g.length; i += size) {
-          const chunk = g.slice(i, i + size);
-          await this.sendChunk(provider, chunk.map((x) => x.unit), c);
-          if (!full) this.repo.ackChanges(chunk.flatMap((x) => x.seqs));
-        }
-      }
-      if (full) this.repo.ackChanges(snapshot.filter((p) => p.seq <= maxSeq).map((p) => p.seq));
-    } catch (e) {
-      if (full) this.repo.markFullPush();
-      throw e;
+    }
+    if (full) {
+      this.repo.ackChanges(snapshot.filter((p) => p.seq <= maxSeq).map((p) => p.seq));
+      this.repo.clearFullPushIf(gen);
     }
   }
 }

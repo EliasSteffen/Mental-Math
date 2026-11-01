@@ -181,6 +181,7 @@ test('Repository: maxPending konfigurierbar', () => {
   const s = repo.getSyncState();
   assert.equal(s.fullPushNeeded, true);
   assert.equal(s.pending.length, 0);
+  assert.equal(s.fullPushGen, 1, 'Überlauf erhöht die Generation');
 });
 
 test('Repository: getSyncState füllt Defaults alter Stände, Sync-Helfer', () => {
@@ -190,15 +191,120 @@ test('Repository: getSyncState füllt Defaults alter Stände, Sync-Helfer', () =
   const s = repo.getSyncState();
   assert.equal(s.cursor, null);
   assert.equal(s.fullPushNeeded, false);
+  assert.equal(s.fullPushGen, 0);
+  assert.deepEqual(s.docClock, {});
   repo.markFullPush();
   assert.equal(repo.getSyncState().fullPushNeeded, true);
-  repo.clearFullPush();
+  const gen = repo.getSyncState().fullPushGen;
+  assert.equal(gen, 1);
+  repo.markFullPush(); // erneut angefordert (z. B. während eines laufenden Pushs)
+  assert.equal(repo.clearFullPushIf(gen), false, 'veraltete Generation löscht nicht');
+  assert.equal(repo.getSyncState().fullPushNeeded, true);
+  assert.equal(repo.clearFullPushIf(gen + 1), true);
   assert.equal(repo.getSyncState().fullPushNeeded, false);
   repo.setCursor('c1');
   repo.setLastPulledAt(77);
   const again = new Repository(mem).getSyncState();
   assert.equal(again.cursor, 'c1');
   assert.equal(again.lastPulledAt, 77);
+  assert.equal(again.fullPushGen, 2);
+  assert.equal(again.fullPushNeeded, false);
+
+  mem.set('sync', JSON.stringify({ lastPulledAt: null, lastPushedSeq: 0, nextSeq: 1, pending: [], fullPushGen: 'x', docClock: [1] }));
+  const broken = new Repository(mem).getSyncState();
+  assert.equal(broken.fullPushGen, 0);
+  assert.deepEqual(broken.docClock, {});
+});
+
+test('Repository: Dokument-Uhr merkt den höchsten Remote-Stand, persistiert, clear() setzt zurück', () => {
+  const mem = new MemoryAdapter();
+  const repo = new Repository(mem);
+  assert.equal(repo.getDocClock('best'), 0);
+  repo.noteDocClock('best', 500);
+  repo.noteDocClock('best', 300); // kleiner: bleibt
+  repo.noteDocClock('best', Number.NaN);
+  repo.noteDocClock('log', 7);
+  assert.equal(repo.getDocClock('best'), 500);
+  assert.equal(repo.getDocClock('constructor'), 0, 'nur eigene Felder');
+  repo.noteDocClock('__proto__', 9);
+  assert.equal(repo.getDocClock('__proto__'), 9);
+  assert.equal(Object.getPrototypeOf(repo.getSyncState().docClock), Object.prototype);
+  const again = new Repository(mem);
+  assert.equal(again.getDocClock('best'), 500);
+  assert.equal(again.getDocClock('log'), 7);
+  again.clear();
+  assert.equal(again.getDocClock('best'), 0);
+  assert.deepEqual(again.getSyncState().docClock, {});
+});
+
+test('Repository: getById über den Index, inkl. Tombstones', () => {
+  const mem = new MemoryAdapter();
+  const repo = new Repository(mem);
+  assert.equal(repo.getById('c', 'x'), null);
+  for (let i = 0; i < 5; i++) repo.upsert('c', mk(`i${i}`, 1, i));
+  assert.equal(repo.getById<Item>('c', 'i3')?.points, 3);
+  assert.equal(repo.getById('c', 'nope'), null);
+  repo.remove('c', 'i1');
+  assert.ok(repo.getById('c', 'i1')?.deletedAt, 'Tombstone wird geliefert');
+  repo.upsert('c', mk('i3', 2, 33));
+  assert.equal(repo.getById<Item>('c', 'i3')?.points, 33);
+  repo.replaceCollection('c', [mk('x1')], false);
+  assert.equal(repo.getById('c', 'i3'), null);
+  assert.equal(repo.getById('c', 'x1')?.id, 'x1');
+  new Repository(mem).upsert('c', mk('y1')); // anderer Tab
+  repo.invalidate();
+  assert.equal(repo.getById('c', 'y1')?.id, 'y1');
+  mem.set('col:k', JSON.stringify([null, 5, mk('ok')]));
+  repo.invalidate();
+  assert.equal(repo.getById('k', 'ok')?.id, 'ok');
+});
+
+test('Repository: trim nach Schlüssel – Tombstones, dann sichere (älteste zuerst), Ausstehende zuletzt; Reihenfolge bleibt', () => {
+  const repo = new Repository(new MemoryAdapter());
+  const ext = (id: string, created: number, deleted = false): Item =>
+    ({ ...createMeta(created, 'fremd', id), deletedAt: deleted ? created : null, points: 0 });
+  // lokal ausstehend (jung, aber vorne), dann vom Pull angehängte fremde Datensätze
+  repo.upsert('c', mk('own1', 900));
+  repo.upsert('c', mk('own2', 950));
+  repo.batch(() => {
+    for (const x of [ext('f1', 100), ext('f2', 300), ext('t1', 50, true), ext('f3', 200), ext('f4', 400)]) repo.upsert('c', x, false);
+  });
+  const idsOf = (): string[] => repo.list('c', true).map((x) => x.id);
+  repo.trim('c', 7);
+  assert.deepEqual(idsOf(), ['own1', 'own2', 'f1', 'f2', 't1', 'f3', 'f4'], 'nichts zu tun');
+  repo.trim('c', 6);
+  assert.deepEqual(idsOf(), ['own1', 'own2', 'f1', 'f2', 'f3', 'f4'], 'Tombstone zuerst');
+  repo.trim('c', 4);
+  assert.deepEqual(idsOf(), ['own1', 'own2', 'f2', 'f4'], 'dann die ältesten sicheren');
+  repo.trim('c', 1);
+  assert.deepEqual(idsOf(), ['own2'], 'Ausstehende zuletzt, älteste zuerst');
+
+  // Vollabgleich ausstehend: eigene Datensätze gelten trotz leerer Outbox als unsicher
+  const r2 = new Repository(new MemoryAdapter());
+  const dev = r2.deviceId;
+  r2.batch(() => {
+    r2.upsert('c', { ...createMeta(900, dev, 'mine1') }, false);
+    r2.upsert('c', { ...createMeta(10, 'fremd', 'f1') }, false);
+    r2.upsert('c', { ...createMeta(950, dev, 'mine2') }, false);
+    r2.upsert('c', { ...createMeta(20, 'fremd', 'f2') }, false);
+  });
+  r2.markFullPush();
+  r2.trim('c', 2);
+  assert.deepEqual(r2.list('c').map((x) => x.id), ['mine1', 'mine2']);
+  // ohne Vollabgleich: eigene, bereits hochgeladene sind sicher und nach Alter dran
+  r2.clearFullPushIf(r2.getSyncState().fullPushGen);
+  r2.upsert('c', { ...createMeta(5, 'fremd', 'f0') }, false);
+  r2.trim('c', 2);
+  assert.deepEqual(r2.list('c').map((x) => x.id), ['mine1', 'mine2'], 'f0 ist älter');
+  r2.trim('c', 1);
+  assert.deepEqual(r2.list('c').map((x) => x.id), ['mine2']);
+
+  // kaputte Einträge zuerst; ohne createdAt zählt updatedAt
+  const mem = new MemoryAdapter();
+  mem.set('col:k', JSON.stringify([{ ...mk('a', 5), createdAt: undefined, updatedAt: 1 }, null, mk('b', 3)]));
+  const r3 = new Repository(mem);
+  r3.trim('k', 1);
+  assert.deepEqual(r3.list('k').map((x) => x.id), ['b']);
 });
 
 test('Repository: onTrackedChange meldet nur protokollierte Änderungen', () => {

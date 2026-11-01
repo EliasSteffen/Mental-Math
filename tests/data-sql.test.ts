@@ -175,23 +175,53 @@ describe('training data SQL', () => {
     });
   });
 
-  it('mm_delete_my_data löscht nur die Daten von A', async () => {
+  it('mm_delete_my_data löscht nur die Daten von A und setzt im selben Aufruf die Lösch-Markierung', async () => {
     for (const u of [A, B]) {
       await db.query(`insert into public.user_documents (user_id,name,data,updated_at,device_id) values ($1,'settings','{}',1,'d')`, [u]);
+      await db.query(`insert into public.user_documents (user_id,name,data,updated_at,device_id) values ($1,'wipe','{"at":1}',1,'d')`, [u]);
       await db.query(`insert into public.training_sessions (user_id,id,mode,score,correct_answers,total_questions,duration_ms,avg_time_ms,created_at,updated_at,device_id,rev)
         values ($1,'s1','all',1,1,1,1,1,now(),1,'d',1)`, [u]);
     }
-    await asCommit(A, 'select public.mm_delete_my_data()');
+    const t0 = Date.now();
+    let at = 0;
+    await db.transaction(async (tx) => {
+      await tx.exec('set local role authenticated');
+      await tx.query(`select set_config('request.jwt.claims', $1, true)`, [JSON.stringify({ sub: A })]);
+      at = Number((await tx.query<{ at: unknown }>('select public.mm_delete_my_data() as at')).rows[0]?.at);
+    });
+    // Serveruhr in Epoch-ms (großzügige Toleranz für die Uhr der Testumgebung)
+    assert.ok(Number.isSafeInteger(at) && Math.abs(at - t0) < 60_000, `at=${at}`);
     const n = (t: string, u: string) => db.query<{ n: number }>(`select count(*)::int as n from public.${t} where user_id=$1`, [u]);
-    assert.equal((await n('user_documents', A)).rows[0]?.n, 0);
+    const docs = await db.query<{ name: string; data: unknown; updated_at: string; device_id: string }>(
+      `select name, data, updated_at::text as updated_at, device_id from public.user_documents where user_id=$1`, [A]);
+    assert.deepEqual(docs.rows, [{ name: 'wipe', data: { at }, updated_at: String(at), device_id: 'server' }], 'nur die neue Markierung');
     assert.equal((await n('training_sessions', A)).rows[0]?.n, 0);
     assert.equal((await n('training_sessions', B)).rows[0]?.n, 1);
-    assert.equal((await n('user_documents', B)).rows[0]?.n, 1);
+    assert.equal((await n('user_documents', B)).rows[0]?.n, 2);
+    // zweiter Aufruf: wieder genau eine (neuere) Markierung
+    await asCommit(A, 'select public.mm_delete_my_data()');
+    const again = await db.query<{ at: number }>(`select (data->>'at')::bigint::float8 as at from public.user_documents where user_id=$1`, [A]);
+    assert.equal(again.rows.length, 1);
+    assert.ok((again.rows[0]?.at ?? 0) >= at);
     await as('anon', null, async (tx) => { await rejects(tx.query('select public.mm_delete_my_data()'), /permission denied/i); });
     await as('authenticated', null, async (tx) => {
       await tx.query(`select set_config('request.jwt.claims', '{}', true)`);
       await rejects(tx.query('select public.mm_delete_my_data()'), /not_authenticated/);
     });
+  });
+
+  it('mm_delete_my_data: alte void-Fassung wird ersetzt (Rückgabe bigint), Rechte neu gesetzt', async () => {
+    await db.exec(`drop function public.mm_delete_my_data();
+      create function public.mm_delete_my_data() returns void language plpgsql as $$ begin end $$;`);
+    await db.exec(DATA);
+    const r = await db.query<{ r: string; anon: boolean; auth: boolean; pub: boolean }>(
+      `select pg_get_function_result('public.mm_delete_my_data()'::regprocedure) as r,
+        has_function_privilege('anon', 'public.mm_delete_my_data()', 'execute') as anon,
+        has_function_privilege('authenticated', 'public.mm_delete_my_data()', 'execute') as auth,
+        exists (select 1 from information_schema.routine_privileges
+                where routine_schema = 'public' and routine_name = 'mm_delete_my_data' and grantee = 'PUBLIC') as pub`,
+    );
+    assert.deepEqual(r.rows[0], { r: 'bigint', anon: false, auth: true, pub: false });
   });
 
   it('pa_delete_account kaskadiert auf Trainingsdaten', async () => {

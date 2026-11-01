@@ -6,7 +6,7 @@ import { SyncError } from '../src/errors.ts';
 import { compareMeta } from '../src/merge.ts';
 import { createMeta } from '../src/meta.ts';
 import { Repository } from '../src/repository.ts';
-import type { PullPage, RemoteDoc, RemoteSyncProvider, SyncErrorKind, SyncRecord } from '../src/types.ts';
+import type { PullPage, RemoteDoc, RemoteSyncProvider, SyncErrorKind, SyncRecord, SyncSchema } from '../src/types.ts';
 import { testSchema } from './test-schema.ts';
 
 // ---------- FakeServer: bildet die SQL-Semantik nach ----------
@@ -19,6 +19,12 @@ class FakeServer implements RemoteSyncProvider {
   docs = new Map<string, { doc: RemoteDoc; seq: number }>();
   rejectIds = new Set<string>();
   pullCalls = 0;
+  recordCalls = 0;
+  docCalls = 0;
+  /** Hook vor dem n-ten upsertRecords-Aufruf (z. B. hängen lassen); undefined = sofort weiter */
+  onUpsertRecords: ((n: number) => Promise<void> | undefined) | null = null;
+  /** gesetzt: deleteAll schreibt die Lösch-Markierung selbst und liefert dieses `at` (wie mm_delete_my_data) */
+  serverWipeAt: number | null = null;
   private fails: Array<{ kind: SyncErrorKind | 'boom'; method?: Method }> = [];
 
   failNext(kind: SyncErrorKind | 'boom', method?: Method): void { this.fails.push({ kind, method }); }
@@ -32,6 +38,11 @@ class FakeServer implements RemoteSyncProvider {
   }
 
   upsertRecords(collection: string, items: readonly SyncRecord[]): Promise<void> {
+    const hook = this.onUpsertRecords?.(++this.recordCalls);
+    return hook ? hook.then(() => this.applyUpsert(collection, items)) : this.applyUpsert(collection, items);
+  }
+
+  private applyUpsert(collection: string, items: readonly SyncRecord[]): Promise<void> {
     try {
       this.check('upsertRecords');
       if (items.some((i) => this.rejectIds.has(i.id))) throw new SyncError('invalid');
@@ -46,6 +57,7 @@ class FakeServer implements RemoteSyncProvider {
   }
 
   upsertDocs(docs: readonly RemoteDoc[]): Promise<void> {
+    this.docCalls++;
     try {
       this.check('upsertDocs');
       for (const doc of docs) {
@@ -79,12 +91,15 @@ class FakeServer implements RemoteSyncProvider {
     } catch (e) { return Promise.reject(e as Error); }
   }
 
-  deleteAll(): Promise<void> {
+  deleteAll(): Promise<number | void> {
     try {
       this.check('deleteAll');
       this.records.clear();
       this.docs.clear();
-      return Promise.resolve();
+      const at = this.serverWipeAt;
+      if (at === null) return Promise.resolve();
+      this.docs.set(WIPE_DOC, { doc: { name: WIPE_DOC, data: { at }, updatedAt: at, deviceId: 'server' }, seq: ++this.counter });
+      return Promise.resolve(at);
     } catch (e) { return Promise.reject(e as Error); }
   }
 }
@@ -94,12 +109,22 @@ const clock = { t: 1000 };
 type Rec = SyncRecord & { v?: number };
 
 interface Dev { repo: Repository; engine: SyncEngine; id: string }
-function device(server: RemoteSyncProvider | null, o: { pageSize?: number; chunkSize?: number; onRemoteWipe?: (at: number) => void } = {}): Dev {
-  const repo = new Repository(new MemoryAdapter(), { now: () => clock.t });
+interface DevOpts {
+  pageSize?: number; chunkSize?: number; onRemoteWipe?: (at: number) => void; schema?: SyncSchema; maxPending?: number;
+}
+function device(server: RemoteSyncProvider | null, o: DevOpts = {}, mem: MemoryAdapter = new MemoryAdapter()): Dev {
+  const { schema = testSchema, maxPending, ...rest } = o;
+  const repo = new Repository(mem, { now: () => clock.t, maxPending });
   const id = repo.deviceId;
-  const engine = new SyncEngine(repo, { schema: testSchema, deviceId: () => id, now: () => clock.t, ...o });
+  const engine = new SyncEngine(repo, { schema, deviceId: () => id, now: () => clock.t, ...rest });
   engine.setProvider(server);
   return { repo, engine, id };
+}
+/** Promise, das ein Test von außen auflöst. */
+function deferred(): { promise: Promise<void>; resolve: () => void } {
+  let resolve = (): void => {};
+  const promise = new Promise<void>((r) => { resolve = r; });
+  return { promise, resolve };
 }
 const add = (d: Dev, col: string, id: string, v = 1): void => {
   d.repo.upsert<Rec>(col, { v, ...createMeta(clock.t, d.id, id) });
@@ -249,6 +274,85 @@ test('Vollabgleich bleibt bei Fehler erhalten', async () => {
   assert.ok(server.records.has('a:x'));
 });
 
+test('Vollabgleich: Flag bleibt bis alle Pakete gesendet sind (Abbruch, Überlauf während des Pushs)', async () => {
+  const server = new FakeServer();
+  const mem = new MemoryAdapter();
+  const a = device(server, { chunkSize: 2, maxPending: 3 }, mem);
+  a.repo.batch(() => {
+    for (let i = 0; i < 5; i++) a.repo.upsert<Rec>('b', { v: i, ...createMeta(clock.t, a.id, `r${i}`) }, false);
+  });
+  a.repo.markFullPush();
+  const reached = deferred();
+  const gate = deferred();
+  server.onUpsertRecords = (n) => (n === 2 ? (reached.resolve(), gate.promise) : undefined);
+  const run = a.engine.syncNow();
+  await reached.promise; // 1. Paket gesendet, 2. hängt
+  // Tab wird jetzt beendet: ein neues Repository auf demselben Speicher sieht den Vollabgleich noch
+  assert.equal(new Repository(mem).getSyncState().fullPushNeeded, true);
+  gate.resolve();
+  assert.equal((await run).phase, 'idle');
+  assert.equal(server.records.size, 5);
+  assert.equal(a.repo.getSyncState().fullPushNeeded, false);
+  assert.equal(new Repository(mem).getSyncState().fullPushNeeded, false, 'nach erfolgreicher Runde persistiert');
+
+  // Überlauf während des Pushs: Outbox geleert → Flag muss stehen bleiben
+  a.repo.markFullPush();
+  server.recordCalls = 0;
+  const reached2 = deferred();
+  const gate2 = deferred();
+  server.onUpsertRecords = (n) => (n === 2 ? (reached2.resolve(), gate2.promise) : undefined);
+  const run2 = a.engine.syncNow();
+  await reached2.promise;
+  for (let i = 0; i < 4; i++) add(a, 'b', `n${i}`); // > maxPending
+  assert.equal(a.engine.pendingCount(), 0);
+  gate2.resolve();
+  assert.equal((await run2).phase, 'idle');
+  assert.equal(a.repo.getSyncState().fullPushNeeded, true, 'Überlauf während des Pushs bleibt angefordert');
+  server.onUpsertRecords = null;
+  assert.equal((await a.engine.syncNow()).phase, 'idle');
+  assert.equal(a.repo.getSyncState().fullPushNeeded, false);
+  for (let i = 0; i < 4; i++) assert.ok(server.records.has(`b:n${i}`));
+});
+
+test('Push sucht Outbox-Einträge per Index (kein list() je Eintrag), Tombstones inklusive', async () => {
+  const server = new FakeServer();
+  const a = device(server);
+  for (let i = 0; i < 300; i++) add(a, 'b', `r${i}`);
+  a.repo.remove('b', 'r7');
+  let lists = 0;
+  const list = a.repo.list.bind(a.repo);
+  a.repo.list = ((c: string, inc?: boolean) => { lists++; return list(c, inc); }) as typeof a.repo.list;
+  const st = await a.engine.syncNow();
+  assert.equal(st.phase, 'idle');
+  assert.equal(st.pushed, 300);
+  assert.equal(lists, 0);
+  assert.ok(server.records.get('b:r7')?.item.deletedAt);
+});
+
+test('Limit: neues Gerät behält seine noch nicht hochgeladenen Datensätze, wenn der Pull ältere fremde anhängt', async () => {
+  const schema: SyncSchema = { ...testSchema, collections: [{ name: 'a', limit: 5 }, { name: 'b' }] };
+  for (const viaFullPush of [false, true]) {
+    const server = new FakeServer();
+    const old = device(server, { schema });
+    for (let i = 0; i < 5; i++) { clock.t++; add(old, 'a', `alt${i}`); }
+    await old.engine.syncNow();
+    clock.t += 1000;
+    const neu = device(server, { schema });
+    for (let i = 0; i < 3; i++) {
+      clock.t++;
+      // Variante Vollabgleich: Outbox leer (z. B. nach Überlauf), nur fullPushNeeded
+      neu.repo.upsert<Rec>('a', { v: 1, ...createMeta(clock.t, neu.id, `neu${i}`) }, !viaFullPush);
+    }
+    if (viaFullPush) neu.repo.markFullPush();
+    const st = await neu.engine.syncNow();
+    assert.equal(st.phase, 'idle');
+    assert.deepEqual(ids(neu, 'a'), ['alt3', 'alt4', 'neu0', 'neu1', 'neu2'], 'älteste fremde fallen weg');
+    for (let i = 0; i < 3; i++) assert.ok(server.records.has(`a:neu${i}`), `neu${i} hochgeladen`);
+    assert.equal(neu.engine.pendingCount(), 0);
+    assert.equal(neu.repo.getSyncState().fullPushNeeded, false);
+  }
+});
+
 test('Dokument/Target außerhalb des Schemas wird nie hochgeladen, aber bestätigt', async () => {
   const server = new FakeServer();
   const a = device(server);
@@ -363,11 +467,39 @@ test('wipeRemote leert den Server und setzt den Cursor zurück', async () => {
   add(a, 'a', 'r1');
   await a.engine.syncNow();
   assert.ok(a.repo.getSyncState().cursor !== null);
+  const docCalls = server.docCalls;
   await a.engine.wipeRemote();
   assert.equal(server.records.size, 0);
   assert.equal(a.repo.getSyncState().cursor, null);
+  // Provider ohne Rückgabe: Engine schreibt die Markierung selbst (zweiter Aufruf)
+  assert.equal(server.docCalls, docCalls + 1);
+  assert.deepEqual(server.docs.get(WIPE_DOC)?.doc, { name: WIPE_DOC, data: { at: clock.t }, updatedAt: clock.t, deviceId: a.id });
+  assert.equal(a.repo.getAppliedWipe(), clock.t);
   server.failNext('auth', 'deleteAll');
   await assert.rejects(() => a.engine.wipeRemote(), (e: unknown) => e instanceof SyncError && e.kind === 'auth');
+});
+
+test('wipeRemote: Server schreibt die Markierung atomar (deleteAll liefert at) → kein zweiter Aufruf', async () => {
+  const server = new FakeServer();
+  const a = wipeDevice(server);
+  const b = wipeDevice(server);
+  add(a, 'a', 'r1');
+  await a.engine.syncNow();
+  await b.engine.syncNow();
+  const at = clock.t + 5000; // Serveruhr, nicht die des Geräts
+  server.serverWipeAt = at;
+  const docCalls = server.docCalls;
+  await a.engine.wipeRemote();
+  assert.equal(server.docCalls, docCalls, 'kein upsertDocs');
+  assert.deepEqual([...server.docs.keys()], [WIPE_DOC]);
+  assert.equal(server.records.size, 0);
+  assert.equal(a.repo.getAppliedWipe(), at);
+  assert.equal(a.repo.getSyncState().cursor, null);
+  await a.engine.syncNow();
+  assert.equal(a.wipes.length, 0, 'eigene Marke löst keinen Reset aus');
+  await b.engine.syncNow();
+  assert.deepEqual(b.wipes, [at]);
+  assert.deepEqual(ids(b, 'a'), []);
 });
 
 test('Eigenes perDevice-Remote-Dokument wird per merge eingemischt und löst bei Gleichheit keinen Push aus', async () => {
@@ -409,6 +541,41 @@ test('Merge-Ergebnis gleich Remote löst keinen Rück-Upload aus (kein Ping-Pong
   await a.engine.syncNow();
   assert.deepEqual(a.repo.getDoc('log'), { k1: { ts: 5, v: 'a' }, k2: { ts: 1, v: 'b' } });
   assert.equal(a.engine.pendingCount(), 0);
+});
+
+test('Dokument-Uhr: nachgehende Geräteuhr – gemergtes Dokument wird mit größerem updatedAt gesendet', async () => {
+  const server = new FakeServer();
+  const a = device(server);
+  const ahead = clock.t + 600_000; // anderes Gerät geht 10 min vor
+  await server.upsertDocs([{ name: 'best', data: { l1: 3 }, updatedAt: ahead, deviceId: 'other' }]);
+  a.repo.putDoc('best', { l1: 3 }, false); // gleich: merge ändert nichts
+  await a.engine.syncNow();
+  assert.equal(a.repo.getDocClock('best'), ahead, 'auch ohne Änderung gemerkt');
+  a.repo.putDoc('best', { l1: 5 });
+  assert.equal((await a.engine.syncNow()).pushed, 1);
+  const sent = server.docs.get('best')?.doc;
+  assert.ok(sent && sent.updatedAt > ahead, 'Server-Trigger würde sonst still verwerfen');
+  assert.deepEqual(sent.data, { l1: 5 });
+  // weitere Änderung: bleibt monoton (eigener Stand kommt per Pull zurück)
+  a.repo.putDoc('best', { l1: 6 });
+  await a.engine.syncNow();
+  const next = server.docs.get('best')?.doc;
+  assert.ok(next && next.updatedAt > sent.updatedAt);
+  assert.deepEqual(next.data, { l1: 6 });
+  // eigenes perDevice-Dokument ebenso; Specs mit eigener updatedAt-Funktion (prefs) unverändert
+  await server.upsertDocs([
+    { name: `time:${a.id}`, data: { d1: 1 }, updatedAt: ahead, deviceId: a.id },
+    { name: 'time:fremd', data: { d1: 1 }, updatedAt: ahead + 5, deviceId: 'fremd' },
+    { name: 'prefs', data: { theme: 'x', updatedAt: ahead }, updatedAt: ahead, deviceId: 'other' },
+  ]);
+  await a.engine.syncNow();
+  assert.equal(a.repo.getDocClock('time'), ahead, 'nur das eigene perDevice-Dokument zählt');
+  assert.equal(a.repo.getDocClock('prefs'), 0);
+  a.repo.putDoc('prefs', { theme: 'y', updatedAt: clock.t });
+  a.repo.putDoc('time', { d1: 2 });
+  await a.engine.syncNow();
+  assert.equal(server.docs.get(`time:${a.id}`)?.doc.updatedAt, ahead + 1);
+  assert.equal(server.docs.get('prefs')?.doc.updatedAt, ahead, 'älteres prefs bleibt verworfen (LWW über das Feld)');
 });
 
 // ---------- Lösch-Markierung ----------

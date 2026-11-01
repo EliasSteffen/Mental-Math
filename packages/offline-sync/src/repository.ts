@@ -12,8 +12,12 @@ const ALWAYS_KEEP: readonly string[] = ['deviceId', WIPE_KEY];
 
 const docKey = (name: string): string => `doc:${name}`;
 const colKey = (c: string): string => `col:${c}`;
-const emptySync = (): SyncState => ({ lastPulledAt: null, lastPushedSeq: 0, nextSeq: 1, pending: [], cursor: null, fullPushNeeded: false });
+const emptySync = (): SyncState => ({
+  lastPulledAt: null, lastPushedSeq: 0, nextSeq: 1, pending: [], cursor: null, fullPushNeeded: false, fullPushGen: 0, docClock: {},
+});
 const isDeleted = (x: { deletedAt?: unknown }): boolean => x.deletedAt !== null && x.deletedAt !== undefined;
+const isObj = (x: unknown): x is Record<string, unknown> => x !== null && typeof x === 'object' && !Array.isArray(x);
+const finite = (x: unknown): number | null => (typeof x === 'number' && Number.isFinite(x) ? x : null);
 
 export interface RepositoryOptions {
   now?: () => number;
@@ -169,6 +173,14 @@ export class Repository {
     return l;
   }
 
+  /** Eintrag per ID über den Index (inkl. Tombstones); null, wenn es ihn nicht gibt. */
+  getById<T extends SyncMeta>(collection: string, id: string): T | null {
+    const arr = this.raw<T>(collection);
+    const i = this.idx(collection, arr).get(id);
+    const x = i === undefined ? undefined : arr[i];
+    return x !== null && typeof x === 'object' ? x : null;
+  }
+
   upsert<T extends SyncMeta>(collection: string, item: T, track = true): T {
     const arr = this.raw<T>(collection);
     const byId = this.idx(collection, arr);
@@ -208,22 +220,38 @@ export class Repository {
     }
   }
 
-  /** Auf `max` Einträge kürzen: zuerst Tombstones, dann die ältesten (physisch, kein Sync-Delete). */
+  /**
+   * Auf `max` Einträge kürzen (physisch, kein Sync-Delete). Genau `length − max` Opfer nach dem Schlüssel
+   * [Tombstone ? 0 : 1, sicher ? 0 : 1, createdAt] (aufsteigend = zuerst weg; Gleichstand: Array-Position).
+   * Sicher = nicht in der Outbox und – bei ausstehendem Vollabgleich – nicht vom eigenen Gerät; so fallen noch
+   * nicht hochgeladene Einträge zuletzt weg, auch wenn der Pull fremde Datensätze hinten angehängt hat.
+   * Die Reihenfolge der übrigen bleibt.
+   */
   trim(collection: string, max: number): void {
-    let arr = this.raw<SyncMeta>(collection);
-    if (arr.length <= max) return;
-    let excess = arr.length - max;
-    arr = arr.filter((x) => {
-      if (excess > 0 && x && isDeleted(x)) {
-        excess--;
-        return false;
-      }
-      return true;
-    });
-    if (excess > 0) arr = arr.slice(excess);
+    const arr = this.raw<SyncMeta>(collection);
+    if (arr.length <= max) return; // Fast-Path: läuft nach jedem Upsert der App
+    const s = this.getSyncState();
+    const pending = new Set<string>();
+    for (const c of s.pending) if (c.target === collection) pending.add(c.id);
+    const own = s.fullPushNeeded ? this.deviceId : null;
+    const n = arr.length;
+    const k1 = new Uint8Array(n);
+    const k2 = new Uint8Array(n);
+    const k3 = new Float64Array(n);
+    for (let i = 0; i < n; i++) {
+      const x = arr[i] as Partial<SyncMeta> | null;
+      if (!isObj(x)) continue; // kaputte Einträge zuerst
+      k1[i] = isDeleted(x) ? 0 : 1;
+      const safe = !(typeof x.id === 'string' && pending.has(x.id)) && (own === null || x.deviceId !== own);
+      k2[i] = safe ? 0 : 1;
+      k3[i] = finite(x.createdAt) ?? finite(x.updatedAt) ?? 0;
+    }
+    const order = Array.from({ length: n }, (_, i) => i);
+    order.sort((a, b) => k1[a]! - k1[b]! || k2[a]! - k2[b]! || k3[a]! - k3[b]! || a - b);
+    const drop = new Set(order.slice(0, n - max));
     this.live.delete(collection);
     this.index.delete(collection);
-    this.write(colKey(collection), arr);
+    this.write(colKey(collection), arr.filter((_, i) => !drop.has(i)));
   }
 
   // ----- Änderungsprotokoll -----
@@ -234,6 +262,8 @@ export class Repository {
       // Felder alter Stände auffüllen
       if (st.cursor === undefined) st.cursor = null;
       if (typeof st.fullPushNeeded !== 'boolean') st.fullPushNeeded = false;
+      if (finite(st.fullPushGen) === null) st.fullPushGen = 0;
+      if (!isObj(st.docClock)) st.docClock = {};
       return st;
     }
     const s = emptySync();
@@ -262,6 +292,7 @@ export class Repository {
     s.pending.push(rec);
     if (s.pending.length > this.maxPending) {
       s.fullPushNeeded = true;
+      s.fullPushGen++; // ein laufender Vollabgleich darf das Flag danach nicht löschen
       s.pending = [];
     }
     if (save) this.saveSync();
@@ -270,13 +301,37 @@ export class Repository {
     }
   }
 
+  /** Vollabgleich anfordern; erhöht `fullPushGen`. */
   markFullPush(): void {
-    this.getSyncState().fullPushNeeded = true;
+    const s = this.getSyncState();
+    s.fullPushNeeded = true;
+    s.fullPushGen++;
     this.saveSync();
   }
 
-  clearFullPush(): void {
-    this.getSyncState().fullPushNeeded = false;
+  /**
+   * Vollabgleich als erledigt markieren – nur, wenn seit Beginn des Pushs (`gen`) kein neuer angefordert wurde.
+   * Aufruf erst nach erfolgreichem Senden aller Pakete; ein Abbruch davor lässt das Flag stehen.
+   */
+  clearFullPushIf(gen: number): boolean {
+    const s = this.getSyncState();
+    if (s.fullPushGen !== gen) return false;
+    s.fullPushNeeded = false;
+    this.saveSync();
+    return true;
+  }
+
+  /** Höchster gesehener Remote-`updatedAt` eines Dokuments (0 = keiner). */
+  getDocClock(name: string): number {
+    const c = this.getSyncState().docClock;
+    return Object.hasOwn(c, name) ? (finite(c[name]) ?? 0) : 0;
+  }
+
+  /** Remote-`updatedAt` eines Dokuments merken, wenn er größer ist als der bisher gesehene. */
+  noteDocClock(name: string, at: number): void {
+    if (!Number.isFinite(at) || at <= this.getDocClock(name)) return;
+    const s = this.getSyncState();
+    s.docClock = { ...s.docClock, [name]: at }; // berechneter Schlüssel: auch '__proto__' wird eigenes Feld
     this.saveSync();
   }
 
