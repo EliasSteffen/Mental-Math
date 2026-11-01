@@ -32,18 +32,20 @@ export class LocalStorageAdapter implements StorageAdapter {
     return this.fallback.get(key) ?? null;
   }
 
-  set(key: string, value: string): void {
+  /** `false`, wenn der Wert nur im Memory-Fallback landet (fehlt, Quota, Privatmodus). */
+  set(key: string, value: string): boolean {
     const s = ls();
     if (s) {
       try {
         s.setItem(this.prefix + key, value);
         this.fallback.delete(key);
-        return;
+        return true;
       } catch {
         /* Fallback unten */
       }
     }
     this.fallback.set(key, value);
+    return false;
   }
 
   remove(key: string): void {

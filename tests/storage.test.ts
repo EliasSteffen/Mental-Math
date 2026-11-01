@@ -40,6 +40,15 @@ function withStorage(fs: Storage | null, fn: () => void): void {
   }
 }
 
+/** Datensätze einer Collection aus dem Rohspeicher (`rec:<name>:<id>` → `[ord, record]`), in Speicherreihenfolge. */
+function rawCollection<T>(fs: FakeStorage, name: string): T[] {
+  const p = `${V3}rec:${name}:`;
+  return [...fs.raw].filter(([k]) => k.startsWith(p))
+    .map(([, v]) => JSON.parse(v) as [number, T])
+    .sort((a, b) => a[0] - b[0])
+    .map(([, x]) => x);
+}
+
 const att = (o: Partial<Attempt> = {}): Attempt => ({
   ts: 1, sessionId: 's', mode: 'all', category: 'pct', subtype: 'pct.of', prompt: '', unit: '', expected: 1, given: 1,
   correct: true, errorType: null, timeMs: 1000, targetMs: 2000, weight: 1, points: 100, ...o,
@@ -137,7 +146,8 @@ test('Migration v1 → v2: Daten bleiben, neue Felder und Defaults kommen dazu',
     const stored = JSON.parse(fs.raw.get(V3 + 'doc:settings') ?? '{}') as Record<string, unknown>;
     assert.equal(stored.ghost, false);
     assert.equal(stored.sessionLength, 20);
-    assert.equal((JSON.parse(fs.raw.get(V3 + 'col:results') ?? '[]') as unknown[]).length, 1);
+    assert.equal(rawCollection(fs, 'results').length, 1);
+    assert.ok(![...fs.raw.keys()].some((k) => k.startsWith(V3 + 'col:')), 'ein Schlüssel je Datensatz');
     assert.ok(!fs.raw.has(KEY));
     assert.equal(fs.raw.get(KEY + '.bak'), JSON.stringify(v1));
   });
@@ -202,8 +212,8 @@ test('Cache: Write-Through bei Mutationen, ohne erneutes Lesen', () => {
     assert.equal(fs.reads, reads, 'Mutationen lesen nicht erneut');
     const doc = (n: string): Record<string, unknown> => JSON.parse(fs.raw.get(V3 + n) ?? '{}') as Record<string, unknown>;
     assert.equal(doc('doc:settings').theme, 'paper');
-    assert.equal((JSON.parse(fs.raw.get(V3 + 'col:results') ?? '[]') as Attempt[])[0]?.ts, 7);
-    assert.equal((JSON.parse(fs.raw.get(V3 + 'col:sessions') ?? '[]') as unknown[]).length, 1);
+    assert.equal(rawCollection<Attempt>(fs, 'results')[0]?.ts, 7);
+    assert.equal(rawCollection(fs, 'sessions').length, 1);
     assert.deepEqual(doc('doc:chainBest'), { 2: 6 });
     assert.equal((doc('doc:dailyResults')['2026-01-01'] as DailyResult).correct, 12);
     assert.equal(getAttempts().length, 1);
