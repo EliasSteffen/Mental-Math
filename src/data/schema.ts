@@ -12,6 +12,7 @@ export const DEFAULT_SETTINGS: Settings = {
   lang: 'auto',
   lastSeenVersion: '',
   timerDisplay: 'calm', breathe: false, confetti: false,
+  lastStoreCheck: 0, updateNotifiedVersion: '', updateNotifiedAt: 0, reviewAskedVersion: '', reviewAskedAt: 0,
 };
 
 export const DEFAULT_PARALLEL_STATS: ParallelStats = { nextStart: 2, bestChains: 0, bestCorrectStreak: 0, rounds: 0 };

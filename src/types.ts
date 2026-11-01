@@ -177,6 +177,15 @@ export interface Settings {
   breathe: boolean;
   /** „Feiern“: Konfetti beim Tagesziel (E4) */
   confetti: boolean;
+  // App Store (nur iOS, geräte-lokal)
+  /** letzte Abfrage der Store-Version (ms) */
+  lastStoreCheck: number;
+  /** zuletzt gemeldete Store-Version und wann */
+  updateNotifiedVersion: string;
+  updateNotifiedAt: number;
+  /** App-Version und Zeitpunkt der letzten Bitte um eine Bewertung */
+  reviewAskedVersion: string;
+  reviewAskedAt: number;
 }
 
 export interface ReviewItem { box: number; dueAt: number; lastTs: number }

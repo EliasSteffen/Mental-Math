@@ -55,4 +55,7 @@ export const common: Record<keyof typeof De, string> = {
   // App update (platform/web.ts)
   updateReady: 'New version available',
   updateReload: 'Reload',
+  // App update from the App Store (features/app-store.ts)
+  storeUpdate: 'Update available',
+  storeUpdateAction: 'Update',
 };

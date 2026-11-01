@@ -53,4 +53,7 @@ export const common = {
   // App-Update (platform/web.ts)
   updateReady: 'Neue Version verfügbar',
   updateReload: 'Neu laden',
+  // App-Update aus dem App Store (features/app-store.ts)
+  storeUpdate: 'Update verfügbar',
+  storeUpdateAction: 'Aktualisieren',
 } as const;

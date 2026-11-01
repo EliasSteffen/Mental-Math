@@ -18,6 +18,7 @@
 		9582B6832FE993A70072D4E8 /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9582B6822FE993A50072D4E8 /* SceneDelegate.swift */; };
 		7A11C0DE0000000000000002 /* MainViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A11C0DE0000000000000001 /* MainViewController.swift */; };
 		7A11C0DE0000000000000004 /* NativeAuthPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A11C0DE0000000000000003 /* NativeAuthPlugin.swift */; };
+		7A11C0DE00000000000A5102 /* AppStorePlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A11C0DE00000000000A5101 /* AppStorePlugin.swift */; };
 		7A11C0DE0000000000000006 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 7A11C0DE0000000000000005 /* PrivacyInfo.xcprivacy */; };
 /* End PBXBuildFile section */
 
@@ -35,6 +36,7 @@
 		958DCC722DB07C7200EA8C5F /* debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = debug.xcconfig; path = ../debug.xcconfig; sourceTree = SOURCE_ROOT; };
 		7A11C0DE0000000000000001 /* MainViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainViewController.swift; sourceTree = "<group>"; };
 		7A11C0DE0000000000000003 /* NativeAuthPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeAuthPlugin.swift; sourceTree = "<group>"; };
+		7A11C0DE00000000000A5101 /* AppStorePlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppStorePlugin.swift; sourceTree = "<group>"; };
 		7A11C0DE0000000000000005 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		7A11C0DE0000000000000007 /* App.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = App.entitlements; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -74,6 +76,7 @@
 				9582B6822FE993A50072D4E8 /* SceneDelegate.swift */,
 				7A11C0DE0000000000000001 /* MainViewController.swift */,
 				7A11C0DE0000000000000003 /* NativeAuthPlugin.swift */,
+				7A11C0DE00000000000A5101 /* AppStorePlugin.swift */,
 				7A11C0DE0000000000000007 /* App.entitlements */,
 				7A11C0DE0000000000000005 /* PrivacyInfo.xcprivacy */,
 				50379B222058CBB4000EE86E /* capacitor.config.json */,
@@ -174,6 +177,7 @@
 				9582B6832FE993A70072D4E8 /* SceneDelegate.swift in Sources */,
 				7A11C0DE0000000000000002 /* MainViewController.swift in Sources */,
 				7A11C0DE0000000000000004 /* NativeAuthPlugin.swift in Sources */,
+				7A11C0DE00000000000A5102 /* AppStorePlugin.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

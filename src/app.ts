@@ -8,6 +8,7 @@ import { restoreAccount, watchAccountRestore } from './features/account.ts';
 import { startSync } from './features/sync.ts';
 import { maybeShowWhatsNew } from './features/whats-new.ts';
 import { startPush } from './platform/reminders.ts';
+import { startAppUpdateCheck } from './features/app-store.ts';
 
 await initStorage();
 
@@ -21,3 +22,4 @@ watchAccountRestore(); // Offline-Kaltstart: Anmeldung wiederherstellen, sobald 
 startSync();
 startPush();
 maybeShowWhatsNew();
+startAppUpdateCheck(); // nur iOS: neue Version im App Store
