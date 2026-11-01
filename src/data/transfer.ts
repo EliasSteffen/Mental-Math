@@ -4,9 +4,8 @@ import { isObj, normalize } from './schema.ts';
 import { t } from '../i18n/index.ts';
 import { save } from './storage.ts';
 
-export type ImportResult = { ok: true; attempts: number; sessions: number } | { ok: false; error: string };
-
-const hasTs = (x: unknown): boolean => isObj(x) && typeof x.ts === 'number' && Number.isFinite(x.ts);
+/** `skipped` = verworfene Versuche + Runden (unvollständig, siehe isValidAttempt/isValidSession). */
+export type ImportResult = { ok: true; attempts: number; sessions: number; skipped: number } | { ok: false; error: string };
 
 export function importJSON(text: string): ImportResult {
   let data: unknown;
@@ -27,13 +26,13 @@ export function importJSON(text: string): ImportResult {
   for (const k of ['settings', 'reviews', 'activity', 'dailyResults', 'chainBest', 'parallel'] as const) {
     if (k in data && data[k] !== null && !isObj(data[k])) return { ok: false, error: t('settings.errBadField', { field: k }) };
   }
-  const attempts = (Array.isArray(data.attempts) ? data.attempts : []).filter(hasTs);
-  const sessions = (Array.isArray(data.sessions) ? data.sessions : []).filter(hasTs);
-  const state: State = normalize({ ...data, attempts, sessions });
+  const count = (v: unknown): number => (Array.isArray(v) ? v.length : 0);
+  const state: State = normalize(data); // verwirft ungültige Versuche und Runden
+  const skipped = count(data.attempts) - state.attempts.length + count(data.sessions) - state.sessions.length;
   try {
     save(state);
   } catch {
     return { ok: false, error: t('settings.errSave') };
   }
-  return { ok: true, attempts: state.attempts.length, sessions: state.sessions.length };
+  return { ok: true, attempts: state.attempts.length, sessions: state.sessions.length, skipped };
 }

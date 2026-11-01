@@ -37,7 +37,7 @@ test('importJSON: Round-Trip mit v3-Export', () => {
   resetAll();
   assert.equal(getAttempts().length, 0);
   const res = importJSON(json);
-  assert.deepEqual(res, { ok: true, attempts: 2, sessions: 1 });
+  assert.deepEqual(res, { ok: true, attempts: 2, sessions: 1, skipped: 0 });
   assert.equal(getAttempts().length, 2);
   assert.equal(getSessions().length, 1);
   assert.equal(getSettings().sessionLength, 20);
@@ -48,7 +48,7 @@ test('importJSON: alter v1/v2-State, ungültige Einträge werden verworfen', () 
   fresh();
   const old = { version: 1, attempts: [att({ ts: 5 }), null, 'x', { foo: 1 }], sessions: [ses()], settings: { dailyGoalMin: 30 } };
   const res = importJSON(JSON.stringify(old));
-  assert.deepEqual(res, { ok: true, attempts: 1, sessions: 1 });
+  assert.deepEqual(res, { ok: true, attempts: 1, sessions: 1, skipped: 3 });
   assert.equal(getSettings().dailyGoalMin, 30);
   assert.equal(getSettings().timer, true);
   resetAll();

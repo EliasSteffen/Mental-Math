@@ -69,12 +69,129 @@ test('restoreAccount mit Hint stellt Sitzung wieder her', async () => {
   assert.deepEqual(acct.getAccountState(), { status: 'signed-in', user });
 });
 
-test('restoreAccount: Fehler → still signed-out', async () => {
+/** Modul, dessen restore() nacheinander die Ergebnisse aus `steps` liefert (Error → wird geworfen). */
+function restoreSequence(steps: Array<AuthSession | null | Error>): VendorModuleLike {
   const m = fakeModule();
-  acct._setModuleForTests({ ...m, createPasskeyAuth: () => ({ ...m.createPasskeyAuth(), restore: async () => { throw new Error('offline'); } }) }, ON);
+  return {
+    ...m,
+    createPasskeyAuth: () => {
+      const auth = m.createPasskeyAuth();
+      return {
+        ...auth,
+        restore: async () => {
+          restored += 1;
+          const next = steps.shift() ?? null;
+          if (next instanceof Error) throw next;
+          return next;
+        },
+      };
+    },
+  };
+}
+const authError = (code: string, status?: number): Error => Object.assign(new Error(code), { name: 'PasskeyAuthError', code, status });
+const tick = (): Promise<void> => new Promise((r) => setTimeout(r, 0));
+
+test('restoreAccount: Netzwerkfehler → offline, Hint bleibt', async () => {
+  acct._setModuleForTests(restoreSequence([authError('network')]), ON);
+  store.set('mm:v3:auth.hint', '1');
+  await acct.restoreAccount();
+  assert.equal(acct.getAccountState().status, 'offline');
+  assert.equal(store.get('mm:v3:auth.hint'), '1');
+});
+
+test('restoreAccount: Serverfehler und unbekannte Fehler → offline', async () => {
+  acct._setModuleForTests(restoreSequence([authError('server_error', 503), new Error('Failed to fetch')]), ON);
+  store.set('mm:v3:auth.hint', '1');
+  await acct.restoreAccount();
+  assert.equal(acct.getAccountState().status, 'offline');
+  await acct.restoreAccount();
+  assert.equal(acct.getAccountState().status, 'offline');
+});
+
+test('restoreAccount: Modul nicht ladbar (offline) → offline', async () => {
+  const m = fakeModule();
+  acct._setModuleForTests({ ...m, createPasskeyAuth: () => { throw authError('network'); } }, ON);
+  store.set('mm:v3:auth.hint', '1');
+  await acct.restoreAccount();
+  assert.equal(acct.getAccountState().status, 'offline');
+});
+
+test('restoreAccount: 401 bzw. keine Sitzung → signed-out, Hint weg', async () => {
+  acct._setModuleForTests(restoreSequence([null]), ON); // Client liefert nach 401 null
   store.set('mm:v3:auth.hint', '1');
   await acct.restoreAccount();
   assert.equal(acct.getAccountState().status, 'signed-out');
+  assert.equal(store.has('mm:v3:auth.hint'), false);
+
+  acct._setModuleForTests(restoreSequence([authError('unauthorized', 401)]), ON);
+  store.set('mm:v3:auth.hint', '1');
+  await acct.restoreAccount();
+  assert.equal(acct.getAccountState().status, 'signed-out');
+  assert.equal(store.has('mm:v3:auth.hint'), false);
+});
+
+test('restoreAccount: parallele Aufrufe teilen sich einen Lauf', async () => {
+  acct._setModuleForTests(restoreSequence([session]), ON);
+  store.set('mm:v3:auth.hint', '1');
+  await Promise.all([acct.restoreAccount(), acct.restoreAccount()]);
+  assert.equal(restored, 1);
+  assert.equal(acct.getAccountState().status, 'signed-in');
+});
+
+test('watchAccountRestore: online-Event nach Offline-Start → erneuter restore → signed-in', async () => {
+  acct._setModuleForTests(restoreSequence([authError('network'), session]), ON);
+  store.set('mm:v3:auth.hint', '1');
+  const win = new EventTarget();
+  const doc = Object.assign(new EventTarget(), { visibilityState: 'visible' });
+  acct.watchAccountRestore(win, doc);
+  acct.watchAccountRestore(win, doc); // idempotent: kein zweiter Hörer
+  const seen: string[] = [];
+  acct.onAccountChange((s) => seen.push(s.status));
+  await acct.restoreAccount();
+  assert.equal(acct.getAccountState().status, 'offline');
+  win.dispatchEvent(new Event('online'));
+  await tick();
+  assert.equal(restored, 2);
+  assert.deepEqual(acct.getAccountState(), { status: 'signed-in', user });
+  assert.ok(!seen.slice(1).includes('loading'), 'erneuter Versuch zeigt weiter den Offline-Hinweis');
+  // angemeldet: weitere Events lösen nichts aus
+  win.dispatchEvent(new Event('online'));
+  doc.dispatchEvent(new Event('visibilitychange'));
+  await tick();
+  assert.equal(restored, 2);
+});
+
+test('watchAccountRestore: sichtbarer Tab versucht es erneut, verborgener nicht', async () => {
+  acct._setModuleForTests(restoreSequence([authError('network'), authError('network'), session]), ON);
+  store.set('mm:v3:auth.hint', '1');
+  const win = new EventTarget();
+  const doc = Object.assign(new EventTarget(), { visibilityState: 'hidden' });
+  acct.watchAccountRestore(win, doc);
+  await acct.restoreAccount();
+  doc.dispatchEvent(new Event('visibilitychange'));
+  await tick();
+  assert.equal(restored, 1, 'verborgen: kein Versuch');
+  doc.visibilityState = 'visible';
+  doc.dispatchEvent(new Event('visibilitychange'));
+  await tick();
+  assert.equal(restored, 2);
+  assert.equal(acct.getAccountState().status, 'offline', 'weiter offline');
+  doc.dispatchEvent(new Event('visibilitychange'));
+  await tick();
+  assert.equal(restored, 3);
+  assert.equal(acct.getAccountState().status, 'signed-in');
+});
+
+test('watchAccountRestore: abgemeldet (kein offline) → Events lösen nichts aus', async () => {
+  acct._setModuleForTests(restoreSequence([null, session]), ON);
+  store.set('mm:v3:auth.hint', '1');
+  const win = new EventTarget();
+  acct.watchAccountRestore(win, Object.assign(new EventTarget(), { visibilityState: 'visible' }));
+  await acct.restoreAccount();
+  assert.equal(acct.getAccountState().status, 'signed-out');
+  win.dispatchEvent(new Event('online'));
+  await tick();
+  assert.equal(restored, 1);
 });
 
 test('register: signed-out → signed-in, Hint gesetzt; logout entfernt ihn', async () => {
