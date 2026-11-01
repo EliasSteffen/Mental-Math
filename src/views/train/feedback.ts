@@ -83,7 +83,7 @@ export function buildFeedback({ task, given, diagnosis, assisted, method, isLast
   const methodBtn = method
     ? button({ label: t('train.method'), icon: 'book', onClick: () => openMethodSheet(method) })
     : null;
-  const ai = isAiAvailable() ? aiControl(t('train.aiExplain'), () => aiExplainTask(task, given), { kind: 'outline' }) : null;
+  const ai = isAiAvailable() ? aiControl(t('train.aiExplain'), () => aiExplainTask(task, given, kind === 'good'), { kind: 'outline' }) : null;
   ai?.classList.add('train-fb-ai');
   const actions = methodBtn || ai
     ? h('div', { class: `train-fb-actions${methodBtn && ai ? '' : ' is-single'}` }, methodBtn, ai)

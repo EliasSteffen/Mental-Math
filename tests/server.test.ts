@@ -195,3 +195,73 @@ test('validate/buildPrompt: Sprache', () => {
   const de = buildPrompt(val({ ...goodTask(), expected: 1918 }));
   assert.match(de.user, /Richtige Antwort: 1\.918/);
 });
+
+// Fall aus dem Simulator: 33 statt 33,33 lag in der Toleranz, die KI unterstellte trotzdem einen Rundungsfehler
+const marginTask = (extra: Record<string, unknown> = {}) => ({
+  kind: 'task',
+  subtype: 'pct.points',
+  prompt: 'Die Marge steigt von 6 % auf 8 %. Um wie viel Prozent (nicht Prozentpunkte)?',
+  params: { m1: 6, m2: 8 },
+  expected: 33.3333,
+  unit: '%',
+  given: 33,
+  ...extra,
+});
+const ERROR_DE = /Fehler|falsch/i;
+const ERROR_EN = /wrong|mistake|error/i;
+
+test('validate: correct nur als Boolean, ohne Antwort bedeutungslos', () => {
+  assert.equal((val(marginTask({ correct: true })) as ExplainTaskValue).correct, true);
+  assert.equal((val(marginTask({ correct: false })) as ExplainTaskValue).correct, false);
+  assert.equal((val(marginTask()) as ExplainTaskValue).correct, null);
+  assert.equal((val(marginTask({ correct: null })) as ExplainTaskValue).correct, null);
+  assert.equal((val(marginTask({ given: null, correct: true })) as ExplainTaskValue).correct, null);
+  for (const correct of ['ja', 1, 0, {}, []]) {
+    assert.deepEqual(validateExplainRequest(marginTask({ correct })), { ok: false, error: 'invalid' });
+  }
+});
+
+test('buildPrompt: richtige Antwort ohne Fehler-Rahmung (de/en)', () => {
+  const de = buildPrompt(val(marginTask({ correct: true })));
+  assert.doesNotMatch(de.system + '\n' + de.user, ERROR_DE);
+  assert.match(de.system, /war richtig/);
+  assert.match(de.system, /schnelleren Weg/);
+  assert.match(de.user, /Antwort des Nutzers \(richtig\): 33 %/);
+
+  const en = buildPrompt(val(marginTask({ correct: true, lang: 'en' })));
+  assert.doesNotMatch(en.system + '\n' + en.user, ERROR_EN);
+  assert.match(en.system, /was correct/);
+  assert.match(en.system, /faster way/);
+  assert.match(en.user, /User’s answer \(correct\): 33 %/);
+});
+
+test('buildPrompt: falsche Antwort behält die Fehleranalyse (de/en)', () => {
+  const de = buildPrompt(val(marginTask({ given: 2, correct: false })));
+  assert.match(de.system, /war falsch: Nenne zuerst kurz den wahrscheinlichen Denkfehler/);
+  assert.match(de.user, /Antwort des Nutzers \(falsch\): 2 %/);
+
+  const en = buildPrompt(val(marginTask({ given: 2, correct: false, lang: 'en' })));
+  assert.match(en.system, /was wrong: first briefly name the likely mistake/);
+  assert.match(en.user, /User’s answer \(wrong\): 2 %/);
+});
+
+test('buildPrompt: ohne Wertung (ältere Clients) neutral, ohne Antwort keine Fehlersuche', () => {
+  const open = buildPrompt(val(marginTask()));
+  assert.match(open.system, /Wenn die Antwort des Nutzers falsch war/);
+  assert.match(open.user, /Antwort des Nutzers: 33 %/);
+  assert.doesNotMatch(open.user, ERROR_DE);
+
+  const skipped = buildPrompt(val(marginTask({ given: null })));
+  assert.doesNotMatch(skipped.system + '\n' + skipped.user, ERROR_DE);
+  assert.doesNotMatch(skipped.user, /Antwort des Nutzers/);
+});
+
+test('200: Wertung kommt bis in den Gemini-Prompt', async () => {
+  const calls: Call[] = [];
+  const res = await handleExplain(mkReq(marginTask({ correct: true })), { GOOGLE_API_KEY: 'k' }, { fetchImpl: okFetch(calls) });
+  assert.equal(res.status, 200);
+  const sent = JSON.parse(String(calls[0]?.init?.body));
+  const prompt = sent.systemInstruction.parts[0].text + '\n' + sent.contents[0].parts[0].text;
+  assert.doesNotMatch(prompt, ERROR_DE);
+  assert.match(prompt, /Antwort des Nutzers \(richtig\)/);
+});
