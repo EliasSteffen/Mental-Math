@@ -12,8 +12,8 @@ App ── Repository (sync. Cache + Outbox) ── StorageAdapter ── Indexe
              SyncManager (Trigger, Backoff, Lock, Status)
 ```
 
-- `Repository`: `getDoc`/`putDoc` (Dokumente), `list`/`upsert`/`remove`/`replaceCollection`/`trim` (Collections mit `SyncMeta`), `getSyncState`, `ackChanges`, `onTrackedChange`. Upsert und Remove nutzen einen ID-Index pro Collection (kein O(n)-Suchlauf).
-- Speicherschlüssel: `doc:<name>`, `col:<name>`, `sync`, `deviceId`.
+- `Repository`: `getDoc`/`putDoc` (Dokumente), `list`/`getById`/`upsert`/`remove`/`replaceCollection`/`trim` (Collections mit `SyncMeta`), `getSyncState`, `ackChanges`, `onTrackedChange`. `getById`, Upsert und Remove nutzen einen ID-Index pro Collection (kein O(n)-Suchlauf); `getById` liefert auch Tombstones.
+- Speicherschlüssel: `doc:<name>`, `col:<name>`, `sync` (Outbox, Cursor, Vollabgleich-Flag samt `fullPushGen`, Dokument-Uhr `docClock`), `deviceId`, `wipeAt`.
 - `SyncEngine`: pro Runde erst Pull (Merge), dann Push (Outbox). `syncNow()` wirft nie.
 - `SyncManager`: plant die Runden und hält den `SyncStatus`.
 
@@ -43,7 +43,7 @@ const engine = new SyncEngine(repo, { schema, deviceId: () => repo.deviceId });
 ```
 
 - Nur Collections und Dokumente aus dem Schema werden synchronisiert. Änderungen anderer Ziele (z. B. `profile`) werden sofort quittiert und nie hochgeladen.
-- `limit`: nach jedem Pull wird lokal auf so viele Einträge gekürzt (Tombstones zuerst, dann die ältesten; kein Sync-Delete).
+- `limit`: nach jedem Pull wird lokal auf so viele Einträge gekürzt (physisch, kein Sync-Delete). Weg fallen genau `length − limit` Einträge in dieser Reihenfolge: Tombstones, dann bereits hochgeladene, dann noch ausstehende – jeweils die ältesten (`createdAt`) zuerst. Ausstehend heißt: in der Outbox oder, solange ein Vollabgleich aussteht, vom eigenen Gerät. So verdrängen ältere fremde Datensätze, die der Pull hinten anhängt, keine noch nicht hochgeladenen eigenen. Die Reihenfolge der übrigen bleibt.
 - `perDevice`: Remote-Name `${name}:${deviceId}`. Das eigene Dokument wird per `merge` zurückgeführt, Dokumente anderer Geräte landen ohne Tracking in `${name}Remote` als `{ [deviceId]: data }`.
 - Nach einem Merge wird nur hochgeladen, wenn `toRemote(merged)` vom Remote-Stand abweicht (stabiler JSON-Vergleich). So gibt es kein Ping-Pong.
 
@@ -77,21 +77,26 @@ Reine, kommutative bzw. idempotente Funktionen; kaputte Eingaben zählen als `{}
 ## Konfliktregeln
 
 - Collections: höchstes `(updatedAt, rev, deviceId)` gewinnt, auf Client und (Supabase) im Trigger. Löschen ist ein Tombstone (`deletedAt`).
-- Dokumente: `DocSpec.merge`, siehe oben.
-- Überlauf der Outbox (> 2000, `maxPending`) setzt `fullPushNeeded`: die nächste Runde lädt alle Schema-Daten hoch (idempotent). Bei Fehler bleibt der Vollabgleich erhalten.
-- Push in Paketen (`chunkSize` 200). Bei `invalid` wird das Paket einzeln wiederholt; was weiter abgelehnt wird, zählt als `rejected` und wird quittiert.
+- Dokumente: `DocSpec.merge`, siehe oben. Der Server-Trigger verwirft Dokumente, deren `(updatedAt, deviceId)` nicht größer ist. Damit ein Gerät mit nachgehender Uhr ein gemergtes Dokument nicht still verliert, gilt für Specs **ohne** eigene `updatedAt`-Funktion eine hybride Uhr: Die Engine merkt sich pro Dokument den höchsten gesehenen Remote-`updatedAt` (`docClock` im SyncState, auch wenn `merge` nichts ändert; bei `perDevice` nur das eigene Dokument) und sendet `max(jetzt, docClock + 1)`. Specs mit eigener `updatedAt`-Funktion (z. B. Einstellungen, LWW über ein Feld) senden weiterhin deren Wert. `clear()` setzt die Uhr mit zurück.
+- Überlauf der Outbox (> 2000, `maxPending`) setzt `fullPushNeeded`: die nächste Runde lädt alle Schema-Daten hoch (idempotent). Das Flag wird erst gelöscht, wenn alle Pakete gesendet sind, und nur, wenn währenddessen kein neuer Vollabgleich angefordert wurde (`markFullPush()` oder Überlauf erhöhen `fullPushGen`; der Push löscht per `clearFullPushIf(gen)`). Fehler oder ein beendeter Tab mitten im Push lassen den Vollabgleich also stehen.
+
+## Push
+
+- Basis ist eine Momentaufnahme der Outbox (bzw. bei `fullPushNeeded` alles lokal Vorhandene). Jeder Outbox-Eintrag wird per `getById` aufgelöst; verwaiste Einträge (Ziel nicht im Schema oder nicht mehr vorhanden) werden quittiert.
+- Push in Paketen (`chunkSize` 200), je Collection bzw. für Dokumente getrennt. Normale Pakete werden nach Erfolg sofort quittiert, beim Vollabgleich die Momentaufnahme am Ende.
+- Bei `invalid` wird das Paket einzeln wiederholt; was weiter abgelehnt wird, zählt als `rejected` und wird quittiert. Ein Datensatz, den der Mapper nicht umsetzen kann (Fehler in `toRow`/`docToRow`), gilt ebenfalls als `invalid` – er blockiert den Push nicht (sonst endloser Backoff wegen `server`).
 
 ## Eigener Provider
 
-`RemoteSyncProvider` implementiert `upsertRecords`, `upsertDocs`, `pull(cursor, { limit, rewind })` und `deleteAll`. Er wirft **ausschließlich** `SyncError(kind)` mit `offline | auth | invalid | server`; die Engine bildet alles andere auf `server` ab. Erkannt wird per `isSyncError` (Name, nicht `instanceof`), damit Provider und Engine in getrennten Bundles liegen dürfen. `pull` liefert `cursor` (opak, nur der Provider versteht ihn) und `hasMore`. `rewind: true` (erste Seite einer Runde) setzt die Position um ca. 60 s zurück; das Anwenden ist idempotent.
+`RemoteSyncProvider` implementiert `upsertRecords`, `upsertDocs`, `pull(cursor, { limit, rewind })` und `deleteAll` (`Promise<number | void>`, siehe unten). Er wirft **ausschließlich** `SyncError(kind)` mit `offline | auth | invalid | server`; die Engine bildet alles andere auf `server` ab. Erkannt wird per `isSyncError` (Name, nicht `instanceof`), damit Provider und Engine in getrennten Bundles liegen dürfen. `pull` liefert `cursor` (opak, nur der Provider versteht ihn) und `hasMore`. `rewind: true` (erste Seite einer Runde) setzt die Position um ca. 60 s zurück; das Anwenden ist idempotent.
 
 ## Löschen auf allen Geräten
 
-`engine.wipeRemote()` löscht die Cloud-Daten und legt das reservierte Dokument `WIPE_DOC` (`{ at }`) ab. Findet ein anderes Gerät beim Pull eine Markierung mit `at > repo.getAppliedWipe()`, ruft die Engine `onRemoteWipe(at)` auf (Default: `repo.clear()`), merkt sich `at` und lädt komplett neu; Ausstehendes von vor dem Löschen wird nicht hochgeladen. Neue Geräte setzen vor dem ersten Sync `repo.setAppliedWipe(Date.now())`, damit ältere Markierungen sie nicht treffen. `clear()` behält `deviceId` und `wipeAt` immer.
+`engine.wipeRemote()` löscht die Cloud-Daten und legt das reservierte Dokument `WIPE_DOC` (`{ at }`) ab. Bevorzugt geschieht beides atomar auf dem Server: Liefert `provider.deleteAll()` eine Zahl, hat der Server die Markierung im selben Aufruf geschrieben, und diese Zahl ist `at` (Serveruhr); die Engine sendet dann nichts weiter. Sonst (Provider ohne Rückgabe) folgt die Markierung per `upsertDocs` als zweiter Aufruf – scheitert der, bleibt ein Zustand „gelöscht ohne Markierung“, in dem andere Geräte ihre Daten wieder hochladen. Der Supabase-Provider gibt den Rückgabewert der `deleteAllRpc` als Zahl zurück (bigint als Zahl oder String). Findet ein anderes Gerät beim Pull eine Markierung mit `at > repo.getAppliedWipe()`, ruft die Engine `onRemoteWipe(at)` auf (Default: `repo.clear()`), merkt sich `at` und lädt komplett neu; Ausstehendes von vor dem Löschen wird nicht hochgeladen. Neue Geräte setzen vor dem ersten Sync `repo.setAppliedWipe(Date.now())`, damit ältere Markierungen sie nicht treffen. `clear()` behält `deviceId` und `wipeAt` immer.
 
 ## Supabase
 
-Der Provider für Supabase/PostgREST samt SQL (`sql/offline_sync_guard.sql`) liegt im Subpfad `offline-sync/supabase`. Details: siehe Abschnitt „Supabase“ weiter unten bzw. `src/supabase/`.
+Der Provider für Supabase/PostgREST samt SQL (`sql/offline_sync_guard.sql`) liegt im Subpfad `offline-sync/supabase`. Details: `src/supabase/`. Die `deleteAllRpc` (`SupabaseSyncSchema`) löscht alle Zeilen des Nutzers und fügt im selben Aufruf die Markierung in `docsTable` ein (`name 'wipe'`, `data { at }`, `updated_at at`); sie gibt `at` (Epoch-ms, bigint) zurück. Beispiel: `mm_delete_my_data` in `sql/002_training_data.sql` der App.
 
 ## Entwicklung
 

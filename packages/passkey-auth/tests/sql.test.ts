@@ -161,26 +161,122 @@ describe('passkey-auth SQL', () => {
     });
   });
 
-  it('pa_rotate_session: gültig, unbekannt, abgelaufen', async () => {
-    await db.exec('truncate public.users cascade');
-    await as('service_role', null, async (tx) => {
-      await createUser(tx, A, 'alice', 'cred-a1');
-      await tx.query(
-        `insert into public.auth_sessions (user_id, token_hash, expires_at) values ($1,'old', now() + interval '1 day'), ($1,'exp', now() - interval '1 day')`,
-        [A],
-      );
-      const rot = (o: string, n: string) =>
-        tx.query<{ user_id: string; username: string }>(`select * from public.pa_rotate_session($1, $2, now() + interval '7 days')`, [o, n]);
+  describe('pa_rotate_session', () => {
+    interface SessionRow { id: string; token_hash: string; prev_hash: string | null; same_rotation: boolean; exp_s: number }
+    const rot = (tx: Tx, o: string, n: string, expires = '7 days') =>
+      tx.query<{ user_id: string; username: string }>(
+        `select * from public.pa_rotate_session($1, $2, now() + $3::interval)`, [o, n, expires]);
+    // Zeile per Hash; exp_s = Sekunden bis expires_at, same_rotation = rotated_at ist now()
+    const row = async (tx: Tx, hash: string): Promise<SessionRow | undefined> =>
+      (await tx.query<SessionRow>(
+        `select id, token_hash, prev_hash, rotated_at = now() as same_rotation,
+                round(extract(epoch from expires_at - now()))::int as exp_s
+           from public.auth_sessions where token_hash = $1`, [hash])).rows[0];
+    const count = async (tx: Tx): Promise<number> =>
+      (await tx.query<{ n: number }>('select count(*)::int as n from public.auth_sessions')).rows[0]?.n ?? -1;
+    const insert = (tx: Tx, hash: string, expires: string, absolute: string | null = null) =>
+      tx.query(
+        `insert into public.auth_sessions (user_id, token_hash, expires_at, absolute_expires_at)
+         values ($1, $2, now() + $3::interval, now() + $4::interval)`, [A, hash, expires, absolute]);
 
-      const ok = await rot('old', 'new');
-      assert.deepEqual(ok.rows, [{ user_id: A, username: 'alice' }]);
-      assert.equal((await rot('old', 'new2')).rows.length, 0);
-      assert.equal((await rot('nope', 'new3')).rows.length, 0);
-      assert.equal((await rot('new', 'new4')).rows.length, 1);
+    before(() => db.exec('truncate public.users cascade'));
 
-      assert.equal((await rot('exp', 'new5')).rows.length, 0);
-      const gone = await tx.query(`select 1 from public.auth_sessions where token_hash in ('exp','new5')`);
-      assert.equal(gone.rows.length, 0);
+    it('normale Rotation: dieselbe Zeile, Vorgänger gemerkt; unbekannt und abgelaufen leer', async () => {
+      await as('service_role', null, async (tx) => {
+        await createUser(tx, A, 'alice', 'cred-a1');
+        await insert(tx, 'old', '1 day');
+        await insert(tx, 'exp', '-1 day');
+        const prior = await row(tx, 'old');
+
+        assert.deepEqual((await rot(tx, 'old', 'new')).rows, [{ user_id: A, username: 'alice' }]);
+        const after = await row(tx, 'new');
+        assert.equal(after?.id, prior?.id);
+        assert.equal(after?.prev_hash, 'old');
+        assert.equal(after?.same_rotation, true);
+        assert.equal(after?.exp_s, 7 * 86400, 'ohne absolute Grenze (Altbestand) unbegrenzt');
+
+        assert.equal((await rot(tx, 'nope', 'new3')).rows.length, 0);
+        assert.equal((await rot(tx, 'new', 'new4')).rows.length, 1);
+        assert.equal((await row(tx, 'new4'))?.prev_hash, 'new');
+
+        assert.equal((await rot(tx, 'exp', 'new5')).rows.length, 0);
+        const gone = await tx.query(`select 1 from public.auth_sessions where token_hash in ('exp','new5')`);
+        assert.equal(gone.rows.length, 0);
+        assert.equal(await count(tx), 1);
+      });
+    });
+
+    it('Gnadenfrist: alter Hash innerhalb von 60 s rotiert erneut, Frist gleitet nicht', async () => {
+      await as('service_role', null, async (tx) => {
+        await createUser(tx, A, 'alice', 'cred-a1');
+        await insert(tx, 'h1', '1 day');
+        assert.equal((await rot(tx, 'h1', 'h2')).rows.length, 1);
+        // Antwort verloren: Client schickt nach 50 s nochmals h1
+        await tx.exec(`update public.auth_sessions set rotated_at = now() - interval '50 seconds'`);
+        assert.deepEqual((await rot(tx, 'h1', 'h3')).rows, [{ user_id: A, username: 'alice' }]);
+        const r = await row(tx, 'h3');
+        assert.equal(r?.prev_hash, 'h1');
+        assert.equal(r?.same_rotation, false, 'rotated_at unverändert');
+        assert.equal(await row(tx, 'h2'), undefined, 'h2 ersetzt');
+        // Nach insgesamt 60 s ist die Frist vorbei, auch wenn zwischendurch nochmals rotiert wurde
+        await tx.exec(`update public.auth_sessions set rotated_at = rotated_at - interval '10 seconds'`);
+        assert.equal((await rot(tx, 'h1', 'h4')).rows.length, 0);
+        assert.equal(await count(tx), 0, 'Wiederverwendung löscht die Session');
+        assert.equal((await rot(tx, 'h3', 'h5')).rows.length, 0, 'auch der aktuelle Token ist danach ungültig');
+      });
+    });
+
+    it('Wiederverwendung nach 60 s löscht die Session, der Dieb verliert seinen Token', async () => {
+      await as('service_role', null, async (tx) => {
+        await createUser(tx, A, 'alice', 'cred-a1');
+        await insert(tx, 't1', '1 day');
+        assert.equal((await rot(tx, 't1', 't2')).rows.length, 1);
+        await tx.exec(`update public.auth_sessions set rotated_at = now() - interval '61 seconds'`);
+        assert.equal((await rot(tx, 't1', 't3')).rows.length, 0);
+        assert.equal(await count(tx), 0);
+        assert.equal((await rot(tx, 't2', 't4')).rows.length, 0);
+      });
+    });
+
+    it('absolute Grenze: expires_at wird gekappt und greift trotz Rotation', async () => {
+      await as('service_role', null, async (tx) => {
+        await createUser(tx, A, 'alice', 'cred-a1');
+        await insert(tx, 'a1', '1 day', '2 days');
+        assert.equal((await rot(tx, 'a1', 'a2')).rows.length, 1);
+        assert.equal((await row(tx, 'a2'))?.exp_s, 2 * 86400, 'höchstens bis absolute_expires_at');
+        await tx.exec(`update public.auth_sessions set rotated_at = now() - interval '10 seconds'`);
+        assert.equal((await rot(tx, 'a1', 'a3')).rows.length, 1, 'Gnadenfrist');
+        assert.equal((await row(tx, 'a3'))?.exp_s, 2 * 86400);
+        // Grenze erreicht (gleitende Frist noch offen)
+        await tx.exec(`update public.auth_sessions set absolute_expires_at = now()`);
+        assert.equal((await rot(tx, 'a3', 'a4')).rows.length, 0);
+        assert.equal(await count(tx), 0);
+      });
+    });
+
+    it('Upgrade: bestehende Tabelle wird nachgerüstet, Altzeilen rotieren ohne absolute Grenze', async () => {
+      const old = new PGlite();
+      try {
+        await old.exec(SIM);
+        // Stand vor dieser Version (ohne prev_hash, rotated_at, absolute_expires_at)
+        await old.exec(`
+          create table public.users (id uuid primary key, username text not null, created_at timestamptz not null default now());
+          create table public.auth_sessions (
+            id uuid primary key default gen_random_uuid(),
+            user_id uuid not null references public.users(id) on delete cascade,
+            token_hash text not null unique, expires_at timestamptz not null,
+            created_at timestamptz not null default now(), last_used_at timestamptz);
+          insert into public.users (id, username) values ('${A}', 'alice');
+          insert into public.auth_sessions (user_id, token_hash, expires_at) values ('${A}', 'legacy', now() + interval '1 day');`);
+        await old.exec(SCHEMA);
+        const r = await old.query(`select * from public.pa_rotate_session('legacy', 'next', now() + interval '30 days')`);
+        assert.equal(r.rows.length, 1);
+        const s = await old.query<{ prev_hash: string; abs: string | null }>(
+          `select prev_hash, absolute_expires_at as abs from public.auth_sessions where token_hash = 'next'`);
+        assert.deepEqual(s.rows, [{ prev_hash: 'legacy', abs: null }]);
+      } finally {
+        await old.close();
+      }
     });
   });
 

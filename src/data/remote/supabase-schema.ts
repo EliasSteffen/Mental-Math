@@ -1,21 +1,16 @@
 // Collection → Tabelle + Mapper für den Supabase-Sync-Provider (docs/PLAN-data.md §6).
 import type { SupabaseSyncSchema, SyncRecord } from 'offline-sync';
 import type { GameResult, SessionStats } from '../../types.ts';
+import { isValidAttempt, isValidSession } from '../schema.ts';
 import { resultToRow, rowToResult, rowToSession, sessionToRow } from './mappers.ts';
 
-// Laufzeit-Prüfung statt Cast: Pflichtfelder der jeweiligen Collection müssen vorhanden sein.
-const isStr = (v: unknown): v is string => typeof v === 'string';
-const isNum = (v: unknown): v is number => typeof v === 'number';
-
+// Laufzeit-Prüfung statt Cast: dieselben Pflichtfelder wie bei Import und Migration (schema.ts).
 function asResult(r: SyncRecord): GameResult {
-  const ok = [r.sessionId, r.mode, r.category, r.subtype, r.prompt, r.unit].every(isStr)
-    && [r.ts, r.timeMs, r.targetMs, r.points, r.expected, r.weight].every(isNum) && typeof r.correct === 'boolean';
-  if (!ok) throw new TypeError('Ungültiger Versuch');
+  if (!isValidAttempt(r)) throw new TypeError('Ungültiger Versuch');
   return r as unknown as GameResult;
 }
 function asSession(r: SyncRecord): SessionStats {
-  const ok = isStr(r.mode) && [r.ts, r.n, r.correct, r.points, r.avgTimeMs].every(isNum);
-  if (!ok) throw new TypeError('Ungültige Runde');
+  if (!isValidSession(r)) throw new TypeError('Ungültige Runde');
   return r as unknown as SessionStats;
 }
 

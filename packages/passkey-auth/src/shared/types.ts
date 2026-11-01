@@ -139,8 +139,14 @@ export interface PasskeyAuthOptions {
   webauthn?: WebAuthnApi;           // Default: client/webauthn.ts
   now?: () => number;
   refreshRetryDelayMs?: number;     // Default 400: zweiter /refresh-Versuch nach 401 (anderer Tab hat evtl. gerade rotiert)
+  locks?: LockManagerLike | null;   // Default navigator.locks, falls vorhanden; null = ohne Lock
   /** Native App: Refresh-Token per Header (REFRESH_HEADER) statt Cookie; Server braucht die Origin in appOrigins */
   refreshStore?: RefreshStore;
+}
+
+/** Ausschnitt der Web Locks API (navigator.locks): exklusiv, wartet auf den Lock. Für Tests injizierbar. */
+export interface LockManagerLike {
+  request<T>(name: string, cb: () => Promise<T>): Promise<T>;
 }
 
 export interface PasskeyAuthClient {
@@ -191,8 +197,14 @@ export interface AuthStore {
   findPasskey(credentialId: Base64URL): Promise<(StoredPasskey & { username: string }) | null>;
   listCredentialIds(userId: string): Promise<Base64URL[]>;
   touchPasskey(id: string, counter: number): Promise<void>;
-  createSession(userId: string, tokenHash: string, expiresAt: number): Promise<void>;
-  /** Atomar: alte Session (gültig) löschen, neue anlegen; liefert den User oder null. */
+  /** absoluteExpiresAt (ms): harte Grenze über alle Rotationen hinweg; fehlt → unbegrenzt (Altbestand). */
+  createSession(userId: string, tokenHash: string, expiresAt: number, absoluteExpiresAt?: number): Promise<void>;
+  /**
+   * Atomar rotieren; liefert den User oder null. Semantik wie pa_rotate_session (sql/001):
+   * Treffer über den aktuellen Hash → neuer Hash, alter wird Vorgänger, expiresAt höchstens bis zur absoluten Grenze.
+   * Treffer über den Vorgänger-Hash → innerhalb von 60 s nochmals rotieren (Frist gleitet nicht),
+   * danach Wiederverwendung: Session löschen. Abgelaufen (gleitend oder absolut) → löschen, null.
+   */
   rotateSession(oldHash: string, newHash: string, expiresAt: number): Promise<AuthUser | null>;
   deleteSession(tokenHash: string): Promise<void>;
   /** Wiederherstellungscode setzen oder ersetzen (ein Code pro User, nur der Hash) */
@@ -212,7 +224,8 @@ export interface ServerConfig {
     ttlSec?: number;          // Default 900
   };
   refresh?: {
-    ttlSec?: number;          // Default 30 Tage
+    ttlSec?: number;          // Default 30 Tage, gleitend (je Rotation neu)
+    absoluteTtlSec?: number;  // Default 90 Tage ab Anmeldung, gilt trotz Rotation
     cookieName?: string;      // Default 'mm_rt'
     cookiePath?: string;      // Default basePath
     secure?: boolean;         // Default true (lokal über http://localhost ggf. false)

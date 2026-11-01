@@ -52,4 +52,7 @@ export const common: Record<keyof typeof De, string> = {
   streakOne: '{n}-day streak',
   streakMany: '{n}-day streak',
   xpGain: '{n} XP',
+  // App update (platform/web.ts)
+  updateReady: 'New version available',
+  updateReload: 'Reload',
 };

@@ -29,6 +29,10 @@ export interface SyncState {
   pending: ChangeRecord[];  // max. maxPending; bei Überlauf → fullPushNeeded
   cursor: string | null;    // opaker Pull-Cursor des Providers
   fullPushNeeded: boolean;  // nächste Runde lädt alle lokalen Daten hoch
+  /** +1 je Anforderung eines Vollabgleichs; der Push löscht das Flag nur, wenn sich der Wert nicht geändert hat */
+  fullPushGen: number;
+  /** Dokumentname → höchster gesehener Remote-`updatedAt` (hybride Uhr für merge-basierte Dokumente) */
+  docClock: Record<string, number>;
 }
 
 // ---------- Lokaler Speicher ----------
@@ -51,7 +55,10 @@ export interface PersistentAdapter extends StorageAdapter {
 // ---------- Fachregeln der App ----------
 export interface CollectionSpec {
   name: string;
-  /** lokal höchstens so viele Einträge (älteste zuerst entfernt, kein Sync-Delete); ohne = unbegrenzt */
+  /**
+   * lokal höchstens so viele Einträge; ohne = unbegrenzt. Entfernt werden zuerst Tombstones, dann bereits
+   * hochgeladene, jeweils die ältesten zuerst; noch ausstehende zuletzt (physisch, kein Sync-Delete).
+   */
   limit?: number;
 }
 
@@ -64,7 +71,11 @@ export interface DocSpec {
   merge(local: Record<string, unknown>, remote: Record<string, unknown>, ctx: MergeContext): Record<string, unknown>;
   /** Daten für den Upload (z. B. geräte-lokale Felder entfernen). Default: unverändert. */
   toRemote?(local: Record<string, unknown>): Record<string, unknown>;
-  /** updatedAt des lokalen Dokuments (z. B. aus einem Feld); null → beim Push gilt „jetzt“. Default: null */
+  /**
+   * updatedAt des lokalen Dokuments (z. B. aus einem Feld); null → beim Push gilt „jetzt“.
+   * Ohne diese Funktion (merge-basiert) gilt eine hybride Uhr: max(jetzt, höchster gesehener Remote-Wert + 1),
+   * damit eine nachgehende Geräteuhr den Server-Stand nicht verfehlt.
+   */
   updatedAt?(local: Record<string, unknown>): number | null;
   /**
    * Pro Gerät: Remote-Name `${name}:${deviceId}`. Das eigene Remote-Dokument wird per merge zurückgeführt;
@@ -99,7 +110,11 @@ export interface RemoteSyncProvider {
   upsertDocs(docs: readonly RemoteDoc[]): Promise<void>;
   /** rewind: Positionen um 60 s zurücksetzen (erste Seite einer Runde) */
   pull(cursor: string | null, o: { limit: number; rewind: boolean }): Promise<PullPage>;
-  deleteAll(): Promise<void>;
+  /**
+   * Alle Daten des Nutzers löschen. Liefert der Provider eine Zahl, hat er die Lösch-Markierung (`WIPE_DOC`,
+   * `{ at }`) im selben Aufruf geschrieben und das ist ihr `at`; sonst schreibt die Engine sie per `upsertDocs`.
+   */
+  deleteAll(): Promise<number | void>;
 }
 
 // ---------- Status ----------
@@ -130,6 +145,10 @@ export interface SupabaseSyncSchema {
   collections: Record<string, SupabaseCollectionSpec>;
   /** Tabelle mit (user_id, name, data jsonb, updated_at bigint, device_id, server_updated_at) */
   docsTable: string;
-  /** RPC ohne Parameter, die alle Zeilen des Nutzers löscht */
+  /**
+   * RPC ohne Parameter, die alle Zeilen des Nutzers löscht und im selben Aufruf die Lösch-Markierung
+   * (`name 'wipe'`, `data { at }`, `updated_at at`) in `docsTable` einfügt; gibt `at` (Epoch-ms, bigint) zurück.
+   * Liefert sie keine Zahl (ältere Fassung, `void`), schreibt die Engine die Markierung in einem zweiten Aufruf.
+   */
   deleteAllRpc: string;
 }

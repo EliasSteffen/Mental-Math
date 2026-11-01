@@ -1,4 +1,4 @@
-# Worker mit dem Durable Object für das globale Rate-Limit der KI-Erklärungen (siehe README → KI-Erklärungen).
+# Worker mit dem Durable Object für das globale Rate-Limit von /api/explain und /api/auth (siehe README → Globales Rate-Limit).
 # Deploy: GitHub-Workflow „Deploy Rate Limiter“ oder `npx wrangler deploy` in diesem Ordner.
 name = "mental-math-rate-limiter"
 main = "src/index.ts"

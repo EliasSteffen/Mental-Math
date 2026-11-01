@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { createAuthCore } from '../src/client/auth.ts';
 import { PasskeyAuthError } from '../src/shared/errors.ts';
 import type {
-  AuthSession, AuthenticationResponseJSON, RegistrationResponseJSON, SessionRes, WebAuthnApi,
+  AuthSession, AuthenticationResponseJSON, LockManagerLike, RegistrationResponseJSON, SessionRes, WebAuthnApi,
 } from '../src/shared/types.ts';
 
 interface Call { url: string; init: RequestInit; body: unknown }
@@ -12,7 +12,7 @@ type Handler = (url: string, n: number) => Response | Promise<Response>;
 const json = (x: unknown, status = 200): Response =>
   new Response(JSON.stringify(x), { status, headers: { 'Content-Type': 'application/json' } });
 
-function setup(handler: Handler, startNow = 1_000_000) {
+function setup(handler: Handler, startNow = 1_000_000, locks?: LockManagerLike | null) {
   const calls: Call[] = [];
   const clock = { t: startNow };
   const fetchImpl = (async (url: string | URL | Request, init?: RequestInit) => {
@@ -29,8 +29,46 @@ function setup(handler: Handler, startNow = 1_000_000) {
     create: async (options, signal) => { wcalls.create.push({ options, signal }); return regResp; },
     get: async (options, o) => { wcalls.get.push({ options, o }); return authResp; },
   };
-  const client = createAuthCore({ fetch: fetchImpl, webauthn, now: () => clock.t, refreshRetryDelayMs: 0 });
+  const client = createAuthCore({
+    fetch: fetchImpl, webauthn, now: () => clock.t, refreshRetryDelayMs: 0, ...(locks !== undefined ? { locks } : {}),
+  });
   return { client, calls, clock, wcalls, regResp, authResp };
+}
+
+// Exklusiver, wartender Lock wie navigator.locks.request(name, cb) – eine Warteschlange je Name
+function fakeLocks() {
+  const names: string[] = [];
+  const tails = new Map<string, Promise<unknown>>();
+  const locks: LockManagerLike = {
+    request<T>(name: string, cb: () => Promise<T>): Promise<T> {
+      names.push(name);
+      const run = (tails.get(name) ?? Promise.resolve()).then(cb);
+      tails.set(name, run.catch(() => {}));
+      return run;
+    },
+  };
+  return { locks, names };
+}
+
+// Zwei „Tabs“ mit eigenem Client; protokolliert Beginn/Ende jedes /refresh und die höchste Parallelität
+function twoTabs(locks?: LockManagerLike | null) {
+  const log: string[] = [];
+  let active = 0;
+  let maxActive = 0;
+  let n = 0;
+  const handler: Handler = async () => {
+    const id = ++n;
+    active++;
+    maxActive = Math.max(maxActive, active);
+    log.push(`start${id}`);
+    await new Promise<void>((r) => setTimeout(r, 5));
+    active--;
+    log.push(`end${id}`);
+    return json(sess(5_000_000, `t${id}`));
+  };
+  const a = setup(handler, 1_000_000, locks);
+  const b = setup(handler, 1_000_000, locks);
+  return { a, b, log, maxActive: () => maxActive };
 }
 
 test('refresh: 401 wird einmal wiederholt (Mehr-Tab-Rotation), zweiter Versuch gewinnt', async () => {
@@ -47,7 +85,40 @@ test('refresh: zwei 401 hintereinander → null, genau 2 Versuche', async () => 
   assert.equal(calls.length, 2);
 });
 
-const sess = (expiresAt: number, token = 'tok'): SessionRes =>
+test('refresh: zwei Tabs gleichzeitig → nacheinander durch den Lock „pa-refresh“', async () => {
+  const { locks, names } = fakeLocks();
+  const { a, b, log, maxActive } = twoTabs(locks);
+  const [sa, sb] = await Promise.all([a.client.restore(), b.client.restore()]);
+  assert.deepEqual(names, ['pa-refresh', 'pa-refresh']);
+  assert.equal(maxActive(), 1);
+  assert.deepEqual(log, ['start1', 'end1', 'start2', 'end2']);
+  assert.equal(sa?.accessToken, 't1');
+  assert.equal(sb?.accessToken, 't2');
+});
+
+test('refresh: Default navigator.locks serialisiert ebenfalls', { skip: !globalThis.navigator?.locks }, async () => {
+  const { a, b, maxActive } = twoTabs();
+  await Promise.all([a.client.restore(), b.client.restore()]);
+  assert.equal(maxActive(), 1);
+});
+
+test('refresh: ohne Locks wie bisher (parallel, beide erfolgreich)', async () => {
+  const { a, b, maxActive } = twoTabs(null);
+  const [sa, sb] = await Promise.all([a.client.restore(), b.client.restore()]);
+  assert.equal(maxActive(), 2);
+  assert.ok(sa && sb);
+  assert.equal(a.calls.length + b.calls.length, 2);
+});
+
+test('refresh: Fehler im Lock wird weitergereicht, Lock danach wieder frei', async () => {
+  const { locks } = fakeLocks();
+  let n = 0;
+  const { client } = setup(() => (++n === 1 ? json({ error: { code: 'server_error' } }, 500) : json(sess(5_000_000))), 1_000_000, locks);
+  await assert.rejects(client.restore(), (e: unknown) => e instanceof PasskeyAuthError && e.code === 'server_error');
+  assert.equal((await client.restore())?.accessToken, 'tok');
+});
+
+const sess =(expiresAt: number, token = 'tok'): SessionRes =>
   ({ user: { id: 'u1', username: 'Anna' }, accessToken: token, expiresAt });
 
 test('register: Happy Path', async () => {

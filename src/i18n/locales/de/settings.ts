@@ -80,6 +80,7 @@ export const settings = {
   importConfirm: 'Der Import ersetzt alle aktuellen Daten auf diesem Gerät. Das lässt sich nicht rückgängig machen.',
   importTitle: 'Daten importieren?',
   importDone: 'Import erfolgreich: {attempts} Aufgaben, {sessions} Runden',
+  importDoneSkipped: 'Import erfolgreich: {attempts} Aufgaben, {sessions} Runden. {skipped} unvollständige Einträge wurden übersprungen.',
   resetConfirm: 'Wirklich alle Daten löschen? Das lässt sich nicht rückgängig machen.',
   resetConfirmCloud: 'Alle Daten löschen? Das löscht sie auf diesem Gerät, in deinem Konto und beim nächsten Sync auch auf deinen anderen Geräten. Das lässt sich nicht rückgängig machen.',
   resetTitle: 'Alles zurücksetzen?',

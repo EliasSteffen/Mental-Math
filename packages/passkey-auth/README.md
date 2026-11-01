@@ -9,11 +9,24 @@ Wer alle Passkeys verliert, verliert das Konto. Die UI sollte deshalb nach der R
 - **D1** Der Server prüft und speichert Passkeys (`service_role`), der Client hat kein INSERT auf `passkeys`.
 - **D2** `auth.users` wird nicht genutzt. Der Server stellt selbst ein Supabase-kompatibles Access-JWT aus (`role`/`aud` = `authenticated`, 15 min).
 - **D3** Signatur ES256 mit eigenem, in Supabase importiertem Key (`kid` im Header). HS256 mit Secret geht für andere Projekte.
-- **D4** Refresh-Token: zufällig, in der DB nur als SHA-256, HttpOnly-Cookie `mm_rt` (`SameSite=Strict`, `Path=/api/auth`), Rotation bei jeder Nutzung, 30 Tage. Das Access-Token liegt nur im Speicher.
+- **D4** Refresh-Token: zufällig, in der DB nur als SHA-256, HttpOnly-Cookie `mm_rt` (`SameSite=Strict`, `Path=/api/auth`), Rotation bei jeder Nutzung, 30 Tage gleitend, höchstens 90 Tage ab Anmeldung. Alter Token: 60 s Gnadenfrist, danach gilt er als gestohlen (siehe unten). Das Access-Token liegt nur im Speicher.
 - **D5** Same-origin (kein CORS); jeder Request braucht einen erlaubten `Origin`-Header (CSRF-Schutz).
 - **D6** Login ohne Benutzername über Discoverable Credentials; `userHandle` muss zum Passkey-Besitzer passen. Counter-Regression bei Zähler > 0 wird abgelehnt.
 - **D7** Der User entsteht erst nach erfolgreicher Prüfung (eine SQL-Transaktion).
 - **D8** Challenges liegen serverseitig, gelten 5 min und sind einmalig (`DELETE … RETURNING`).
+
+## Sitzungen: Rotation, Gnadenfrist, absolute Dauer
+
+Eine Session ist eine Zeile in `auth_sessions`. `/refresh` rotiert sie über `pa_rotate_session` (der `MemoryAuthStore` bildet dieselbe Logik nach):
+
+- **Normale Rotation:** Der Hash des Cookies steht in `token_hash`. Die Zeile bekommt den neuen Hash, der alte wandert nach `prev_hash`, `rotated_at = now()`. `expires_at` wird neu gesetzt (Default 30 Tage), aber nie über `absolute_expires_at` hinaus.
+- **Gnadenfrist (60 s):** Kommt der alte Token noch einmal (Antwort von `/refresh` ging verloren, paralleler Tab), wird erneut rotiert und der User geliefert. `prev_hash` und `rotated_at` bleiben dabei, die Frist gleitet also nicht.
+- **Mehrere Tabs:** Der Client schickt `/refresh` unter `navigator.locks.request('pa-refresh', …)` (exklusiv, wartend), damit sich parallele Rotationen nicht überholen und das Cookie kein schon ersetztes Token behält. Ohne Web Locks wie bisher; Option `locks` zum Injizieren, `null` schaltet den Lock ab.
+- **Wiederverwendung:** Kommt der alte Token nach Ablauf der Frist, wird die ganze Session gelöscht (Diebstahlsignal). Auch der aktuelle Token ist dann wertlos, der Nutzer meldet sich neu an.
+- **Absolute Dauer:** Beim Anlegen (Registrierung, Login, Wiederherstellung) setzt der Server `absolute_expires_at = jetzt + refresh.absoluteTtlSec` (Default 90 Tage). Danach hilft keine Rotation mehr. Das Cookie-`Max-Age` ist höchstens `min(ttlSec, absoluteTtlSec)`.
+- **Altbestand:** Sessions aus Versionen vor dieser Logik haben `absolute_expires_at = null` und gelten als unbegrenzt (sie gleiten weiter, solange sie alle 30 Tage genutzt werden). Begrenzen per Hand: `update public.auth_sessions set absolute_expires_at = now() + interval '90 days' where absolute_expires_at is null;`
+
+DB und Server lassen sich unabhängig ausrollen: Die Signatur von `pa_rotate_session` ist unverändert. Ein neuer Server ohne die neuen Spalten legt Sessions ohne absolute Grenze an (mit Log-Eintrag), ein alter Server mit neuer DB bekommt Gnadenfrist und Wiederverwendungserkennung, aber keine absolute Grenze.
 
 ## Installation und Exports
 
@@ -29,7 +42,7 @@ Npm-Workspace (`packages/passkey-auth`), gebaut mit `npm run build -w passkey-au
 
 ## SQL-Setup
 
-1. `sql/001_passkey_auth.sql` im Supabase-SQL-Editor ausführen (Tabellen, RLS, Funktionen), danach `sql/003_recovery_codes.sql` (Wiederherstellungscodes). Optional `sql/tests/rls_test.sql` (läuft in einer Transaktion mit Rollback).
+1. `sql/001_passkey_auth.sql` im Supabase-SQL-Editor ausführen (Tabellen, RLS, Funktionen), danach `sql/003_recovery_codes.sql` (Wiederherstellungscodes). Optional `sql/tests/rls_test.sql` (läuft in einer Transaktion mit Rollback). Beide Dateien sind idempotent; nach einem Update des Pakets `001` erneut ausführen (rüstet z. B. `prev_hash`, `rotated_at`, `absolute_expires_at` nach und ersetzt `pa_rotate_session`).
 2. Eigenen Signing Key importieren (nur bei Projekten mit ES256): Dashboard, Project Settings, JWT Keys, „Create standby key“, „Import“, privaten JWK einfügen, dann „Rotate keys“. Die Data API akzeptiert nur den **aktuellen** Key, ein Standby-Key reicht nicht. Kontrolle: `<projekt>/auth/v1/.well-known/jwks.json` enthält die `kid`.
 3. Supabase-JWKs tragen `key_ops: ["sign","verify"]`. Das Paket entfernt `key_ops`/`use` beim Import selbst, der JWK kann also unverändert in `AUTH_JWT_KEY` stehen.
 
@@ -53,10 +66,13 @@ export const onRequest: PagesFunction<Env> = ({ request, env }) => {
     rpName: 'Meine App',
     origins: env.AUTH_ORIGINS.split(','),
     jwt: { key: env.AUTH_JWT_KEY, issuer: `${new URL(request.url).origin}/api/auth` },
+    // optional: refresh: { ttlSec: 30 * 86400, absoluteTtlSec: 90 * 86400 }
   }, createSupabaseAuthStore(admin));
   return handler(request);
 };
 ```
+
+Das Paket selbst begrenzt keine Anfragen. Ein Rate-Limit gehört vor den Handler, da es weder E-Mail noch Captcha gibt und `/login/options` bzw. `/register/options` bei jedem anonymen Aufruf eine Challenge-Zeile schreiben. In dieser App macht das `server/auth.ts`: 30 Anfragen/min je IP über alle Auth-Routen, darüber `429` mit `{ "error": { "code": "rate_limited" } }`.
 
 ## Client
 
@@ -90,7 +106,7 @@ Alle `POST`, JSON, `Content-Type: application/json`, Body bis 16 KB, `Origin` er
 | `/register/verify` | - | Attestation prüfen, User + Passkey anlegen, Session |
 | `/login/options` | - | Challenge, `allowCredentials: []` |
 | `/login/verify` | - | Assertion prüfen, Session |
-| `/refresh` | Cookie | Refresh-Token rotieren, neues Access-Token (sonst 401) |
+| `/refresh` | Cookie | Refresh-Token rotieren, neues Access-Token (sonst 401; alter Token 60 s Gnadenfrist) |
 | `/logout` | Cookie | Session löschen, Cookie entfernen (immer 204) |
 | `/passkeys/options` | Bearer | Challenge für zusätzlichen Passkey |
 | `/passkeys/verify` | Bearer | Zusätzlichen Passkey speichern |
@@ -115,7 +131,6 @@ Alle `POST`, JSON, `Content-Type: application/json`, Body bis 16 KB, `Origin` er
 - `http://localhost:<port>` öffnen, **nicht** `127.0.0.1`: WebAuthn akzeptiert keine IP als RP-ID. Dann `AUTH_RP_ID=localhost` und `AUTH_ORIGINS=http://localhost:<port>`.
 - Das Refresh-Cookie ist standardmäßig `Secure`. Auf `http://localhost` muss `refresh: { secure: false }` in der Server-Konfiguration stehen (nur lokal).
 - `*.pages.dev`-Previews können keine Passkeys der Produktions-RP-ID nutzen.
-- Empfehlung: Rate-Limit auf `POST /api/auth/*/options` (z. B. 20/min/IP), da es weder E-Mail noch Captcha gibt.
 
 ## Tests
 

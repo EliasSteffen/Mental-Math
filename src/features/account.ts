@@ -7,9 +7,11 @@ import { APP_SUPABASE_SCHEMA } from '../data/remote/supabase-schema.ts';
 import { PUBLIC_CONFIG } from '../generated/public-config.ts';
 import { authOptions } from '../platform/index.ts';
 
+/** 'offline': Sitzung beim Start nicht prüfbar (Netz/Server) – Hint bleibt, watchAccountRestore versucht es erneut. */
 export type AccountState =
   | { status: 'disabled' }
   | { status: 'loading' }
+  | { status: 'offline' }
   | { status: 'signed-out' }
   | { status: 'signed-in'; user: AuthUser };
 
@@ -86,15 +88,46 @@ function load(): Promise<Loaded> {
   return p;
 }
 
-export async function restoreAccount(): Promise<void> {
-  if (!accountEnabled() || !readHint()) return;
-  setState({ status: 'loading' });
-  try {
-    const { auth } = await load();
-    onSession(await auth.restore());
-  } catch {
-    setState({ status: 'signed-out' }); // Netzwerkfehler: still abgemeldet
-  }
+let restoring: Promise<void> | null = null;
+
+/**
+ * Sitzung beim Start wiederherstellen. 401 bzw. keine Sitzung → 'signed-out'; jeder andere Fehler (Netz, Server,
+ * Modul nicht ladbar) → 'offline', der Hint bleibt. Parallele Aufrufe teilen sich einen Lauf.
+ */
+export function restoreAccount(): Promise<void> {
+  if (!accountEnabled() || !readHint()) return Promise.resolve();
+  restoring ??= (async () => {
+    if (state.status !== 'offline') setState({ status: 'loading' }); // erneuter Versuch: Hinweis bleibt sichtbar
+    try {
+      const { auth } = await load();
+      onSession(await auth.restore());
+    } catch (e) {
+      if (errorCode(e) === 'unauthorized') onSession(null);
+      else setState({ status: 'offline' });
+    }
+  })().finally(() => { restoring = null; });
+  return restoring;
+}
+
+let unwatch: (() => void) | null = null;
+
+/**
+ * Nach Offline-Kaltstart: bei `online` bzw. wieder sichtbarem Tab restoreAccount erneut, solange der Status
+ * 'offline' ist. Idempotent; Ziele nur für Tests injizierbar.
+ */
+export function watchAccountRestore(
+  win: Pick<EventTarget, 'addEventListener' | 'removeEventListener'> | undefined = globalThis.window,
+  doc: (Pick<EventTarget, 'addEventListener' | 'removeEventListener'> & { visibilityState: string }) | undefined = globalThis.document,
+): void {
+  if (unwatch) return;
+  const retry = (): void => { if (state.status === 'offline') void restoreAccount(); };
+  const onVisible = (): void => { if (doc?.visibilityState === 'visible') retry(); };
+  win?.addEventListener('online', retry);
+  doc?.addEventListener('visibilitychange', onVisible);
+  unwatch = () => {
+    win?.removeEventListener('online', retry);
+    doc?.removeEventListener('visibilitychange', onVisible);
+  };
 }
 
 /** Sync-Provider für das angemeldete Konto; null, wenn nicht angemeldet. */
@@ -154,6 +187,9 @@ export function errorCode(e: unknown): AuthErrorCode {
 export function _setModuleForTests(m: VendorModuleLike | null, config?: { supabaseUrl: string; supabaseKey: string }): void {
   injected = m;
   ready = null;
+  restoring = null;
+  unwatch?.();
+  unwatch = null;
   listeners.clear();
   if (config) configGetter = () => config;
   state = accountEnabled() ? { status: 'signed-out' } : { status: 'disabled' };

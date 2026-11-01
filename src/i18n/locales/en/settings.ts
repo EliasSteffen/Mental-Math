@@ -82,6 +82,7 @@ export const settings: Record<keyof typeof De, string> = {
   importConfirm: 'Importing replaces all current data on this device. This cannot be undone.',
   importTitle: 'Import data?',
   importDone: 'Import successful: {attempts} tasks, {sessions} rounds',
+  importDoneSkipped: 'Import successful: {attempts} tasks, {sessions} rounds. {skipped} incomplete entries were skipped.',
   resetConfirm: 'Really delete all data? This cannot be undone.',
   resetConfirmCloud: 'Delete all data? This deletes it on this device, in your account and, at their next sync, on your other devices too. This cannot be undone.',
   resetTitle: 'Reset everything?',

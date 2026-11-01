@@ -118,13 +118,18 @@ drop policy if exists user_documents_update on public.user_documents;
 create policy user_documents_update on public.user_documents for update to authenticated
   using (user_id = (select auth.uid())) with check (user_id = (select auth.uid()));
 
--- Alle eigenen Trainingsdaten löschen („Alle Daten löschen“ im angemeldeten Zustand)
-create or replace function public.mm_delete_my_data()
-returns void
+-- Alle eigenen Trainingsdaten löschen („Alle Daten löschen“ im angemeldeten Zustand) und im selben Aufruf
+-- die Lösch-Markierung 'wipe' ({ at }) setzen: kein Zustand „gelöscht, aber ohne Markierung“, in dem andere
+-- Geräte ihre Daten wieder hochladen. Gibt at (Epoch-ms, Serveruhr) zurück.
+-- Rückgabetyp früher void → alte Fassung entfernen (create or replace kann ihn nicht ändern).
+drop function if exists public.mm_delete_my_data();
+create function public.mm_delete_my_data()
+returns bigint
 language plpgsql security definer set search_path = ''
 as $$
 declare
   v_uid uuid := auth.uid();
+  v_at  bigint;
 begin
   if v_uid is null then
     raise exception 'not_authenticated' using errcode = '28000';
@@ -132,6 +137,10 @@ begin
   delete from public.training_results  where user_id = v_uid;
   delete from public.training_sessions where user_id = v_uid;
   delete from public.user_documents    where user_id = v_uid;
+  v_at := (extract(epoch from clock_timestamp()) * 1000)::bigint;
+  insert into public.user_documents (user_id, name, data, updated_at, device_id)
+    values (v_uid, 'wipe', jsonb_build_object('at', v_at), v_at, 'server');
+  return v_at;
 end;
 $$;
 

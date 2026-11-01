@@ -2,7 +2,9 @@
 import type { RemoteSyncProvider, SyncStatus } from 'offline-sync';
 import { SyncEngine, SyncManager, browserSyncEnv } from '../vendor/storage.ts';
 import { APP_SYNC_SCHEMA } from '../data/sync-schema.ts';
-import { emitDataChange, getAttempts, getProfile, getRepository, getSessions, getSettings, onChange, resetAll, updateProfile } from '../data/storage.ts';
+import {
+  emitDataChange, getAttempts, getProfile, getRepository, getSessions, getSettings, getSyncState, onChange, resetAll, updateProfile,
+} from '../data/storage.ts';
 import { createSyncProvider, getAccountState, logout, onAccountChange } from './account.ts';
 import type { AccountState } from './account.ts';
 import { applyTheme } from '../ui/theme.ts';
@@ -75,6 +77,42 @@ export async function wipeCloudData(): Promise<void> {
 
 function hasLocalData(): boolean { return getAttempts().length > 0 || getSessions().length > 0; }
 
+/** Noch nicht hochgeladene Änderungen (nur Sync-Ziele); steht ein Vollabgleich aus, zählen alle lokalen Datensätze. */
+export function unsyncedCount(): number {
+  const st = getSyncState();
+  const n = st.pending.filter((c) => isSchemaTarget(c.target)).length;
+  return st.fullPushNeeded ? Math.max(n, getAttempts().length + getSessions().length, 1) : n;
+}
+
+export interface ForgetDeviceOptions {
+  /** Zweite Nachfrage: `pending` Änderungen sind nicht in der Cloud und gingen verloren. true = trotzdem entfernen. */
+  confirmLoss(pending: number): Promise<boolean>;
+  /** Nur für Tests ersetzbar */
+  online?: () => boolean;
+  sync?: () => Promise<unknown>;
+  signOut?: () => Promise<void>;
+}
+
+/**
+ * Abmelden und alle Trainingsdaten von diesem Gerät entfernen (A5). Ausstehende Änderungen werden – wenn online –
+ * erst synchronisiert; was danach noch fehlt, geht nur nach `confirmLoss` verloren. false = abgebrochen, nichts
+ * geändert. Scheitert das Abmelden, wird der Fehler weitergereicht und lokal bleibt alles.
+ */
+export async function logoutAndForgetDevice(o: ForgetDeviceOptions): Promise<boolean> {
+  const online = o.online ?? ((): boolean => globalThis.navigator?.onLine !== false);
+  let pending = unsyncedCount();
+  if (pending > 0 && online()) {
+    try { await (o.sync ?? syncNow)(); } catch { /* bleibt ausstehend */ }
+    pending = unsyncedCount();
+  }
+  if (pending > 0 && !(await o.confirmLoss(pending))) return false;
+  await (o.signOut ?? logout)(); // → 'signed-out' → applyAccount schaltet den Sync ab, bevor gelöscht wird
+  resetAll();
+  updateProfile({ cloudUserId: null }); // nächste Anmeldung verknüpft neu ('first')
+  emitDataChange('remote'); // wie beim Remote-Wipe: Theme, Sprache und Ansicht folgen den Standardwerten
+  return true;
+}
+
 /** Verknüpft das lokale Profil mit dem Konto; false = nicht aktivieren (fremdes Konto, abgemeldet). */
 async function linkAccount(userId: string): Promise<boolean> {
   const decision = decideLink(getProfile().cloudUserId, userId);
@@ -103,7 +141,7 @@ async function linkAccount(userId: string): Promise<boolean> {
 async function applyAccount(st: AccountState): Promise<void> {
   if (!manager) return;
   const gen = ++linkGen;
-  if (st.status !== 'signed-in') { manager.disable(); return; }
+  if (st.status !== 'signed-in') { manager.disable(); return; } // auch 'offline' (A1): Sync aus bis zur Wiederherstellung
   try {
     if (!(await linkAccount(st.user.id))) { if (gen === linkGen) manager.disable(); return; }
     const provider: RemoteSyncProvider | null = await createSyncProvider();

@@ -43,12 +43,20 @@ export function createAuthCore(o: PasskeyAuthOptions & { webauthn: WebAuthnApi }
   const retryDelay = o.refreshRetryDelayMs ?? 400;
   const is401 = (e: unknown): boolean => e instanceof PasskeyAuthError && e.status === 401;
 
+  // /refresh tab-übergreifend nacheinander: Parallele Rotationen in der Gnadenfrist könnten sonst in
+  // umgekehrter Reihenfolge ankommen, das Cookie hielte dann ein schon ersetztes Token. Ohne Locks wie bisher.
+  const locks = o.locks !== undefined ? o.locks : (globalThis.navigator?.locks ?? null);
+  const postRefresh = (): Promise<SessionRes> => {
+    const post = (): Promise<SessionRes> => api.post<SessionRes>('/refresh');
+    return locks ? locks.request('pa-refresh', post) : post();
+  };
+
   // Refresh: 401 → einmal kurz verzögert wiederholen (ein anderer Tab kann gerade rotiert haben,
   // dann schickt der Browser jetzt dessen neues Cookie); danach Session verwerfen, null. Sonstige Fehler weiterreichen.
   const refresh = async (): Promise<AuthSession | null> => {
     for (let attempt = 0; ; attempt++) {
       try {
-        return setSession(await api.post<SessionRes>('/refresh'));
+        return setSession(await postRefresh());
       } catch (e) {
         if (!is401(e)) throw e;
         if (attempt >= 1) {

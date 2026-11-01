@@ -119,7 +119,10 @@ Alternativ im Dashboard unter *Workers & Pages → mental-math → Settings → 
 
 ### Globales Rate-Limit (Durable Object, einmalig einrichten)
 
-Pages Functions können keine eigenen Durable Objects definieren. Deshalb stellt ein kleiner Worker (`workers/rate-limiter`, Name `mental-math-rate-limiter`, ohne öffentliche Route) das Durable Object `RateLimiter` bereit. `/api/explain` nutzt es über das Binding `RATE_LIMITER`; fehlt das Binding oder ist das Objekt nicht erreichbar, greift das Limit pro Instanz.
+Pages Functions können keine eigenen Durable Objects definieren. Deshalb stellt ein kleiner Worker (`workers/rate-limiter`, Name `mental-math-rate-limiter`, ohne öffentliche Route) das Durable Object `RateLimiter` bereit. `/api/explain` und `/api/auth` nutzen es über das Binding `RATE_LIMITER`, jede Route mit einer eigenen Objekt-Instanz („explain“ bzw. „auth“) und eigenen Zählern; fehlt das Binding oder ist das Objekt nicht erreichbar, greift das Limit pro Instanz.
+
+- `/api/explain`: siehe oben (60/min gesamt, je IP 15/min und 200/Tag).
+- `/api/auth/*` (Konto, Passkeys): je IP 30 Anfragen pro Minute über alle Auth-Routen, darüber `429 rate_limited`. Das bremst vor allem massenhaft angelegte Konten.
 
 1. API-Token zusätzlich mit **Account · Workers Scripts · Edit** ausstatten (Dashboard → *My Profile → API Tokens*).
 2. Worker deployen: *Actions → Deploy Rate Limiter → Run workflow* (läuft danach automatisch bei Änderungen unter `workers/rate-limiter/`), oder lokal:
@@ -229,6 +232,8 @@ Fortschritt und Statistiken liegen lokal in IndexedDB. Ohne Konto bleibt alles a
 **Wiederherstellungscode:** Beim Anlegen des Kontos zeigt die App einmalig einen Code (20 Zeichen). Wer alle Passkeys verliert, legt damit unter *Einstellungen → Daten & Account → Passkey verloren?* einen neuen Passkey an; danach gibt es einen neuen Code. Gespeichert wird nur ein SHA-256-Hash.
 
 **Supabase-SQL (einmalig, in dieser Reihenfolge im SQL-Editor):** `packages/passkey-auth/sql/001_passkey_auth.sql`, `packages/offline-sync/sql/offline_sync_guard.sql`, `sql/002_training_data.sql`, `packages/passkey-auth/sql/003_recovery_codes.sql`, für Erinnerungen außerdem `sql/004_push.sql` und `sql/005_push_cron.sql`. Alle Skripte sind idempotent.
+
+**Update auf 1.14.0:** `packages/passkey-auth/sql/001_passkey_auth.sql` (Gnadenfrist und Wiederverwendungserkennung beim Refresh, Sitzungen höchstens 90 Tage) und `sql/002_training_data.sql` (Löschen samt Lösch-Markierung in einem Aufruf) erneut einspielen. Beide sind idempotent; ob zuerst SQL oder Server ausgerollt wird, ist egal.
 
 ## Struktur
 

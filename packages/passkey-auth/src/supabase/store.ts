@@ -156,15 +156,22 @@ export function createSupabaseAuthStore(admin: SupabaseClient): AuthStore {
       if (error) fail(error, 'touchPasskey');
     },
 
-    async createSession(userId, tokenHash, expiresAt) {
-      const { error } = await admin.from('auth_sessions').insert({
-        user_id: userId,
-        token_hash: tokenHash,
-        expires_at: new Date(expiresAt).toISOString(),
-      });
+    async createSession(userId, tokenHash, expiresAt, absoluteExpiresAt) {
+      const row = { user_id: userId, token_hash: tokenHash, expires_at: new Date(expiresAt).toISOString() };
+      if (absoluteExpiresAt !== undefined) {
+        const { error } = await admin.from('auth_sessions').insert({
+          ...row, absolute_expires_at: new Date(absoluteExpiresAt).toISOString(),
+        });
+        if (!error) return;
+        // Spalte fehlt (sql/001 noch nicht eingespielt): ohne absolute Grenze anlegen, Login geht weiter
+        if (error.code !== 'PGRST204' && error.code !== '42703') fail(error, 'createSession');
+        console.error('passkey-auth: auth_sessions.absolute_expires_at missing, session without absolute limit');
+      }
+      const { error } = await admin.from('auth_sessions').insert(row);
       if (error) fail(error, 'createSession');
     },
 
+    // Gnadenfrist, Wiederverwendung und absolute Grenze regelt pa_rotate_session (sql/001)
     async rotateSession(oldHash, newHash, expiresAt) {
       const { data, error } = await admin.rpc('pa_rotate_session', {
         p_old_hash: oldHash,

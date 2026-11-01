@@ -3,6 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { SyncError } from '../errors.ts';
 import type { PullPage, RemoteDoc, RemoteSyncProvider, SupabaseSyncSchema, SyncRecord } from '../types.ts';
 import { docToRow, rowToDoc } from './docs.ts';
+import type { DocRow } from './docs.ts';
 import { toSyncError } from './errors.ts';
 
 const REWIND_MS = 60_000;
@@ -88,14 +89,28 @@ export function createSupabaseSyncProvider(
   return {
     name: 'supabase',
 
+    // Mapper-Fehler (z. B. TypeError aus toRow) sind ungültige Daten, kein Serverfehler: als 'invalid' melden,
+    // damit die Engine einzeln wiederholt und nur den kaputten Datensatz ablehnt (sonst endloser Backoff).
     async upsertRecords(collection: string, items: readonly SyncRecord[]): Promise<void> {
       const spec = Object.hasOwn(schema.collections, collection) ? schema.collections[collection] : undefined;
       if (!spec) throw new SyncError('invalid', 'invalid (unknown collection)');
-      await upsertChunks(spec.table, items.map((i) => spec.toRow(i, userId)), 'user_id,id');
+      let rows: Record<string, unknown>[];
+      try {
+        rows = items.map((i) => spec.toRow(i, userId));
+      } catch {
+        throw new SyncError('invalid', 'invalid (toRow)');
+      }
+      await upsertChunks(spec.table, rows, 'user_id,id');
     },
 
     async upsertDocs(docs: readonly RemoteDoc[]): Promise<void> {
-      await upsertChunks(schema.docsTable, docs.map((d) => docToRow(d, userId)), 'user_id,name');
+      let rows: DocRow[];
+      try {
+        rows = docs.map((d) => docToRow(d, userId));
+      } catch {
+        throw new SyncError('invalid', 'invalid (docToRow)');
+      }
+      await upsertChunks(schema.docsTable, rows, 'user_id,name');
     },
 
     async pull(cursor, { limit, rewind }): Promise<PullPage> {
@@ -132,8 +147,12 @@ export function createSupabaseSyncProvider(
       return { records, docs, cursor: Object.keys(p).length > 0 ? JSON.stringify({ v: 2, p }) : null, hasMore };
     },
 
-    async deleteAll(): Promise<void> {
-      await guarded(() => client.rpc(schema.deleteAllRpc));
+    /** Gibt `at` der vom Server atomar geschriebenen Lösch-Markierung zurück (bigint als Zahl oder String); sonst nichts. */
+    async deleteAll(): Promise<number | void> {
+      const res = await guarded(() => client.rpc(schema.deleteAllRpc));
+      const raw: unknown = (res as { data?: unknown }).data;
+      const at = typeof raw === 'number' ? raw : typeof raw === 'string' && raw.trim() !== '' ? Number(raw) : NaN;
+      return Number.isFinite(at) && at > 0 ? at : undefined;
     },
   };
 }
