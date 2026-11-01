@@ -26,7 +26,7 @@ export interface SyncState {
   lastPulledAt: number | null;
   lastPushedSeq: number;
   nextSeq: number;
-  pending: ChangeRecord[];  // max. maxPending; bei Überlauf → fullPushNeeded
+  pending: ChangeRecord[];  // max. maxPending; bei Überlauf → fullPushNeeded; gespeichert je Eintrag (`out:<seq>`)
   cursor: string | null;    // opaker Pull-Cursor des Providers
   fullPushNeeded: boolean;  // nächste Runde lädt alle lokalen Daten hoch
   /** +1 je Anforderung eines Vollabgleichs; der Push löscht das Flag nur, wenn sich der Wert nicht geändert hat */
@@ -36,11 +36,16 @@ export interface SyncState {
 }
 
 // ---------- Lokaler Speicher ----------
-/** Schlüssel/Wert-Speicher (synchron). */
+/**
+ * Schlüssel/Wert-Speicher (synchron). Das Repository legt jeden Datensatz unter einem eigenen Schlüssel ab
+ * (`rec:<collection>:<id>`) und jeden Outbox-Eintrag ebenso (`out:<seq>`); ein getrackter Upsert schreibt also nur
+ * diese beiden kleinen Werte.
+ */
 export interface StorageAdapter {
   readonly name: string;
   get(key: string): string | null;
-  set(key: string, value: string): void;
+  /** `false`: Wert liegt nur flüchtig vor (z. B. localStorage voll → Memory-Fallback); sonst dauerhaft bzw. eingeplant. */
+  set(key: string, value: string): boolean | void;
   remove(key: string): void;
   keys(prefix: string): string[];
 }

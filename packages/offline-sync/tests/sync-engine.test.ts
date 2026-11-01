@@ -403,17 +403,17 @@ test('Pagination mit kleiner Seitengröße und Chunking', async () => {
   assert.equal((await b.engine.syncNow()).pulled, 0);
 });
 
-test('Pull: jede Seite schreibt eine Collection nur einmal (batch statt Schreiben je Datensatz)', async () => {
+test('Pull: schreibt je Datensatz genau einen Schlüssel, nie die ganze Collection', async () => {
   const server = new FakeServer();
   const a = device(server);
   for (let i = 0; i < 30; i++) add(a, 'b', `r${i}`);
   await a.engine.syncNow();
 
-  let writes = 0;
+  const writes = new Map<string, number>();
   const mem = new MemoryAdapter();
   const set = mem.set.bind(mem);
   mem.set = (k: string, v: string): void => {
-    if (k === 'col:b') writes++;
+    writes.set(k, (writes.get(k) ?? 0) + 1);
     set(k, v);
   };
   const repo = new Repository(mem, { now: () => clock.t });
@@ -423,7 +423,10 @@ test('Pull: jede Seite schreibt eine Collection nur einmal (batch statt Schreibe
   const st = await engine.syncNow();
   assert.equal(st.pulled, 30);
   assert.equal(repo.list('b').length, 30);
-  assert.equal(writes, 3, 'eine Schreiboperation je Seite');
+  const recs = [...writes].filter(([k]) => k.startsWith('rec:b:'));
+  assert.equal(recs.length, 30);
+  assert.ok(recs.every(([, n]) => n === 1), 'jeder Datensatz genau einmal');
+  assert.ok(![...writes.keys()].some((k) => k.startsWith('col:')));
 });
 
 test('Collection-Limit: nach dem Pull auf limit gekürzt, Tombstones zuerst', async () => {
