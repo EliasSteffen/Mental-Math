@@ -104,6 +104,14 @@ jobs:
             rm "$RUNNER_TEMP/cert.p12"
           fi
 
+      # Bricht früh und mit klarer Meldung ab, wenn der Schlüssel nicht passt oder die App in App Store Connect fehlt
+      - name: App Store Connect prüfen (Schlüssel, App)
+        if: steps.release.outputs.upload == 'true'
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+        run: ASC_KEY_PATH="$RUNNER_TEMP/asc/AuthKey.p8" node scripts/asc-check.ts
+
       - name: Archivieren (Release)
         if: steps.release.outputs.upload == 'true'
         env:
