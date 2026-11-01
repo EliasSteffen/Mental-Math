@@ -55,6 +55,7 @@ export const account = {
   'err.network': 'Keine Verbindung. Bitte prüfe dein Netz.',
   'err.server_error': 'Etwas ist schiefgelaufen. Bitte versuche es später erneut.',
   'err.already_registered': 'Auf diesem Gerät bzw. in diesem Passwortmanager gibt es schon einen Passkey für dein Konto. Wähle im Dialog ein anderes Gerät (z. B. Handy per QR-Code) oder einen Sicherheitsschlüssel.',
+  'err.not_associated': 'Passkeys sind in dieser App noch nicht freigeschaltet: Die Verknüpfung mit der Website fehlt. Bitte versuche es später erneut.',
   'sync.syncing': 'Synchronisiere …',
   'sync.offline': 'Offline – wird später synchronisiert',
   'sync.authError': 'Anmeldung abgelaufen – bitte neu anmelden',

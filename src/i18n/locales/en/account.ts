@@ -57,6 +57,7 @@ export const account: Record<keyof typeof De, string> = {
   'err.network': 'No connection. Please check your network.',
   'err.server_error': 'Something went wrong. Please try again later.',
   'err.already_registered': 'This device or password manager already has a passkey for your account. In the dialog, choose another device (e.g. your phone via QR code) or a security key.',
+  'err.not_associated': 'Passkeys are not yet enabled in this app: the link to the website is missing. Please try again later.',
   'sync.syncing': 'Syncing …',
   'sync.offline': 'Offline – will sync later',
   'sync.authError': 'Session expired – please sign in again',
