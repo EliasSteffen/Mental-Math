@@ -1,11 +1,11 @@
-// Bündelt src/vendor/{auth,storage}.ts mit esbuild zu dist/js/vendor/*.js (überschreibt die tsc-Ausgabe). Läuft nach tsc.
+// Bündelt src/vendor/{auth,storage,native}.ts mit esbuild zu dist/js/vendor/*.js (überschreibt die tsc-Ausgabe). Läuft nach tsc.
 import { mkdirSync, readFileSync, statSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { build } from 'esbuild';
 
 const ROOT: string = fileURLToPath(new URL('..', import.meta.url));
 const OUT_DIR: string = `${ROOT}dist/js/vendor`;
-const ENTRIES: readonly string[] = ['auth', 'storage'];
+const ENTRIES: readonly string[] = ['auth', 'storage', 'native'];
 
 mkdirSync(OUT_DIR, { recursive: true });
 for (const name of ENTRIES) {

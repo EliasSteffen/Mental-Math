@@ -126,12 +126,20 @@ export interface WebAuthnApi {
   get(options: AuthenticationOptionsJSON, o?: { mediation?: 'conditional' | 'optional'; signal?: AbortSignal }): Promise<AuthenticationResponseJSON>;
 }
 
+/** Ablage des Refresh-Tokens in nativen App-Hüllen (z. B. Keychain). null = löschen. */
+export interface RefreshStore {
+  get(): Promise<string | null>;
+  set(token: string | null): Promise<void>;
+}
+
 export interface PasskeyAuthOptions {
   baseUrl?: string;                 // Default '/api/auth'
   fetch?: typeof fetch;
   webauthn?: WebAuthnApi;           // Default: client/webauthn.ts
   now?: () => number;
   refreshRetryDelayMs?: number;     // Default 400: zweiter /refresh-Versuch nach 401 (anderer Tab hat evtl. gerade rotiert)
+  /** Native App: Refresh-Token per Header (REFRESH_HEADER) statt Cookie; Server braucht die Origin in appOrigins */
+  refreshStore?: RefreshStore;
 }
 
 export interface PasskeyAuthClient {
@@ -210,6 +218,9 @@ export interface ServerConfig {
   };
   challengeTtlSec?: number;   // Default 300
   basePath?: string;          // Default '/api/auth'
+  /** Origins nativer App-Hüllen (z. B. 'capacitor://localhost'): Refresh-Token per Header statt Cookie,
+   *  zusätzlich gilt https://<rpId> als WebAuthn-Origin (so meldet iOS native Passkeys). */
+  appOrigins?: string[];
 }
 
 export interface AuthHandlerDeps {

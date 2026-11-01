@@ -1,0 +1,143 @@
+# iOS-App: baut die Web-App, kopiert sie mit Capacitor ins Xcode-Projekt (ios/) und
+# - prüft bei jedem Push und Pull Request, dass die App für den Simulator baut,
+# - lädt sie zu App Store Connect (TestFlight) hoch, wenn die Version in package.json steigt
+#   oder per Hand (Actions → iOS → Run workflow).
+# Einmalige Einrichtung (Apple-Konto, App Store Connect, Secrets): siehe README.md → iOS-App.
+name: iOS
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      upload:
+        description: Zu TestFlight hochladen
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ios:
+    runs-on: macos-26
+    timeout-minutes: 45
+    env:
+      PUBLIC_SUPABASE_URL: ${{ vars.PUBLIC_SUPABASE_URL }}
+      PUBLIC_SUPABASE_ANON_KEY: ${{ vars.PUBLIC_SUPABASE_ANON_KEY }}
+      PUBLIC_API_ORIGIN: ${{ vars.PUBLIC_API_ORIGIN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+
+      - name: Web-App bauen und ins Xcode-Projekt kopieren
+        run: npm run ios:sync
+
+      - name: Hochladen?
+        id: release
+        shell: bash
+        env:
+          EVENT: ${{ github.event_name }}
+          UPLOAD: ${{ inputs.upload }}
+          BEFORE: ${{ github.event.before }}
+          HAS_KEY: ${{ secrets.ASC_KEY_P8 != '' && secrets.ASC_KEY_ID != '' && secrets.ASC_ISSUER_ID != '' && vars.APPLE_TEAM_ID != '' }}
+        run: |
+          version=$(node -p "require('./package.json').version")
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          upload=false
+          if [ "$EVENT" = workflow_dispatch ] && [ "$UPLOAD" = true ]; then upload=true; fi
+          # Push auf main: nur wenn die Version gegenüber dem letzten Stand gestiegen ist
+          if [ "$EVENT" = push ] && git cat-file -e "$BEFORE:package.json" 2>/dev/null; then
+            before=$(git show "$BEFORE:package.json" | node -p "JSON.parse(require('fs').readFileSync(0, 'utf8')).version")
+            if [ "$before" != "$version" ]; then upload=true; fi
+          fi
+          if [ "$upload" = true ] && [ "$HAS_KEY" != true ]; then
+            echo "::warning::Upload übersprungen: Secrets/Variablen für App Store Connect fehlen (README → iOS-App)"
+            upload=false
+          fi
+          echo "upload=$upload" >> "$GITHUB_OUTPUT"
+          echo "Version $version, Upload: $upload"
+
+      - name: Für den Simulator bauen (ohne Signatur)
+        if: steps.release.outputs.upload != 'true'
+        run: >
+          xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Debug
+          -sdk iphonesimulator -destination 'generic/platform=iOS Simulator'
+          CODE_SIGNING_ALLOWED=NO -quiet build
+
+      # Signieren: Xcode verwaltet Zertifikate und Profile über den App-Store-Connect-API-Schlüssel (Rolle Admin).
+      # Optional ein eigenes Zertifikat (.p12, z. B. „Apple Development“ vom eigenen Mac), damit nicht bei jedem
+      # Lauf ein neues Entwicklungszertifikat entsteht.
+      - name: Schlüssel und Zertifikat bereitstellen
+        if: steps.release.outputs.upload == 'true'
+        shell: bash
+        env:
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+          CERT_P12: ${{ secrets.IOS_CERT_P12_BASE64 }}
+          CERT_PASSWORD: ${{ secrets.IOS_CERT_PASSWORD }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/asc"
+          printf '%s\n' "$ASC_KEY_P8" > "$RUNNER_TEMP/asc/AuthKey.p8"
+          if [ -n "$CERT_P12" ]; then
+            keychain="$RUNNER_TEMP/signing.keychain-db"
+            pass=$(openssl rand -hex 16)
+            security create-keychain -p "$pass" "$keychain"
+            security set-keychain-settings -lut 3600 "$keychain"
+            security unlock-keychain -p "$pass" "$keychain"
+            printf '%s' "$CERT_P12" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+            security import "$RUNNER_TEMP/cert.p12" -P "$CERT_PASSWORD" -A -t cert -f pkcs12 -k "$keychain"
+            security set-key-partition-list -S apple-tool:,apple: -k "$pass" "$keychain" >/dev/null
+            security list-keychains -d user -s "$keychain" $(security list-keychains -d user | tr -d '"')
+            rm "$RUNNER_TEMP/cert.p12"
+          fi
+
+      - name: Archivieren (Release)
+        if: steps.release.outputs.upload == 'true'
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
+          VERSION: ${{ steps.release.outputs.version }}
+          BUILD: ${{ github.run_number }}
+        run: >
+          xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Release
+          -destination 'generic/platform=iOS' -archivePath "$RUNNER_TEMP/App.xcarchive"
+          -allowProvisioningUpdates
+          -authenticationKeyPath "$RUNNER_TEMP/asc/AuthKey.p8"
+          -authenticationKeyID "$ASC_KEY_ID" -authenticationKeyIssuerID "$ASC_ISSUER_ID"
+          DEVELOPMENT_TEAM="$TEAM_ID" MARKETING_VERSION="$VERSION" CURRENT_PROJECT_VERSION="$BUILD"
+          -quiet archive
+
+      - name: Zu App Store Connect hochladen (TestFlight)
+        if: steps.release.outputs.upload == 'true'
+        shell: bash
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
+        run: |
+          sed "s/__TEAM_ID__/$TEAM_ID/" ios/ExportOptions.plist > "$RUNNER_TEMP/ExportOptions.plist"
+          xcodebuild -exportArchive -archivePath "$RUNNER_TEMP/App.xcarchive" \
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" -exportPath "$RUNNER_TEMP/export" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$RUNNER_TEMP/asc/AuthKey.p8" \
+            -authenticationKeyID "$ASC_KEY_ID" -authenticationKeyIssuerID "$ASC_ISSUER_ID"
+          echo "### Hochgeladen: Version ${{ steps.release.outputs.version }} (Build ${{ github.run_number }})" >> "$GITHUB_STEP_SUMMARY"
+          echo "Nach der Verarbeitung (ca. 10–30 Minuten) in App Store Connect → TestFlight bzw. als Build der nächsten Version wählbar." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Schlüssel entfernen
+        if: always()
+        run: rm -rf "$RUNNER_TEMP/asc" "$RUNNER_TEMP/signing.keychain-db"

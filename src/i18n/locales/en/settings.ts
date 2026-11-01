@@ -28,6 +28,7 @@ export const settings: Record<keyof typeof De, string> = {
   reminders: 'Reminders',
   remindOn: 'Reminders on this device',
   remindOnHelp: 'Push notifications, even when the app is closed.',
+  remindOnHelpApp: 'Notifications at your chosen time, even when the app is closed.',
   remindDaily: 'Daily reminder',
   remindTime: 'Time',
   remindDays: 'Days',
@@ -44,9 +45,11 @@ export const settings: Record<keyof typeof De, string> = {
   remindTestWait: 'Please wait a moment before testing again.',
   remindError: 'That did not work. Please try again later.',
   remindDenied: 'Notifications are blocked. Allow them for this site in your browser or system settings.',
+  remindDeniedApp: 'Notifications are blocked. Allow them in iOS Settings under “Mental Math” → Notifications.',
   remindUnsupported: 'This browser does not support push notifications.',
   remindIos: 'On iPhone and iPad: Share → “Add to Home Screen” and open the app from there. Then you can turn on reminders here.',
   remindPrivacy: 'For reminders, the server stores your push subscription, time, time zone and a brief learning status (streak, daily goal, due reviews, weak spots). Turning them off deletes the subscription.',
+  remindPrivacyApp: 'This device schedules the reminders itself; no data is sent for them.',
   // Darstellung
   appearance: 'Appearance',
   theme: 'Theme',
@@ -62,6 +65,7 @@ export const settings: Record<keyof typeof De, string> = {
   feedback: 'Feedback',
   haptics: 'Haptics',
   hapticsHelp: 'Light vibration on Android. Colour and text always show the result on their own as well.',
+  hapticsHelpApp: 'A light tap with every answer. Colour and text always show the result on their own as well.',
   sound: 'Sound',
   soundHelp: 'A soft two-tone chime, only for correct answers.',
   // Daten

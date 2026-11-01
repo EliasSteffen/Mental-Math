@@ -1,13 +1,11 @@
-// Push-Erinnerungen im Browser: Unterstützung erkennen, Erlaubnis + Abo, Einstellungen und Lernstand an /api/push melden.
+// Erinnerungen per Web Push (Browser/PWA): Unterstützung erkennen, Erlaubnis + Abo, Einstellungen und Lernstand an /api/push melden.
+// Die iOS-App plant stattdessen lokal (native-reminders.ts); gemeinsame API über platform/reminders.ts.
 // Ohne Konto: Das Gerät erzeugt id + Geheimnis (localStorage); der Server speichert nur den Hash des Geheimnisses.
 import { DEFAULT_REMINDER_PREFS, parsePrefs } from '../core/reminders.ts';
 import type { ReminderPrefs, ReminderState } from '../core/reminders.ts';
-import { dayKey, streakInfo } from '../core/progress.ts';
-import { dueReviews, nextDue } from '../core/review.ts';
-import { weaknesses } from '../core/scoring.ts';
-import { getActivity, getAttempts, getReviews, getSettings, onChange } from '../data/storage.ts';
+import { onChange } from '../data/storage.ts';
+import { currentReminderState } from '../features/reminder-input.ts';
 import { getLang, onLangChange } from '../i18n/index.ts';
-import type { Activity, Attempt, CategoryId, Reviews } from '../types.ts';
 
 const KEY = 'mm:v3:push';
 const SW_TIMEOUT_MS = 10_000;
@@ -99,39 +97,6 @@ export function notificationPermission(): NotificationPermission | 'unsupported'
 
 /* ---------- Lernstand ---------- */
 
-export interface StateInput {
-  activity: Activity;
-  goalMin: number;
-  reviews: Reviews;
-  attempts: Attempt[];
-  enabledCategories: CategoryId[] | null;
-}
-
-/** Was der Server für Erinnerungen braucht – nicht mehr. */
-export function buildReminderState(o: StateInput, now: number = Date.now()): ReminderState {
-  const goalMin = Math.max(1, Math.round(o.goalMin));
-  const st = streakInfo(o.activity, goalMin * 60_000, now);
-  return {
-    day: dayKey(now),
-    todayMin: Math.floor(st.todayMs / 60_000),
-    goalMin,
-    goalDone: st.todayDone,
-    streak: st.current,
-    reviewsDue: dueReviews(o.reviews, now).length,
-    nextReviewAt: nextDue(o.reviews),
-    weak: weaknesses(o.attempts, 3, { enabledCategories: o.enabledCategories }).map((w) => w.subtype),
-    at: now,
-  };
-}
-
-function currentState(now = Date.now()): ReminderState {
-  const s = getSettings();
-  return buildReminderState({
-    activity: getActivity(), goalMin: s.dailyGoalMin, reviews: getReviews(), attempts: getAttempts(),
-    enabledCategories: s.enabledCategories,
-  }, now);
-}
-
 /** Vergleichsschlüssel ohne Zeitstempel */
 const stateKey = (s: ReminderState): string => JSON.stringify({ ...s, at: 0 });
 
@@ -189,7 +154,7 @@ async function browserSubscription(publicKey: string): Promise<PushSubscription>
 }
 
 async function register(local: Local, publicKey: string, sub: PushSubscription): Promise<boolean> {
-  const state = currentState();
+  const state = currentReminderState();
   const res = await api('subscribe', {
     id: local.id, secret: local.secret, subscription: sub.toJSON(), tz: timeZone(), lang: getLang(), prefs: local.prefs, state,
   });
@@ -280,7 +245,7 @@ export async function sendTestPush(): Promise<TestResult> {
 async function reportState(o: { keepalive?: boolean; refresh?: boolean } = {}): Promise<void> {
   const local = readLocal();
   if (!local?.enabled) return;
-  const state = currentState();
+  const state = currentReminderState();
   const key = stateKey(state);
   if (key === local.sent && !(o.refresh && state.at - local.sentAt >= REFRESH_MS)) return;
   try {

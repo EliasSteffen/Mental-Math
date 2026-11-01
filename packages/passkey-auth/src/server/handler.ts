@@ -22,6 +22,7 @@ const STATUS: Record<AuthErrorCode, number> = {
 function respond(r: Reply): Response {
   const h = new Headers({ 'Cache-Control': 'no-store' });
   for (const c of r.cookies ?? []) h.append('Set-Cookie', c);
+  for (const [k, v] of Object.entries(r.headers ?? {})) h.set(k, v);
   if (r.status === 204 || r.body === undefined) return new Response(null, { status: r.status, headers: h });
   h.set('Content-Type', 'application/json; charset=utf-8');
   return new Response(JSON.stringify(r.body), { status: r.status, headers: h });
@@ -57,11 +58,12 @@ export function createAuthHandler(config: ServerConfig, store: AuthStore, deps: 
     if (!route) return errorReply('invalid_request', 404);
     if (req.method !== 'POST') return errorReply('invalid_request', 405);
     const origin = req.headers.get('origin');
-    if (!origin || !config.origins.includes(origin)) return errorReply('invalid_request', 403);
+    const app = origin !== null && (config.appOrigins ?? []).includes(origin);
+    if (!origin || !(app || config.origins.includes(origin))) return errorReply('invalid_request', 403);
     const body = await readBody(req);
     const ctx: Ctx = {
       config, store, tokens, now, randomBytes, randomUUID, verifyRegistration, verifyAuthentication,
-      basePath, req, body,
+      basePath, req, body, app,
     };
     return route(ctx);
   }

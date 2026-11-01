@@ -4,3 +4,4 @@ export { toBase64Url, fromBase64Url, isBase64Url, utf8Encode, utf8Decode } from 
 export { normalizeUsername, USERNAME_MIN, USERNAME_MAX } from './username.ts';
 export type { UsernameResult } from './username.ts';
 export { generateRecoveryCode, normalizeRecoveryCode, formatRecoveryCode, RECOVERY_CODE_LENGTH } from './recovery.ts';
+export { REFRESH_HEADER } from './refresh.ts';

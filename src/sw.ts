@@ -59,7 +59,7 @@ sw.addEventListener('activate', (event) => {
   })());
 });
 
-/* ---------- Push-Erinnerungen (Texte kommen fertig vom Server, siehe server/push-messages.ts) ---------- */
+/* ---------- Push-Erinnerungen (Texte kommen fertig vom Server, siehe src/core/reminder-messages.ts) ---------- */
 
 interface PushPayload { title: string; body: string; url: string; tag: string }
 

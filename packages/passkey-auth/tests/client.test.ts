@@ -225,3 +225,38 @@ test('204 liefert undefined', async () => {
   await client.restore();
   assert.equal(await client.addPasskey(), undefined);
 });
+
+test('refreshStore: Token per Header, keine Cookies, Rotation und Logout pflegen die Ablage', async () => {
+  const calls: Array<{ url: string; init: RequestInit }> = [];
+  let stored: string | null = 'rt1';
+  const refreshStore = { get: async () => stored, set: async (t: string | null) => { stored = t; } };
+  let refreshStatus = 200;
+  const fetchImpl = (async (url: string | URL | Request, init?: RequestInit) => {
+    calls.push({ url: String(url), init: init ?? {} });
+    if (String(url).endsWith('/refresh')) {
+      return refreshStatus === 200
+        ? new Response(JSON.stringify(sess(5_000_000)), { status: 200, headers: { 'content-type': 'application/json', 'x-refresh-token': 'rt2' } })
+        : json({ error: { code: 'unauthorized' } }, 401);
+    }
+    return new Response(null, { status: 204, headers: { 'x-refresh-token': '' } });
+  }) as typeof fetch;
+  const webauthn: WebAuthnApi = {
+    support: async () => ({ webauthn: true, platform: true, conditional: false }),
+    create: async () => ({ id: 'r' }) as unknown as RegistrationResponseJSON,
+    get: async () => ({ id: 'a' }) as unknown as AuthenticationResponseJSON,
+  };
+  const client = createAuthCore({ fetch: fetchImpl, webauthn, refreshStore, refreshRetryDelayMs: 0 });
+  await client.restore();
+  const hdr = (i: number): Record<string, string> => calls[i]?.init.headers as Record<string, string>;
+  assert.equal(hdr(0)['x-refresh-token'], 'rt1');
+  assert.equal(calls[0]?.init.credentials, 'omit');
+  assert.equal(stored, 'rt2');
+  await client.logout();
+  assert.equal(hdr(1)['x-refresh-token'], 'rt2');
+  assert.equal(stored, null);
+  // Zweimal 401 beim Wiederherstellen: Ablage leer
+  stored = 'old';
+  refreshStatus = 401;
+  assert.equal(await client.restore(), null);
+  assert.equal(stored, null);
+});

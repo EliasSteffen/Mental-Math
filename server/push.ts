@@ -8,8 +8,8 @@ import {
 import type { ReminderPrefs, ReminderSchedule, ReminderState } from '../src/core/reminders.ts';
 import { b64uDecode, b64uEncode, generateVapidKeys, sendPush, validVapidKeys } from './push-crypto.ts';
 import type { FetchLike, SendResult, VapidKeys } from './push-crypto.ts';
-import { composeMessage } from './push-messages.ts';
-import type { MessageKind } from './push-messages.ts';
+import { composeMessage } from '../src/core/reminder-messages.ts';
+import type { MessageKind } from '../src/core/reminder-messages.ts';
 import { hitLimits } from './rate-limit.ts';
 import type { Hits } from './rate-limit.ts';
 
