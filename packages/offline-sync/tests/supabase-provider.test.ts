@@ -1,9 +1,12 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { MemoryAdapter } from '../src/adapters/memory.ts';
+import { SyncEngine } from '../src/engine.ts';
 import { isSyncError } from '../src/errors.ts';
+import { Repository } from '../src/repository.ts';
 import { createSupabaseSyncProvider } from '../src/supabase/index.ts';
-import type { SupabaseSyncSchema, SyncRecord } from '../src/types.ts';
+import type { RemoteDoc, SupabaseSyncSchema, SyncRecord } from '../src/types.ts';
 
 const U = '00000000-0000-4000-8000-00000000000a';
 type Call = { table: string; ops: Array<[string, unknown[]]> };
@@ -172,10 +175,51 @@ test('Fehlerabbildung', async () => {
   assert.equal(await kindOf({}), 'ok');
 });
 
-test('deleteAll ruft die RPC aus dem Schema auf', async () => {
-  const { client, rpcs } = fake(() => ({}));
-  await mk(client).deleteAll();
-  assert.deepEqual(rpcs, ['delete_everything']);
+test('deleteAll ruft die RPC aus dem Schema auf und liefert at der Server-Markierung', async () => {
+  const at = 1_790_000_000_123;
+  const cases: Array<[unknown, number | undefined]> = [
+    [at, at], [String(at), at], [null, undefined], [undefined, undefined], ['', undefined], ['x', undefined], [0, undefined], [{}, undefined],
+  ];
+  for (const [data, want] of cases) {
+    const { client, rpcs } = fake(() => ({ data }));
+    assert.equal(await mk(client).deleteAll(), want, `data=${JSON.stringify(data)}`);
+    assert.deepEqual(rpcs, ['delete_everything']);
+  }
   const bad = fake(() => ({ status: 401, error: { code: 'PGRST301', message: 'x' } }));
   await assert.rejects(mk(bad.client).deleteAll(), (e: unknown) => isSyncError(e) && e.kind === 'auth');
+});
+
+test('upsert: Mapper-Fehler (toRow/docToRow) → invalid, nichts gesendet', async () => {
+  const { client, calls } = fake(() => ({}));
+  const throwing: SupabaseSyncSchema = {
+    ...schema,
+    collections: { big: { ...schema.collections.big!, toRow: () => { throw new TypeError('Ungültiger Versuch'); } } },
+  };
+  const isInvalid = (e: unknown): boolean => isSyncError(e) && e.kind === 'invalid';
+  await assert.rejects(createSupabaseSyncProvider(client, U, throwing).upsertRecords('big', [rec('a')]), isInvalid);
+  await assert.rejects(mk(client).upsertDocs([null as unknown as RemoteDoc]), isInvalid);
+  assert.equal(calls.length, 0);
+});
+
+test('Poison Pill: wirft toRow für einen Datensatz, lehnt die Engine nur diesen ab (kein Backoff, Push läuft weiter)', async () => {
+  const { client, calls } = fake(() => ({ data: [] }));
+  const small = schema.collections.small!;
+  const poisoned: SupabaseSyncSchema = {
+    ...schema,
+    collections: {
+      small: { ...small, toRow: (i, u) => { if (i.id === 'bad') throw new TypeError('Ungültige Runde'); return small.toRow(i, u); } },
+    },
+  };
+  const repo = new Repository(new MemoryAdapter());
+  const engine = new SyncEngine(repo, { schema: { collections: [{ name: 'small' }], docs: [] }, deviceId: () => 'd' });
+  engine.setProvider(createSupabaseSyncProvider(client, U, poisoned));
+  for (const id of ['good1', 'bad', 'good2']) repo.upsert('small', rec(id));
+  const st = await engine.syncNow();
+  assert.equal(st.phase, 'idle');
+  assert.equal(st.lastError, null);
+  assert.equal(st.pushed, 2);
+  assert.equal(st.rejected, 1);
+  assert.equal(st.pending, 0);
+  const sent = calls.flatMap((c) => op(c, 'upsert').flatMap((a) => (a[0] as Array<{ id: string }>).map((r) => r.id)));
+  assert.deepEqual(sent.sort(), ['good1', 'good2']);
 });
