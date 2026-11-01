@@ -127,6 +127,43 @@ test('createSession / deleteSession', async () => {
   assert.deepEqual(f.calls[1]?.ops, [['delete', []], ['eq', ['token_hash', 'h']]]);
 });
 
+test('createSession: absolute Grenze als absolute_expires_at; fehlt die Spalte, ohne Grenze', async () => {
+  const f = makeFake(ok(null));
+  await createSupabaseAuthStore(f.sb).createSession('u', 'h', expiresAt, expiresAt + 86_400_000);
+  assert.equal(f.calls.length, 1);
+  assert.deepEqual(f.calls[0]?.ops[0], ['insert', [{
+    user_id: 'u', token_hash: 'h', expires_at: iso, absolute_expires_at: '2030-01-02T12:00:00.000Z',
+  }]]);
+
+  // sql/001 noch nicht eingespielt: PostgREST meldet die unbekannte Spalte, Login darf nicht scheitern
+  const origError = console.error;
+  console.error = () => {};
+  try {
+    for (const code of ['PGRST204', '42703']) {
+      const results: Res[] = [{ data: null, error: { code } }, ok(null)];
+      const calls: Call[] = [];
+      const sb = {
+        from(table: string) {
+          const res = results.shift() ?? ok(null);
+          const c: Call = { kind: 'from', table, ops: [] };
+          calls.push(c);
+          return { insert: (...a: unknown[]) => { c.ops.push(['insert', a]); return Promise.resolve(res); } };
+        },
+      } as unknown as SupabaseClient;
+      await createSupabaseAuthStore(sb).createSession('u', 'h', expiresAt, expiresAt + 1);
+      assert.equal(calls.length, 2, code);
+      assert.deepEqual(calls[1]?.ops[0], ['insert', [{ user_id: 'u', token_hash: 'h', expires_at: iso }]]);
+    }
+  } finally {
+    console.error = origError;
+  }
+
+  // Andere Fehler bleiben Fehler, ohne zweiten Versuch
+  const e = makeFake({ data: null, error: { code: '23505' } });
+  await assert.rejects(createSupabaseAuthStore(e.sb).createSession('u', 'h', expiresAt, expiresAt + 1), /supabase: createSession: 23505/);
+  assert.equal(e.calls.length, 1);
+});
+
 test('rotateSession: rpc-Argumente, User oder null', async () => {
   const f = makeFake(ok([{ user_id: 'u', username: 'Ann' }]));
   assert.deepEqual(await createSupabaseAuthStore(f.sb).rotateSession('o', 'n', expiresAt), { id: 'u', username: 'Ann' });

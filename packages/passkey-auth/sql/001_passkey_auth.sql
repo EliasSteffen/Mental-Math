@@ -36,10 +36,18 @@ create table if not exists public.auth_sessions (     -- nur service_role
   id           uuid primary key default gen_random_uuid(),
   user_id      uuid not null references public.users(id) on delete cascade,
   token_hash   text not null unique,                  -- SHA-256(refresh token), base64url
-  expires_at   timestamptz not null,
+  expires_at   timestamptz not null,                  -- gleitend, je Rotation neu (höchstens absolute_expires_at)
   created_at   timestamptz not null default now(),
-  last_used_at timestamptz
+  last_used_at timestamptz,
+  prev_hash    text,                                  -- Hash vor der letzten Rotation (Gnadenfrist, Wiederverwendung)
+  rotated_at   timestamptz,                           -- Zeitpunkt der letzten Rotation über token_hash
+  absolute_expires_at timestamptz                     -- harte Grenze ab Login; null = unbegrenzt (Sessions vor dieser Version)
 );
+-- Nachrüsten bestehender Installationen
+alter table public.auth_sessions add column if not exists prev_hash text;
+alter table public.auth_sessions add column if not exists rotated_at timestamptz;
+alter table public.auth_sessions add column if not exists absolute_expires_at timestamptz;
+create index if not exists auth_sessions_prev_hash_idx on public.auth_sessions(prev_hash);
 
 -- RLS und Rechte
 alter table public.users           enable row level security;
@@ -106,25 +114,48 @@ begin
 end;
 $$;
 
--- Refresh-Session rotieren; leer bei unbekanntem oder abgelaufenem Hash (abgelaufen wird trotzdem entfernt)
+-- Refresh-Session rotieren (Signatur unverändert, Zeile bleibt dieselbe, nur token_hash wechselt):
+-- 1. Treffer über token_hash: abgelaufen (gleitend oder absolut) → löschen, leer;
+--    sonst neuer Hash, alter wird prev_hash, rotated_at = now(), expires_at höchstens bis absolute_expires_at.
+-- 2. Treffer über prev_hash (alter Token nach Rotation): innerhalb von 60 s seit rotated_at (verlorene Antwort,
+--    paralleler Tab) nochmals neuer Hash, prev_hash/rotated_at bleiben (Frist gleitet nicht);
+--    danach Wiederverwendung → Session löschen (Diebstahlsignal), leer.
+-- absolute_expires_at null (Sessions vor dieser Version) = unbegrenzt.
 create or replace function public.pa_rotate_session(p_old_hash text, p_new_hash text, p_expires_at timestamptz)
 returns table (user_id uuid, username text)
 language plpgsql security definer set search_path = ''
 as $$
 declare
-  v_old public.auth_sessions;
+  v_row public.auth_sessions;
 begin
-  select * into v_old from public.auth_sessions s where s.token_hash = p_old_hash for update;
+  select * into v_row from public.auth_sessions s where s.token_hash = p_old_hash for update;
+  if found then
+    if v_row.expires_at <= now() or coalesce(v_row.absolute_expires_at <= now(), false) then
+      delete from public.auth_sessions s where s.id = v_row.id;
+      return;
+    end if;
+    update public.auth_sessions s
+       set token_hash = p_new_hash, prev_hash = p_old_hash, rotated_at = now(),
+           expires_at = least(p_expires_at, coalesce(s.absolute_expires_at, p_expires_at))
+     where s.id = v_row.id;
+    return query select u.id, u.username from public.users u where u.id = v_row.user_id;
+    return;
+  end if;
+
+  select * into v_row from public.auth_sessions s where s.prev_hash = p_old_hash limit 1 for update;
   if not found then
     return;
   end if;
-  delete from public.auth_sessions s where s.id = v_old.id;
-  if v_old.expires_at <= now() then
+  if v_row.expires_at <= now() or coalesce(v_row.absolute_expires_at <= now(), false)
+     or v_row.rotated_at is null or v_row.rotated_at <= now() - interval '60 seconds' then
+    delete from public.auth_sessions s where s.id = v_row.id;
     return;
   end if;
-  insert into public.auth_sessions (user_id, token_hash, expires_at)
-  values (v_old.user_id, p_new_hash, p_expires_at);
-  return query select u.id, u.username from public.users u where u.id = v_old.user_id;
+  update public.auth_sessions s
+     set token_hash = p_new_hash,
+         expires_at = least(p_expires_at, coalesce(s.absolute_expires_at, p_expires_at))
+   where s.id = v_row.id;
+  return query select u.id, u.username from public.users u where u.id = v_row.user_id;
 end;
 $$;
 

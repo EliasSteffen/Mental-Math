@@ -37,6 +37,7 @@ const cookieName = (c: Ctx): string => c.config.refresh?.cookieName ?? 'mm_rt';
 const cookiePath = (c: Ctx): string => c.config.refresh?.cookiePath ?? c.basePath;
 const cookieSecure = (c: Ctx): boolean => c.config.refresh?.secure ?? true;
 const refreshTtlSec = (c: Ctx): number => c.config.refresh?.ttlSec ?? 30 * 24 * 3600;
+const absoluteTtlSec = (c: Ctx): number => c.config.refresh?.absoluteTtlSec ?? 90 * 24 * 3600;
 const clear = (c: Ctx): string => clearCookie(cookieName(c), { path: cookiePath(c), secure: cookieSecure(c) });
 
 async function newChallenge(
@@ -69,9 +70,11 @@ function registrationOptions(
 async function issueSession(c: Ctx, user: AuthUser, rotatedFrom?: string): Promise<Reply> {
   const { token, expiresAt } = await c.tokens.sign(user);
   const refresh = newRefreshToken(c.randomBytes);
-  const ttl = refreshTtlSec(c);
+  // Neue Session: gleitende Frist, aber nie über die absolute Grenze hinaus (auch nicht im Cookie)
+  const ttl = Math.min(refreshTtlSec(c), absoluteTtlSec(c));
   if (rotatedFrom === undefined) {
-    await c.store.createSession(user.id, await hashToken(refresh), c.now() + ttl * 1000);
+    const now = c.now();
+    await c.store.createSession(user.id, await hashToken(refresh), now + ttl * 1000, now + absoluteTtlSec(c) * 1000);
   }
   const body: SessionRes = { user, accessToken: token, expiresAt };
   return {
@@ -209,7 +212,9 @@ export async function refresh(c: Ctx): Promise<Reply> {
   const denied: Reply = { status: 401, body: { error: { code: 'unauthorized' } } };
   if (!old) return denied;
   const next = newRefreshToken(c.randomBytes);
-  const ttl = refreshTtlSec(c);
+  // Der Store kappt expiresAt auf die absolute Grenze der Session; das Cookie kennt nur die Dauer
+  const ttl = Math.min(refreshTtlSec(c), absoluteTtlSec(c));
+  // Alter Token nach Rotation: 60 s Gnadenfrist (verlorene Antwort), danach Wiederverwendung → Session gelöscht
   const user = await c.store.rotateSession(await hashToken(old), await hashToken(next), c.now() + ttl * 1000);
   if (!user) return denied;
   const { token, expiresAt } = await c.tokens.sign(user);

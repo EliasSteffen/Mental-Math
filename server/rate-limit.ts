@@ -1,8 +1,10 @@
-// Rate-Limit für /api/explain: gleitende Zeitfenster je Schlüssel (DOM-frei, Cloudflare Workers + Node >= 20).
+// Rate-Limit für /api/explain und /api/auth: gleitende Zeitfenster je Schlüssel (DOM-frei, Cloudflare Workers + Node >= 20).
 // Zählt bevorzugt global über ein Durable Object (workers/rate-limiter), sonst best effort pro Isolate im Speicher.
 
 export interface LimitCheck { key: string; windowMs: number; max: number }
 export type Hits = Record<string, number[]>;
+/** Prüfliste je IP; legt Schlüssel und Grenzen eines Limiters fest */
+export type ChecksFor = (ip: string) => LimitCheck[];
 
 const MIN = 60_000;
 export const DAY = 86_400_000;
@@ -29,6 +31,11 @@ export function explainChecks(ip: string): LimitCheck[] {
   ];
 }
 
+/** Grenze für /api/auth/*: je IP 30/min über alle Routen; eigene Schlüssel, teilt nichts mit explain */
+export function authChecks(ip: string): LimitCheck[] {
+  return [{ key: `ip:${ip}:auth:min`, windowMs: MIN, max: 30 }];
+}
+
 /** Gültige Prüfliste aus einem Request-Body (für das Durable Object) oder null */
 export function parseChecks(body: unknown): LimitCheck[] | null {
   const raw = body && typeof body === 'object' ? (body as { checks?: unknown }).checks : null;
@@ -48,11 +55,11 @@ export function parseChecks(body: unknown): LimitCheck[] | null {
 export interface RateLimiter { limited(ip: string, now: number): Promise<boolean> }
 
 /** Best effort pro Isolate: zählt nur Anfragen, die zufällig in derselben Instanz landen */
-export function memoryLimiter(): RateLimiter & { reset(): void } {
+export function memoryLimiter(checksFor: ChecksFor = explainChecks): RateLimiter & { reset(): void } {
   let hits: Hits = {};
   return {
     async limited(ip, now) {
-      const checks = explainChecks(ip);
+      const checks = checksFor(ip);
       const r = hitLimits(hits, checks, now);
       hits = { ...hits, ...r.hits };
       if (Object.keys(hits).length > 10_000) {
@@ -68,16 +75,22 @@ export function memoryLimiter(): RateLimiter & { reset(): void } {
 export interface DoStub { fetch(input: string, init?: RequestInit): Promise<Response> }
 export interface DoNamespace { idFromName(name: string): unknown; get(id: unknown): DoStub }
 
-/** Global über ein Durable Object; ist es nicht erreichbar, entscheidet der Fallback (nie offen ohne Limit). */
-export function durableLimiter(ns: DoNamespace, fallback: RateLimiter): RateLimiter {
+/**
+ * Global über ein Durable Object; ist es nicht erreichbar, entscheidet der Fallback (nie offen ohne Limit).
+ * name wählt die Objekt-Instanz (eigener Speicher je Name), checksFor die Schlüssel und Grenzen; Default: explain.
+ */
+export function durableLimiter(
+  ns: DoNamespace, fallback: RateLimiter, opts: { name?: string; checksFor?: ChecksFor } = {},
+): RateLimiter {
+  const { name = 'explain', checksFor = explainChecks } = opts;
   return {
     async limited(ip, now) {
       try {
-        const stub = ns.get(ns.idFromName('explain'));
+        const stub = ns.get(ns.idFromName(name));
         const res = await stub.fetch('https://rate-limiter/hit', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ checks: explainChecks(ip) }),
+          body: JSON.stringify({ checks: checksFor(ip) }),
         });
         if (!res.ok) throw new Error(`status ${res.status}`);
         const data = (await res.json()) as { ok?: unknown };

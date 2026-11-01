@@ -253,28 +253,78 @@ test('login: Counter-Regel', async () => {
   assert.equal((await loginFlow(s2, authResponse())).status, 200);
 });
 
-test('refresh: Rotation, altes Cookie ungültig', async () => {
+const refreshWith = (s: Setup, cookie?: string): Promise<Response> =>
+  s.h(post('/refresh', undefined, cookie === undefined ? {} : { cookie: `mm_rt=${cookie}` }));
+const DAY_MS = 24 * 3600_000;
+
+test('refresh: normale Rotation, ohne Cookie und abgelaufen 401', async () => {
   const s = setup();
   const reg = await register(s);
   const c1 = rt(reg.res);
-  const r1 = await s.h(post('/refresh', undefined, { cookie: `mm_rt=${c1}` }));
+  const r1 = await refreshWith(s, c1);
   assert.equal(r1.status, 200);
   const c2 = rt(r1);
   assert.ok(c2 && c2 !== c1);
   assert.equal(((await r1.json()) as J)['user'].username, 'Alice');
   assert.equal(s.store.snapshot().sessions, 1);
-  const old = await s.h(post('/refresh', undefined, { cookie: `mm_rt=${c1}` }));
-  assert.equal(old.status, 401);
-  assert.equal(await code(old), 'unauthorized');
-  assert.equal(old.headers.get('set-cookie'), null); // Mehr-Tab: neues Cookie anderer Tabs nicht löschen
-  assert.equal((await s.h(post('/refresh', undefined, { cookie: `mm_rt=${c2}` }))).status, 200);
-  const none = await s.h(post('/refresh'));
+  s.clock.t += 14 * 60_000;
+  const r2 = await refreshWith(s, c2);
+  assert.equal(r2.status, 200);
+  assert.ok(rt(r2) && rt(r2) !== c2);
+  assert.equal(s.store.snapshot().sessions, 1);
+  const none = await refreshWith(s);
   assert.equal(none.status, 401);
   assert.equal(none.headers.get('set-cookie'), null);
   // abgelaufen
   const reg2 = await register(s, 'Bob');
-  s.clock.t += 31 * 24 * 3600_000;
-  assert.equal((await s.h(post('/refresh', undefined, { cookie: `mm_rt=${rt(reg2.res)}` }))).status, 401);
+  s.clock.t += 31 * DAY_MS;
+  assert.equal((await refreshWith(s, rt(reg2.res))).status, 401);
+});
+
+test('refresh: altes Cookie innerhalb von 60 s gültig (verlorene Antwort), danach Wiederverwendung', async () => {
+  const s = setup();
+  const c1 = rt((await register(s)).res);
+  const c2 = rt(await refreshWith(s, c1)); // Antwort erreicht den Client nicht
+  s.clock.t += 30_000;
+  const retry = await refreshWith(s, c1);
+  assert.equal(retry.status, 200);
+  const c3 = rt(retry);
+  assert.ok(c3 && c3 !== c1 && c3 !== c2);
+  assert.equal((await refreshWith(s, c2)).status, 401, 'c2 wurde durch c3 ersetzt');
+  assert.equal(s.store.snapshot().sessions, 1);
+  s.clock.t += 30_000; // 60 s seit der Rotation, die Gnadenfrist gleitet nicht
+  const old = await refreshWith(s, c1);
+  assert.equal(old.status, 401);
+  assert.equal(await code(old), 'unauthorized');
+  assert.equal(old.headers.get('set-cookie'), null); // Mehr-Tab: neues Cookie anderer Tabs nicht löschen
+  assert.equal(s.store.snapshot().sessions, 0, 'Wiederverwendung löscht die Session');
+  assert.equal((await refreshWith(s, c3)).status, 401);
+});
+
+test('refresh: absolute Sitzungsdauer greift trotz Rotation; Cookie nie länger als die Grenze', async () => {
+  const s = setup({}, { refresh: { absoluteTtlSec: 2 * 24 * 3600 } });
+  const reg = await register(s);
+  assert.match(reg.res.headers.get('set-cookie') ?? '', /Max-Age=172800;/);
+  s.clock.t += DAY_MS;
+  const r1 = await refreshWith(s, rt(reg.res));
+  assert.equal(r1.status, 200);
+  assert.match(r1.headers.get('set-cookie') ?? '', /Max-Age=172800;/);
+  s.clock.t += DAY_MS;
+  assert.equal((await refreshWith(s, rt(r1))).status, 401);
+  assert.equal(s.store.snapshot().sessions, 0);
+
+  // Default: 30 Tage gleitend, 90 Tage absolut
+  const d = setup();
+  let c = rt((await register(d)).res);
+  for (let day = 20; day <= 80; day += 20) {
+    d.clock.t += 20 * DAY_MS;
+    const r = await refreshWith(d, c);
+    assert.equal(r.status, 200, `Tag ${day}`);
+    assert.match(r.headers.get('set-cookie') ?? '', /Max-Age=2592000;/);
+    c = rt(r);
+  }
+  d.clock.t += 10 * DAY_MS; // Tag 90
+  assert.equal((await refreshWith(d, c)).status, 401);
 });
 
 test('logout: 204, Cookie gelöscht, Session weg', async () => {
