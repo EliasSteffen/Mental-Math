@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { validPublicKey, validPublicUrl } from '../scripts/build-info.ts';
-import { addConnectSrc } from '../scripts/copy-static.ts';
+import { addConnectSrc, appleAppSiteAssociation } from '../scripts/copy-static.ts';
 
 const URL_OK = 'https://anrfpvgcaplyjkmraald.supabase.co';
 const CSP_LINE = "  Content-Security-Policy: default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
@@ -53,4 +53,11 @@ test('validPublicKey akzeptiert nur publishable oder anon-Keys', () => {
   assert.equal(validPublicKey('sb_secret_abc123'), false);
   assert.equal(validPublicKey('irgendwas'), false);
   assert.equal(validPublicKey(''), false);
+});
+
+test('apple-app-site-association: webcredentials nur mit gültiger Team-ID', () => {
+  const aasa = appleAppSiteAssociation('ABCDE12345', 'de.example.app');
+  assert.deepEqual(JSON.parse(aasa ?? 'null'), { webcredentials: { apps: ['ABCDE12345.de.example.app'] } });
+  assert.equal(appleAppSiteAssociation('abc', 'de.example.app'), null);
+  assert.equal(appleAppSiteAssociation('ABCDE12345', 'de example'), null);
 });

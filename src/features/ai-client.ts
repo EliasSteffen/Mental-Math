@@ -1,6 +1,7 @@
 // Client für /api/explain + sicherer Mini-Markdown-Parser (kein HTML, nur Datenstruktur)
 import type { AiBlock, AiInline, AiResult, SubtypeId, Task } from '../types.ts';
 import { getLang } from '../i18n/index.ts';
+import { apiUrl } from '../platform/index.ts';
 
 const CACHE_KEY = 'kopfrechner.ai.v1';
 const OFF_KEY = 'kopfrechner.ai.off';
@@ -77,7 +78,7 @@ async function request(payload: Record<string, unknown>, key: string): Promise<A
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
   try {
-    const res = await fetch('/api/explain', {
+    const res = await fetch(apiUrl('/api/explain'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),

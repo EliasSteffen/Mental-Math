@@ -6,7 +6,19 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT: string = fileURLToPath(new URL('..', import.meta.url));
 
-export interface PublicConfig { supabaseUrl: string; supabaseKey: string }
+export interface PublicConfig { supabaseUrl: string; supabaseKey: string; apiOrigin: string }
+
+/** API der iOS-App (die Website nutzt relative Pfade); überschreibbar mit PUBLIC_API_ORIGIN */
+export const DEFAULT_API_ORIGIN = 'https://mental-math.elias-steffen.de';
+
+/** https-Origin ohne Pfad, z. B. https://mental-math.example */
+export function validApiOrigin(origin: string): boolean {
+  try {
+    return new URL(origin).origin === origin && origin.startsWith('https://');
+  } catch {
+    return false;
+  }
+}
 
 function gitHash(): string {
   try {
@@ -50,9 +62,11 @@ export function readPublicConfig(): PublicConfig {
   loadDotEnvIfNeeded();
   const url: string = (process.env.PUBLIC_SUPABASE_URL ?? '').trim();
   const key: string = (process.env.PUBLIC_SUPABASE_ANON_KEY ?? '').trim();
+  const api: string = (process.env.PUBLIC_API_ORIGIN ?? '').trim();
   return {
     supabaseUrl: validPublicUrl(url) ? url : '',
     supabaseKey: validPublicKey(key) ? key : '',
+    apiOrigin: validApiOrigin(api) ? api : DEFAULT_API_ORIGIN,
   };
 }
 
@@ -68,7 +82,7 @@ export const BUILD_INFO: BuildInfo = ${JSON.stringify(info)};
 
   const cfg: PublicConfig = readPublicConfig();
   const publicOut = `// AUTOMATISCH ERZEUGT von scripts/build-info.ts – nicht bearbeiten. Nur öffentliche Werte.
-export const PUBLIC_CONFIG: { supabaseUrl: string; supabaseKey: string } = ${JSON.stringify(cfg)};
+export const PUBLIC_CONFIG: { supabaseUrl: string; supabaseKey: string; apiOrigin: string } = ${JSON.stringify(cfg)};
 `;
 
   mkdirSync(`${ROOT}src/generated`, { recursive: true });

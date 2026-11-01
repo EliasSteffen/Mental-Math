@@ -1,11 +1,12 @@
 // Profil → Erinnerungen: Push-Benachrichtigungen auf diesem Gerät (täglich zur Wunschzeit, Serie retten,
-// Wiederholungen, Lern-Hinweis). Die Gruppe erscheint nur, wenn der Server Push anbietet (/api/push/config).
+// Wiederholungen, Lern-Hinweis). Website: nur, wenn der Server Push anbietet (/api/push/config); iOS-App: lokal, immer.
 import { formatTime, parseTime } from '../core/reminders.ts';
 import type { ReminderPrefs } from '../core/reminders.ts';
 import {
   disablePush, enablePush, getPushPrefs, isPushEnabled, notificationPermission, pushConfig, pushSupport, sendTestPush,
   setPushPrefs,
-} from '../features/push.ts';
+} from '../platform/reminders.ts';
+import { isNative } from '../platform/index.ts';
 import { getLang, locale, t } from '../i18n/index.ts';
 import { h } from '../ui/dom.ts';
 import { group, list, row, switchRow } from '../ui/kit.ts';
@@ -119,7 +120,7 @@ export function remindersGroup(): HTMLElement {
     const denied = notificationPermission() === 'denied';
     let busy = false;
     const master = switchRow({
-      label: t('settings.remindOn'), help: t('settings.remindOnHelp'), checked: enabled, disabled: denied,
+      label: t('settings.remindOn'), help: t(isNative() ? 'settings.remindOnHelpApp' : 'settings.remindOnHelp'), checked: enabled, disabled: denied,
       onChange: (on) => {
         if (busy) { master.set(!on); return; }
         busy = true;
@@ -140,10 +141,10 @@ export function remindersGroup(): HTMLElement {
     });
     body.replaceChildren(
       list([master.el]),
-      ...(denied ? [h('p', { class: 'prof-note' }, t('settings.remindDenied'))] : []),
+      ...(denied ? [h('p', { class: 'prof-note' }, t(isNative() ? 'settings.remindDeniedApp' : 'settings.remindDenied'))] : []),
       ...(enabled ? details() : []),
       status,
-      h('p', { class: 'prof-note' }, t('settings.remindPrivacy')),
+      h('p', { class: 'prof-note' }, t(isNative() ? 'settings.remindPrivacyApp' : 'settings.remindPrivacy')),
     );
   }
 

@@ -107,3 +107,16 @@
     .cta::after { animation:none; }
   }
 }
+
+/* iOS-App (html.is-native, src/platform/native.ts): kein Gummiband der ganzen Seite, kein Markieren und kein
+   Kontextmenü außerhalb von Eingaben – wie in nativen Apps. */
+.is-native, .is-native body { overscroll-behavior:none; }
+.is-native body { -webkit-touch-callout:none; -webkit-user-select:none; user-select:none; }
+.is-native :is(input, textarea, [contenteditable="true"]) { -webkit-user-select:text; user-select:text; }
+/* Statusleiste: Inhalt scrollt unter einen leicht durchscheinenden Streifen statt direkt unter die Uhrzeit
+   (über der Tab-Leiste, unter Dialogen und Popovern). body::before ist schon der Hintergrund. */
+.is-native body::after {
+  content:""; position:fixed; inset:0 0 auto 0; height:env(safe-area-inset-top, 0px); z-index:45; pointer-events:none;
+  background:color-mix(in srgb, var(--bg) 82%, transparent);
+  -webkit-backdrop-filter:blur(14px); backdrop-filter:blur(14px);
+}

@@ -4,6 +4,7 @@ import { getMethod } from '../src/core/methods.ts';
 import type { Params, ParamValue } from '../src/types.ts';
 import { locale } from '../src/i18n/index.ts';
 import type { Lang } from '../src/i18n/index.ts';
+import { APP_ORIGIN } from './app-origin.ts';
 import { durableLimiter, memoryLimiter } from './rate-limit.ts';
 import type { DoNamespace, RateLimiter } from './rate-limit.ts';
 
@@ -201,6 +202,7 @@ const json = (status: number, obj: unknown): Response =>
 function originOk(request: Request): boolean {
   const origin = request.headers.get('Origin');
   if (!origin) return false;
+  if (origin === APP_ORIGIN) return true;
   try {
     return new URL(origin).host === new URL(request.url).host;
   } catch {

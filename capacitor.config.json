@@ -1,0 +1,17 @@
+{
+  "appId": "de.eliassteffen.mentalmath",
+  "appName": "Mental Math",
+  "webDir": "dist",
+  "loggingBehavior": "debug",
+  "ios": {
+    "contentInset": "never",
+    "allowsLinkPreview": false,
+    "preferredContentMode": "mobile",
+    "webContentsDebuggingEnabled": false
+  },
+  "plugins": {
+    "LocalNotifications": {
+      "presentationOptions": ["list"]
+    }
+  }
+}

@@ -1,5 +1,6 @@
-import type { AuthErrorCode, ErrorBody } from '../shared/types.ts';
+import type { AuthErrorCode, ErrorBody, RefreshStore } from '../shared/types.ts';
 import { PasskeyAuthError, isAuthErrorCode } from '../shared/errors.ts';
+import { REFRESH_HEADER } from '../shared/refresh.ts';
 
 export interface Api {
   post<T>(path: string, body?: unknown, bearer?: string): Promise<T>;
@@ -12,23 +13,33 @@ function fallbackCode(status: number): AuthErrorCode {
   return 'server_error';
 }
 
-export function createApi(baseUrl: string, fetchImpl: typeof fetch): Api {
+// Nur diese Endpunkte lesen das Refresh-Token; alle anderen bekommen es nicht mit
+const NEEDS_REFRESH: ReadonlySet<string> = new Set(['/refresh', '/logout']);
+
+/** `refreshStore`: native App – Refresh-Token per Header senden und aus der Antwort übernehmen, keine Cookies. */
+export function createApi(baseUrl: string, fetchImpl: typeof fetch, refreshStore?: RefreshStore): Api {
   return {
     async post<T>(path: string, body?: unknown, bearer?: string): Promise<T> {
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       if (bearer) headers['Authorization'] = `Bearer ${bearer}`;
+      if (refreshStore && NEEDS_REFRESH.has(path)) {
+        const token = await refreshStore.get();
+        if (token) headers[REFRESH_HEADER] = token;
+      }
       let res: Response;
       try {
         res = await fetchImpl(`${baseUrl}${path}`, {
           method: 'POST',
           headers,
           body: JSON.stringify(body ?? {}),
-          credentials: 'same-origin',
+          credentials: refreshStore ? 'omit' : 'same-origin',
           cache: 'no-store',
         });
       } catch {
         throw new PasskeyAuthError('network');
       }
+      const next = refreshStore ? res.headers.get(REFRESH_HEADER) : null;
+      if (refreshStore && next !== null) await refreshStore.set(next === '' ? null : next);
       if (!res.ok) {
         let code = fallbackCode(res.status);
         let message: string | undefined;

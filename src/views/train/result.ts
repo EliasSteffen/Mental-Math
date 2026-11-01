@@ -19,6 +19,7 @@ import { safeSteps } from '../../ui/widgets.ts';
 import { answerText, givenAnswerText, roundInsight, type RoundInsight } from './diagnosis.ts';
 import type { TrainCtx, TrainResult } from './index.ts';
 import { t } from '../../i18n/index.ts';
+import { publicUrl, shareText } from '../../platform/index.ts';
 
 /** Gegebene Antwort als Text (Auswahl-Option oder Zahl mit Einheit, wie evaluate() sie gewertet hat). */
 function givenText(r: TrainResult): string {
@@ -84,12 +85,10 @@ export function showResult(ctx: TrainCtx): void {
     shareBtn = button({
       label: t('train.share'), icon: 'upload',
       onClick: () => {
-        const text = dailyShareText(dres, dateKey, location.origin + location.pathname);
-        if (typeof navigator.share === 'function') {
-          navigator.share({ text }).catch(() => { /* abgebrochen */ });
-        } else if (navigator.clipboard) {
-          navigator.clipboard.writeText(text).then(() => { toast(t('train.copied')); }, () => { toast(t('train.copyFail')); });
-        }
+        void shareText(dailyShareText(dres, dateKey, publicUrl())).then((r) => {
+          if (r === 'copied') toast(t('train.copied'));
+          else if (r === 'failed') toast(t('train.copyFail'));
+        });
       },
     });
   }
