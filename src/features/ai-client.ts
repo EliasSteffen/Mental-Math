@@ -105,7 +105,8 @@ async function request(payload: Record<string, unknown>, key: string): Promise<A
   }
 }
 
-export function aiExplainTask(task: Task, given: number | null | undefined): Promise<AiResult> {
+/** `correct`: Wertung der App (inkl. Toleranz), damit die KI einer richtigen Antwort keinen Fehler unterstellt. */
+export function aiExplainTask(task: Task, given: number | null | undefined, correct: boolean): Promise<AiResult> {
   const g = typeof given === 'number' && Number.isFinite(given) ? given : null;
   const payload = {
     kind: 'task',
@@ -115,9 +116,10 @@ export function aiExplainTask(task: Task, given: number | null | undefined): Pro
     expected: task.expected,
     unit: task.unit || '',
     given: g,
+    correct,
     lang: getLang(),
   };
-  return request(payload, `${getLang()}|t|${task.subtype}|${task.prompt}|${g === null ? '' : g}`);
+  return request(payload, `${getLang()}|t|${task.subtype}|${task.prompt}|${g === null ? '' : g}|${correct ? 1 : 0}`);
 }
 
 export function aiExplainMethod(subtypeId: SubtypeId): Promise<AiResult> {

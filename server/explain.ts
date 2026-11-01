@@ -24,6 +24,8 @@ export interface ExplainTaskValue {
   expected: number;
   unit: string;
   given: number | null;
+  /** Hat die App die Antwort als richtig gewertet (inkl. Toleranz)? null = unbekannt (ältere Clients) */
+  correct: boolean | null;
   /** Antwortsprache der KI (Standard: de) */
   lang?: Lang;
 }
@@ -48,13 +50,15 @@ export function validateExplainRequest(body: unknown): ExplainValidation {
   if (lang !== 'de' && lang !== 'en') return INVALID;
   if (kind === 'method') return { ok: true, value: { kind, subtype, lang } };
 
-  const { prompt, params, expected, unit, given } = b;
+  const { prompt, params, expected, unit, given, correct } = b;
   if (!isStr(prompt, 160) || prompt.length === 0) return INVALID;
   if (!isNum(expected)) return INVALID;
   const u = unit === undefined || unit === null ? '' : unit;
   if (!isStr(u, 20)) return INVALID;
   const g = given === undefined ? null : given;
   if (g !== null && !isNum(g)) return INVALID;
+  const ok = correct === undefined || correct === null ? null : correct;
+  if (ok !== null && typeof ok !== 'boolean') return INVALID;
   const p = params === undefined || params === null ? {} : params;
   if (typeof p !== 'object' || Array.isArray(p)) return INVALID;
   const rec = p as Record<string, unknown>;
@@ -67,21 +71,29 @@ export function validateExplainRequest(body: unknown): ExplainValidation {
     if (!(isNum(v) || isStr(v, 40))) return INVALID;
     cleanParams[k] = v;
   }
-  return { ok: true, value: { kind, subtype, prompt, params: cleanParams, expected, unit: u, given: g, lang } };
+  return { ok: true, value: { kind, subtype, prompt, params: cleanParams, expected, unit: u, given: g, correct: g === null ? null : ok, lang } };
 }
 
-// Prompt-Texte je Sprache: Anweisungen ans Modell und Beschriftungen der Aufgabendaten
-const PROMPT: Record<Lang, Record<'coach' | 'steps' | 'format' | 'close' | 'task' | 'method' | 'type' | 'cat' | 'ask' | 'choice'
-  | 'right' | 'wrong' | 'params' | 'general' | 'pref' | 'idea' | 'stepsL' | 'trick', string>> = {
+// Prompt-Texte je Sprache: Anweisungen ans Modell und Beschriftungen der Aufgabendaten.
+// Die Rahmung der Nutzerantwort hängt an `correct`: richtig → keine Fehlersuche, falsch → Denkfehler zuerst,
+// unbekannt (ältere Clients) → bedingt wie bisher.
+type PromptKey = 'coach' | 'steps' | 'format' | 'close' | 'task' | 'taskGood' | 'taskBad' | 'taskOpen' | 'method'
+  | 'type' | 'cat' | 'ask' | 'choice' | 'right' | 'given' | 'good' | 'wrong' | 'params' | 'general' | 'pref' | 'idea' | 'stepsL'
+  | 'trick';
+const PROMPT: Record<Lang, Record<PromptKey, string>> = {
   de: {
     coach: 'Du bist ein Mathe-Coach für Consulting-Case-Interviews.',
     steps: 'Erkläre den Rechenweg fürs Kopfrechnen mit den konkreten Zahlen, in nummerierten Schritten.',
     format: 'Nutze deutsches Zahlenformat (Punkt als Tausendertrenner, Komma als Dezimaltrenner), kein LaTeX, keine Überschriften.',
     close: 'Schließe mit einem kurzen Plausibilitätscheck und einem Merksatz.',
-    task: 'Antworte mit höchstens 120 Wörtern. Wenn die Antwort des Nutzers falsch war, nenne zuerst kurz den wahrscheinlichen Denkfehler (z. B. einen Nullen-Fehler).',
+    task: 'Antworte mit höchstens 120 Wörtern.',
+    taskGood: 'Die Antwort des Nutzers war richtig (Abweichungen innerhalb der Toleranz zählen als richtig). Bestätige das kurz und zeige dann den Rechenweg und, wenn es einen gibt, einen schnelleren Weg.',
+    taskBad: 'Die Antwort des Nutzers war falsch: Nenne zuerst kurz den wahrscheinlichen Denkfehler (z. B. einen Nullen-Fehler).',
+    taskOpen: 'Wenn die Antwort des Nutzers falsch war, nenne zuerst kurz den wahrscheinlichen Denkfehler (z. B. einen Nullen-Fehler).',
     method: 'Antworte mit höchstens 180 Wörtern, für jemanden, dem dieser Aufgabentyp schwerfällt, und gib 2 eigene Mini-Beispiele.',
     type: 'Aufgabentyp', cat: 'Kategorie', ask: 'Aufgabe', choice: 'Auswahl-Aufgabe mit den Optionen', right: 'Richtige Antwort',
-    wrong: 'Antwort des Nutzers (falsch)', params: 'Parameter', general: 'Erkläre die Methode für diesen Aufgabentyp allgemein.',
+    given: 'Antwort des Nutzers', good: 'Antwort des Nutzers (richtig)', wrong: 'Antwort des Nutzers (falsch)', params: 'Parameter',
+    general: 'Erkläre die Methode für diesen Aufgabentyp allgemein.',
     pref: 'Bevorzugte Methode der App (bitte darauf aufbauen):', idea: 'Idee', stepsL: 'Schritte', trick: 'Trick',
   },
   en: {
@@ -89,13 +101,25 @@ const PROMPT: Record<Lang, Record<'coach' | 'steps' | 'format' | 'close' | 'task
     steps: 'Explain the mental-maths solution with the concrete numbers, in numbered steps.',
     format: 'Answer in English. Use English number format (comma as thousands separator, point as decimal separator), no LaTeX, no headings.',
     close: 'Finish with a short sanity check and a one-line takeaway.',
-    task: 'Answer in at most 120 words. If the user’s answer was wrong, first briefly name the likely mistake (e.g. a zeros error).',
+    task: 'Answer in at most 120 words.',
+    taskGood: 'The user’s answer was correct (deviations within the tolerance count as correct). Briefly confirm that, then show the solution and, if there is one, a faster way.',
+    taskBad: 'The user’s answer was wrong: first briefly name the likely mistake (e.g. a zeros error).',
+    taskOpen: 'If the user’s answer was wrong, first briefly name the likely mistake (e.g. a zeros error).',
     method: 'Answer in at most 180 words, for someone who finds this task type hard, and give 2 mini examples of your own.',
     type: 'Task type', cat: 'Category', ask: 'Task', choice: 'Multiple-choice task with the options', right: 'Correct answer',
-    wrong: 'User’s answer (wrong)', params: 'Parameters', general: 'Explain the method for this task type in general.',
+    given: 'User’s answer', good: 'User’s answer (correct)', wrong: 'User’s answer (wrong)', params: 'Parameters',
+    general: 'Explain the method for this task type in general.',
     pref: 'The app’s preferred method (please build on it):', idea: 'Idea', stepsL: 'Steps', trick: 'Trick',
   },
 };
+
+/** Anweisung und Beschriftung zur Nutzerantwort; ohne Antwort (übersprungen) gibt es nichts zu bewerten. */
+function answerFraming(value: ExplainTaskValue, L: Record<PromptKey, string>): { rule: string; label: string } {
+  if (value.given === null || value.given === undefined) return { rule: '', label: '' };
+  if (value.correct === true) return { rule: L.taskGood, label: L.good };
+  if (value.correct === false) return { rule: L.taskBad, label: L.wrong };
+  return { rule: L.taskOpen, label: L.given };
+}
 
 export function buildPrompt(value: ExplainValue): { system: string; user: string } {
   const sub = SUBTYPES[value.subtype];
@@ -106,10 +130,12 @@ export function buildPrompt(value: ExplainValue): { system: string; user: string
   const nf = new Intl.NumberFormat(locale(lang), { maximumFractionDigits: 4 });
   const num = (x: number): string => nf.format(x);
   const method = getMethod(value.subtype, lang);
-  const system = [L.coach, L.steps, L.format, L.close, value.kind === 'task' ? L.task : L.method].join('\n');
+  const answer = value.kind === 'task' ? answerFraming(value, L) : null;
+  const task = answer ? [L.task, answer.rule].filter(Boolean).join(' ') : L.method;
+  const system = [L.coach, L.steps, L.format, L.close, task].join('\n');
 
   const lines = [`${L.type}: ${sub.name}`, `${L.cat}: ${cat ? cat.name : sub.category}`];
-  if (value.kind === 'task') {
+  if (value.kind === 'task' && answer) {
     lines.push(`${L.ask}: ${value.prompt}`);
     const p: Params = value.params || {};
     const opts = [0, 1, 2, 3].map((i) => p['c' + i]).filter((x): x is string => typeof x === 'string');
@@ -119,12 +145,12 @@ export function buildPrompt(value: ExplainValue): { system: string; user: string
       lines.push(`${L.choice}: ` + opts.map((o, i) => `${i + 1}) ${o}`).join(' | '));
       lines.push(`${L.right}: ${opts[value.expected] ?? num(value.expected)}`);
       if (value.given !== null && value.given !== undefined) {
-        lines.push(`${L.wrong}: ${opts[value.given] ?? num(value.given)}`);
+        lines.push(`${answer.label}: ${opts[value.given] ?? num(value.given)}`);
       }
     } else {
       lines.push(`${L.right}: ${num(value.expected)}${unit}`);
       if (value.given !== null && value.given !== undefined) {
-        lines.push(`${L.wrong}: ${num(value.given)}${unit}`);
+        lines.push(`${answer.label}: ${num(value.given)}${unit}`);
       }
     }
     const entries = Object.entries(p).filter(([k]) => !(isChoice && /^c[0-3]$/.test(k)));
