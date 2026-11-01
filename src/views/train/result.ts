@@ -20,6 +20,7 @@ import { answerText, givenAnswerText, roundInsight, type RoundInsight } from './
 import type { TrainCtx, TrainResult } from './index.ts';
 import { t } from '../../i18n/index.ts';
 import { publicUrl, shareText } from '../../platform/index.ts';
+import { maybeAskForReview } from '../../features/app-store.ts';
 
 /** Gegebene Antwort als Text (Auswahl-Option oder Zahl mit Einheit, wie evaluate() sie gewertet hat). */
 function givenText(r: TrainResult): string {
@@ -171,4 +172,6 @@ export function showResult(ctx: TrainCtx): void {
   setTitle(t('common.roundDone'));
   window.scrollTo(0, 0);
   title.focus({ preventScroll: true });
+  // Bitte um eine Bewertung (nur iOS, selten); ein Bestwert setzt hier ohnehin ≥ 80 % voraus (personalBest)
+  addCleanup(maybeAskForReview({ correct, n, newBest: false }));
 }

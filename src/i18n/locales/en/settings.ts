@@ -95,6 +95,8 @@ export const settings: Record<keyof typeof De, string> = {
   sourceCode: 'Source code',
   help: 'Help & contact',
   privacy: 'Privacy',
+  rateApp: 'Rate the app',
+  iosApp: 'iOS app',
   build: 'Build',
   deviceId: 'Device ID',
   profileId: 'Profile ID',

@@ -11,6 +11,7 @@ import { createLegacyStore, getDefaultAdapter, initStorageAdapter, setDefaultAda
 import { LEGACY_BACKUP_KEY, LEGACY_KEY, migrateV1 } from './migrate.ts';
 import { createMeta, touch } from './meta.ts';
 import { DEFAULT_PARALLEL_STATS, DEFAULT_SETTINGS, isObj, normalize, normalizeParallel, normalizeSettings } from './schema.ts';
+import { DEVICE_LOCAL_SETTINGS } from './sync-schema.ts';
 
 export { DEFAULT_PARALLEL_STATS, DEFAULT_SETTINGS, normalize };
 
@@ -199,6 +200,17 @@ export const getSettings = (): Settings => view('settings', () => {
 export function setSettings(partial: Partial<Settings>): Settings {
   const next = normalizeSettings({ ...getSettings(), ...partial });
   r().putDoc('settings', { ...next, updatedAt: Date.now() });
+  return getSettings();
+}
+
+/**
+ * Nur geräte-lokale Einstellungen (DEVICE_LOCAL_SETTINGS) schreiben – ohne neues `updatedAt` und ohne Outbox-Eintrag.
+ * Für Hintergrund-Buchhaltung (z. B. App-Store-Abfrage): sie darf im Sync-LWW keine Änderung eines anderen Geräts schlagen.
+ */
+export function setDeviceSettings(partial: Partial<Settings>): Settings {
+  const doc = r().getDoc<Record<string, unknown>>('settings') ?? {};
+  const local = Object.entries(partial).filter(([k]) => DEVICE_LOCAL_SETTINGS.includes(k));
+  r().putDoc('settings', { ...doc, ...Object.fromEntries(local) }, false);
   return getSettings();
 }
 

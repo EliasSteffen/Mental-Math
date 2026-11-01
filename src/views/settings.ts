@@ -20,7 +20,7 @@ import type { PasskeyInfo, RecoveryStatus } from '../vendor/auth.ts';
 import * as acct from '../features/account.ts';
 import { getSyncStatus, logoutAndForgetDevice, onSyncStatus, syncNow, syncStatusEntries, wipeCloudData } from '../features/sync.ts';
 import { remindersGroup } from './settings-reminders.ts';
-import { isNative, publicUrl, saveFile } from '../platform/index.ts';
+import { APP_STORE_URL, isNative, openStorePage, publicUrl, saveFile } from '../platform/index.ts';
 
 const NAME_MIN = 2;
 const NAME_MAX = 32;
@@ -275,10 +275,14 @@ function aboutGroup(): HTMLElement {
   // Öffentliche Seiten (scripts/pages.ts); absolut, damit die iOS-App sie im In-App-Browser öffnet
   const help = row({ icon: 'chat', label: t('settings.help'), href: `${publicUrl()}hilfe`, target: '_blank' });
   const privacy = row({ icon: 'key', label: t('settings.privacy'), href: `${publicUrl()}datenschutz`, target: '_blank' });
+  // App bewerten (App Store) bzw. auf der Website der Weg zur iOS-App
+  const store = isNative()
+    ? row({ icon: 'sparkles', label: t('settings.rateApp'), chevron: true, onClick: () => { void openStorePage(true); } })
+    : row({ icon: 'download', label: t('settings.iosApp'), value: 'App Store', href: APP_STORE_URL, target: '_blank' });
   const meta = (label: string, value: string, title?: string): HTMLElement =>
     h('div', null, h('dt', null, label), h('dd', { class: 'num', title }, value));
   return profGroup(t('settings.about'),
-    list([news, help, privacy, source]),
+    list([news, help, privacy, store, source]),
     h('dl', { class: 'prof-meta' },
       meta(t('settings.build'), `${BUILD_INFO.build} · ${fmtIsoDate(BUILD_INFO.date)}`),
       meta(t('settings.deviceId'), short(profile.deviceId), profile.deviceId),

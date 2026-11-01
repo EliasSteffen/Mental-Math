@@ -45,6 +45,34 @@ export async function nativeAuthPlugin(): Promise<NativeAuthPlugin> {
   return authPlugin;
 }
 
+/** Eigenes Plugin der App (ios/App/App/AppStorePlugin.swift): Bewertungsdialog und App-Store-Seite. */
+export interface AppStorePlugin {
+  /** requested: Dialog angefragt – ob er erscheint, entscheidet iOS. */
+  requestReview(): Promise<{ requested: boolean }>;
+  /** appId: nur Ziffern; writeReview öffnet gleich „Bewertung schreiben“. */
+  openStorePage(o: { appId: string; writeReview: boolean }): Promise<void>;
+}
+
+let storePlugin: AppStorePlugin | null = null;
+
+/** AppStore als schlichtes Objekt (Proxy-`then`, siehe nativeAuthPlugin). */
+export async function appStorePlugin(): Promise<AppStorePlugin> {
+  const m = await loadNative();
+  if (!storePlugin) {
+    const p = m.registerPlugin<AppStorePlugin>('AppStore');
+    storePlugin = {
+      requestReview: () => p.requestReview(),
+      openStorePage: (o) => p.openStorePage(o),
+    };
+  }
+  return storePlugin;
+}
+
+/** App kommt zurück in den Vordergrund (Capacitor App „resume“). */
+export function onNativeResume(fn: () => void): void {
+  void loadNative().then((m) => m.App.addListener('resume', fn)).catch(() => undefined);
+}
+
 /** Statusleiste: helle Schrift auf dunklen Themes, dunkle auf Papier (theme.ts setzt color-scheme). */
 function syncStatusBar(m: NativeModule): void {
   const scheme = document.querySelector('meta[name="color-scheme"]')?.getAttribute('content');

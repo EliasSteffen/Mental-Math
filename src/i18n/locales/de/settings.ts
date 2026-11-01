@@ -93,6 +93,8 @@ export const settings = {
   sourceCode: 'Quellcode',
   help: 'Hilfe & Kontakt',
   privacy: 'Datenschutz',
+  rateApp: 'App bewerten',
+  iosApp: 'iOS-App',
   build: 'Build',
   deviceId: 'Geräte-ID',
   profileId: 'Profil-ID',

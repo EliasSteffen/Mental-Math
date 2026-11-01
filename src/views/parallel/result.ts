@@ -12,6 +12,7 @@ import { bindResultKeys } from '../../ui/modal.ts';
 import { tapGuard } from '../../ui/dock.ts';
 import { playDock } from '../play-ui.ts';
 import { t } from '../../i18n/index.ts';
+import { maybeAskForReview } from '../../features/app-store.ts';
 
 export interface ParallelSession {
   /** aufeinanderfolgende fehlerfreie Runden in diesem Besuch */
@@ -83,5 +84,7 @@ export function renderResult(
   setTitle(t('common.roundDone'));
   // Screenreader und Tastatur starten bei der Überschrift (das Ergebnis ersetzt die Eingabe vollständig)
   title.focus({ preventScroll: true });
-  return bindResultKeys(again, () => go('#/'));
+  const unbind = bindResultKeys(again, () => go('#/'));
+  const cancelReview = maybeAskForReview({ correct: result.correct, n: result.total, newBest });
+  return () => { cancelReview(); unbind(); };
 }
