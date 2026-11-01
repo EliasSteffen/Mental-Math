@@ -51,7 +51,13 @@ async function main(): Promise<void> {
   const team = await probe(ascToken({ keyId, issuerId, pem, now: Date.now() }), appId);
   console.log(`App Store Connect als Team-Schlüssel: HTTP ${team.status} ${team.detail}`);
   if (team.status === 200) {
-    if (team.apps === 0) fail(`Schlüssel ok, aber keine App mit Bundle-ID ${appId} – in App Store Connect unter Apps → + anlegen.`);
+    if (team.apps === 0) {
+      const token = ascToken({ keyId, issuerId, pem, now: Date.now() });
+      const res = await fetch(`${API}?fields[apps]=bundleId&limit=50`, { headers: { Authorization: `Bearer ${token}` } });
+      const all = ((await res.json().catch(() => ({}))) as { data?: Array<{ attributes?: { bundleId?: string } }> }).data ?? [];
+      const ids = all.map((a) => a.attributes?.bundleId).filter(Boolean).join(', ') || 'keine';
+      fail(`Schlüssel ok, aber keine App mit Bundle-ID ${appId} – in App Store Connect unter Apps → + anlegen. Vorhandene Apps: ${ids}.`);
+    }
     console.log(`ok: Schlüssel gültig, App ${appId} vorhanden`);
     return;
   }
