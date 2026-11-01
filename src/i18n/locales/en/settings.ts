@@ -92,6 +92,8 @@ export const settings: Record<keyof typeof De, string> = {
   news: 'What’s new',
   version: 'Version',
   sourceCode: 'Source code',
+  help: 'Help & contact',
+  privacy: 'Privacy',
   build: 'Build',
   deviceId: 'Device ID',
   profileId: 'Profile ID',

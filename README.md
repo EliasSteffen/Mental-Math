@@ -215,7 +215,7 @@ npm run ios:open
 
 ### Vor der ersten Einreichung (App Store Connect)
 
-- **URLs:** Datenschutzerklärung und Support
+- **URLs:** Datenschutz `https://mental-math.elias-steffen.de/datenschutz`, Support `https://mental-math.elias-steffen.de/hilfe`, Marketing (optional) `https://mental-math.elias-steffen.de/neuigkeiten`. Die Seiten erzeugt `scripts/pages.ts` beim Build (Deutsch und Englisch, Neuigkeiten aus `src/releases.ts`); in der App verlinkt unter Profil → Über.
 - **App-Datenschutz:** ohne Konto keine Daten; mit Konto Nutzer-ID und Trainingsdaten (mit der Identität verknüpft, App-Funktionalität), kein Tracking. KI-Erklärungen schicken nur Aufgabendaten an Google Gemini. `ios/App/App/PrivacyInfo.xcprivacy` entsprechend prüfen.
 - **Screenshots** 6,9″ (z. B. iPhone 17 Pro Max im Simulator), Kategorie *Bildung*, Altersfreigabe
 - **Hinweise für die Prüfung:** Die App funktioniert ohne Konto; Konto (Passkey) und KI-Erklärungen sind optional; Erinnerungen unter *Profil → Erinnerungen*
@@ -249,7 +249,7 @@ src/
 public/             ← statische Quellen (index.html, css/, icons/, manifest, favicon, _headers)
 dist/               ← Build-Ausgabe, nicht versioniert, wird ausgeliefert
   js/ sw.js precache.json + kopierte public/-Dateien
-scripts/            Build-Skripte (laufen mit node): clean.ts, copy-static.ts, precache.ts (→ dist/precache.json)
+scripts/            Build-Skripte (laufen mit node): clean.ts, copy-static.ts, pages.ts (/datenschutz, /hilfe, /neuigkeiten), precache.ts (→ dist/precache.json)
 functions/api/explain.ts    ← Cloudflare Pages Function (KI-Endpoint, bleibt im Repo-Root)
 server/explain.ts           ← Validierung, Prompt (de/en), Gemini-Aufruf
 server/rate-limit.ts        ← Rate-Limit-Logik (In-Memory-Fallback + Durable-Object-Client)

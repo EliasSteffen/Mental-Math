@@ -20,7 +20,7 @@ import type { PasskeyInfo, RecoveryStatus } from '../vendor/auth.ts';
 import * as acct from '../features/account.ts';
 import { getSyncStatus, onSyncStatus, syncNow, syncStatusEntries, wipeCloudData } from '../features/sync.ts';
 import { remindersGroup } from './settings-reminders.ts';
-import { isNative, saveFile } from '../platform/index.ts';
+import { isNative, publicUrl, saveFile } from '../platform/index.ts';
 
 const NAME_MIN = 2;
 const NAME_MAX = 32;
@@ -268,10 +268,13 @@ function aboutGroup(): HTMLElement {
   ver?.classList.add('num');
   ver?.prepend(h('span', { class: 'prof-ver-word' }, `${t('settings.version')} `));
   const source = row({ icon: 'link', label: t('settings.sourceCode'), value: 'GitHub', href: SOURCE_URL, target: '_blank' });
+  // Öffentliche Seiten (scripts/pages.ts); absolut, damit die iOS-App sie im In-App-Browser öffnet
+  const help = row({ icon: 'chat', label: t('settings.help'), href: `${publicUrl()}hilfe`, target: '_blank' });
+  const privacy = row({ icon: 'key', label: t('settings.privacy'), href: `${publicUrl()}datenschutz`, target: '_blank' });
   const meta = (label: string, value: string, title?: string): HTMLElement =>
     h('div', null, h('dt', null, label), h('dd', { class: 'num', title }, value));
   return profGroup(t('settings.about'),
-    list([news, source]),
+    list([news, help, privacy, source]),
     h('dl', { class: 'prof-meta' },
       meta(t('settings.build'), `${BUILD_INFO.build} · ${fmtIsoDate(BUILD_INFO.date)}`),
       meta(t('settings.deviceId'), short(profile.deviceId), profile.deviceId),
