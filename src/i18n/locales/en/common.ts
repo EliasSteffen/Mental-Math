@@ -16,6 +16,13 @@ export const common: Record<keyof typeof De, string> = {
   correct: 'Correct',
   wrong: 'Wrong',
   roundDone: 'Round complete!',
+  // Share result (ui/share-card.ts)
+  shareResult: 'Share result',
+  shareRendering: 'Creating …',
+  share: 'Share',
+  shareSaved: 'Image saved',
+  shareFailed: 'Sharing not possible',
+  shareRenderFailed: 'Couldn’t create the image',
   answer: 'Answer',
   keypad: 'Number pad',
   keyDelete: 'Delete',

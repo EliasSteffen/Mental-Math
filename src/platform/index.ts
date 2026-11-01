@@ -4,7 +4,7 @@ import { PUBLIC_CONFIG } from '../generated/public-config.ts';
 import type { PasskeyAuthOptions } from '../vendor/auth.ts';
 import { appStorePlugin, loadNative, nativeIfLoaded, onNativeResume, startNative } from './native.ts';
 import { storeVersionOf } from '../features/app-update.ts';
-import { registerSW, webHaptic, webSaveFile, webShareText } from './web.ts';
+import { registerSW, webHaptic, webSaveFile, webShareImage, webShareText } from './web.ts';
 import type { ShareResult } from './web.ts';
 
 export type { ShareResult } from './web.ts';
@@ -58,6 +58,39 @@ export async function shareText(text: string): Promise<ShareResult> {
   try {
     const m = await loadNative();
     await m.Share.share({ text });
+    return 'shared';
+  } catch {
+    return 'cancelled';
+  }
+}
+
+/** Blob → base64 ohne data:-Präfix (Filesystem.writeFile schreibt base64 ohne encoding als Binärdatei). */
+function blobBase64(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(String(r.result).replace(/^data:[^,]*,/, ''));
+    r.onerror = () => reject(r.error ?? new Error('FileReader'));
+    r.readAsDataURL(blob);
+  });
+}
+
+/**
+ * Bild (PNG) mit Begleittext teilen: im Browser Web Share mit Datei, sonst Download ('saved');
+ * in der App über den Cache ins Teilen-Menü wie saveFile („Bild sichern“ braucht NSPhotoLibraryAddUsageDescription).
+ */
+export async function shareImage(blob: Blob, fileName: string, text: string): Promise<ShareResult> {
+  // synchron bis navigator.share(): die Nutzergeste muss noch gelten
+  if (!isNative()) return webShareImage(blob, fileName, text);
+  let m: Awaited<ReturnType<typeof loadNative>>;
+  let uri: string;
+  try {
+    m = await loadNative();
+    ({ uri } = await m.Filesystem.writeFile({ path: fileName, data: await blobBase64(blob), directory: m.Directory.Cache }));
+  } catch {
+    return 'failed';
+  }
+  try {
+    await m.Share.share({ text, files: [uri] });
     return 'shared';
   } catch {
     return 'cancelled';

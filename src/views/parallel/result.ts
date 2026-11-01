@@ -1,5 +1,5 @@
 // Parallel · Ergebnis (Fokus-Modus) wie das Rundenergebnis: „N von M Ketten richtig“, Ergebnis-Segmente,
-// ruhige Hinweise (Bestwert, Serie), Liste je Kette mit „deine X · richtig Y“; Dock „Fertig“ + CTA „Nochmal“.
+// ruhige Hinweise (Bestwert, Serie), Liste je Kette mit „deine X · richtig Y“; Dock „Fertig“ / „Ergebnis teilen“ + CTA „Nochmal“.
 import type { ParallelChainResult, ParallelState } from '../../types.ts';
 import { scoreParallel, updateParallelStats } from '../../core/parallel.ts';
 import { fmt } from '../../core/numbers.ts';
@@ -13,6 +13,9 @@ import { tapGuard } from '../../ui/dock.ts';
 import { playDock } from '../play-ui.ts';
 import { t } from '../../i18n/index.ts';
 import { maybeAskForReview } from '../../features/app-store.ts';
+import { publicUrl } from '../../platform/index.ts';
+import { buildShareCard } from '../../features/share-card.ts';
+import { shareCardButton } from '../../ui/share-card.ts';
 
 export interface ParallelSession {
   /** aufeinanderfolgende fehlerfreie Runden in diesem Besuch */
@@ -57,9 +60,15 @@ export function renderResult(
   const title = h('h1', { class: 'play-result-title num', tabindex: '-1' },
     t('parallel.someRight', { correct: result.correct, total: result.total }));
 
-  const resultDock = playDock(h('div', { class: 'play-dock-row is-split' },
-    button({ label: t('parallel.done'), href: '#/' }),
-    button({ label: t('common.again'), kind: 'primary', onClick: again })));
+  // Ergebniskarte als Bild teilen (wie im Training: Zeile „Fertig“ / „Ergebnis teilen“, darunter „Nochmal“)
+  const shareBtn = shareCardButton(buildShareCard({
+    kind: 'parallel', level: state.config.level, correct: result.correct, total: result.total, points: result.points,
+    bestChains: stats.bestChains, bestStreak: stats.bestCorrectStreak, ts: Date.now(),
+    marks: result.chains.map((c) => c.correct),
+  }, publicUrl()));
+  const resultDock = playDock(
+    h('div', { class: 'play-dock-row' }, button({ label: t('parallel.done'), href: '#/' }), shareBtn),
+    button({ label: t('common.again'), kind: 'primary', full: true, onClick: again }));
   // Doppeltipp auf „Prüfen“ (letzte Kette) träfe sonst gleich „Nochmal“ an derselben Stelle; Enter gilt sofort
   tapGuard(resultDock);
 

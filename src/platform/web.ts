@@ -82,7 +82,8 @@ export function webSaveFile(name: string, mime: string, text: string): Promise<b
   return Promise.resolve(true);
 }
 
-export type ShareResult = 'shared' | 'cancelled' | 'copied' | 'failed';
+/** 'saved': Bild heruntergeladen, weil der Browser keine Dateien teilen kann (shareImage) */
+export type ShareResult = 'shared' | 'cancelled' | 'copied' | 'failed' | 'saved';
 
 /** Teilen-Menü des Systems, sonst in die Zwischenablage. */
 export async function webShareText(text: string): Promise<ShareResult> {
@@ -91,4 +92,38 @@ export async function webShareText(text: string): Promise<ShareResult> {
   }
   if (!navigator.clipboard) return 'cancelled';
   try { await navigator.clipboard.writeText(text); return 'copied'; } catch { return 'failed'; }
+}
+
+/** Datei als Download anbieten (Anker + Objekt-URL wie webSaveFile). */
+function downloadBlob(blob: Blob, name: string): boolean {
+  try {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = name;
+    document.body.append(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Bild über das Teilen-Menü (Web Share mit Datei), sonst als PNG herunterladen. Kein await vor share():
+ * der Aufruf muss noch in der Nutzergeste liegen. Abbruch → 'cancelled'; andere Fehler → Download.
+ */
+export async function webShareImage(blob: Blob, name: string, text: string): Promise<ShareResult> {
+  const data: ShareData = { files: [new File([blob], name, { type: blob.type || 'image/png' })], text };
+  if (typeof navigator.share === 'function' && navigator.canShare?.(data) === true) {
+    try {
+      await navigator.share(data);
+      return 'shared';
+    } catch (e) {
+      if (e instanceof DOMException && e.name === 'AbortError') return 'cancelled';
+    }
+  }
+  return downloadBlob(blob, name) ? 'saved' : 'failed';
 }
