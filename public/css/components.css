@@ -335,6 +335,14 @@
   .seg.is-good { background:var(--good); }
   .seg.is-bad { background:var(--bad); }
 
+  /* ---------- Ergebniskarte (ui/share-card.ts): Vorschau 4:5 im Sheet, passt auch auf kleine Bildschirme ---------- */
+  .share-card-preview {
+    display:block; flex:none; align-self:center;
+    width:min(100%, calc(min(56dvh, 520px) * .8)); height:auto; aspect-ratio:4 / 5;
+    border-radius:var(--radius-md); background:var(--surface-2);
+    box-shadow:0 0 0 1px var(--border), var(--shadow-2);
+  }
+
   /* ---------- Zeitlinie: füllt sich bis zur Zielzeit, danach einmal weich nach Ocker ---------- */
   .timeline { height:2px; border-radius:1px; background:var(--surface-2); overflow:hidden; }
   .timeline-fill {
