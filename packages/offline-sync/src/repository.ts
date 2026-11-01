@@ -1,6 +1,7 @@
 // Repository: typisierter Zugriff auf Dokumente und Collections über einen StorageAdapter,
 // mit In-Memory-Cache und Änderungsprotokoll (SyncState) für die Cloud-Synchronisierung.
-// Collections liegen pro Datensatz unter `rec:<collection>:<id>`; das Altformat `col:<collection>` wird beim Laden migriert.
+// Collections liegen pro Datensatz unter `rec:<collection>:<id>`, die Outbox pro Eintrag unter `out:<seq>`; die
+// Altformate `col:<collection>` und `sync.pending` werden beim Laden migriert.
 import { getDeviceId } from './ids.ts';
 import { compareMeta } from './merge.ts';
 import { tombstone } from './meta.ts';
@@ -11,7 +12,7 @@ const SYNC_KEY = 'sync';
 const WIPE_KEY = 'wipeAt';
 /** Schlüssel, die ein Reset immer behält. */
 const ALWAYS_KEEP: readonly string[] = ['deviceId', WIPE_KEY];
-/** Blockgröße der Altformat-Migration; so viel Speicher braucht sie höchstens zusätzlich zur Endgröße. */
+/** Blockgröße der Altformat-Migrationen; so viel Speicher brauchen sie höchstens zusätzlich zur Endgröße. */
 const MIGRATE_CHUNK = 500;
 /** Wert im Batch: Schlüssel entfernen. */
 const REMOVE = Symbol('remove');
@@ -21,6 +22,9 @@ const docKey = (name: string): string => `doc:${name}`;
 const colKey = (c: string): string => `col:${c}`;
 /** Präfix der Datensatz-Schlüssel; der Name ist kodiert, damit `rec:a:` nie `rec:a:b:…` trifft. */
 const recPrefix = (c: string): string => `rec:${encodeURIComponent(c)}:`;
+/** Präfix der Outbox-Einträge: `out:<seq>` → ChangeRecord. */
+const OUT_PREFIX = 'out:';
+const outKey = (seq: number): string => `${OUT_PREFIX}${seq}`;
 const emptySync = (): SyncState => ({
   lastPulledAt: null, lastPushedSeq: 0, nextSeq: 1, pending: [], cursor: null, fullPushNeeded: false, fullPushGen: 0, docClock: {},
 });
@@ -28,6 +32,48 @@ const isDeleted = (x: { deletedAt?: unknown }): boolean => x.deletedAt !== null 
 const isObj = (x: unknown): x is Record<string, unknown> => x !== null && typeof x === 'object' && !Array.isArray(x);
 const finite = (x: unknown): number | null => (typeof x === 'number' && Number.isFinite(x) ? x : null);
 const hasId = (x: unknown): x is SyncMeta => isObj(x) && typeof x.id === 'string';
+/** Zusammenfassungs-Schlüssel der Outbox: ein Eintrag je target+id. */
+const tid = (c: Pick<ChangeRecord, 'target' | 'id'>): string => `${c.target}\u0000${c.id}`;
+
+/** Gültiger Outbox-Eintrag (Folgenummer ganzzahlig ≥ 1, ggf. genau `seq`) als neues Objekt; sonst null. */
+function asChange(x: unknown, seq?: number): ChangeRecord | null {
+  if (!isObj(x) || typeof x.target !== 'string' || typeof x.id !== 'string') return null;
+  const s = finite(x.seq);
+  if (s === null || !Number.isSafeInteger(s) || s < 1 || (seq !== undefined && s !== seq)) return null;
+  if (x.op !== 'upsert' && x.op !== 'delete') return null;
+  return { seq: s, target: x.target, id: x.id, op: x.op, at: finite(x.at) ?? 0 };
+}
+
+/** Folgenummer aus einem Schlüssel `out:<seq>` (nur kanonische Schreibweise); sonst null. */
+function outSeq(key: string): number | null {
+  const n = Number(key.slice(OUT_PREFIX.length));
+  return Number.isSafeInteger(n) && n >= 1 && outKey(n) === key ? n : null;
+}
+
+/** Gespeicherter Outbox-Eintrag; null, wenn Schlüssel und Wert nicht zusammenpassen oder der Wert unlesbar ist. */
+function parseOut(key: string, raw: string | null): ChangeRecord | null {
+  const seq = outSeq(key);
+  if (seq === null || raw === null) return null;
+  try {
+    return asChange(JSON.parse(raw) as unknown, seq);
+  } catch {
+    return null;
+  }
+}
+
+/** Skalare Felder aus dem gespeicherten `sync`, fehlende/ungültige (alte Stände) aufgefüllt; `pending` bleibt leer. */
+function syncFrom(v: unknown): SyncState {
+  const s = emptySync();
+  if (!isObj(v)) return s;
+  s.lastPulledAt = finite(v.lastPulledAt);
+  s.lastPushedSeq = finite(v.lastPushedSeq) ?? 0;
+  s.nextSeq = finite(v.nextSeq) ?? 1;
+  if (typeof v.cursor === 'string') s.cursor = v.cursor;
+  if (typeof v.fullPushNeeded === 'boolean') s.fullPushNeeded = v.fullPushNeeded;
+  s.fullPushGen = finite(v.fullPushGen) ?? 0;
+  if (isObj(v.docClock)) s.docClock = v.docClock as Record<string, number>;
+  return s;
+}
 
 /**
  * Geladene Collection in Speicherreihenfolge (`ords` aufsteigend, Gleichstand: ID). `items[i]` ist null, wenn der
@@ -237,10 +283,14 @@ export class Repository {
     }
   }
 
-  /** Alle Schlüssel außer `keep` entfernen (Reset); Geräte-ID und Lösch-Marke bleiben immer. */
+  /** Alle Schlüssel außer `keep` entfernen (Reset); Geräte-ID und Lösch-Marke bleiben immer, mit `sync` die Outbox. */
   clear(keep: readonly string[] = []): void {
     this.flushDeferred();
-    for (const k of this.adapter.keys('')) if (!keep.includes(k) && !ALWAYS_KEEP.includes(k)) this.adapter.remove(k);
+    const keepOut = keep.includes(SYNC_KEY);
+    for (const k of this.adapter.keys('')) {
+      if (keep.includes(k) || ALWAYS_KEEP.includes(k) || (keepOut && k.startsWith(OUT_PREFIX))) continue;
+      this.adapter.remove(k);
+    }
     this.invalidate();
   }
 
@@ -311,25 +361,27 @@ export class Repository {
     return true;
   }
 
-  /** Ganze Collection ersetzen (Migration, Import). Doppelte IDs: erste Position, neuester Stand (`compareMeta`). */
+  /**
+   * Ganze Collection ersetzen (Migration, Import). Doppelte IDs: erste Position, neuester Stand (`compareMeta`).
+   * Gebündelt (batch): Jeder Datensatz- und Outbox-Schlüssel erreicht den Adapter höchstens einmal.
+   */
   replaceCollection<T extends SyncMeta>(collection: string, items: T[], track = true): void {
-    const old = this.col(collection);
-    const s = emptyCol();
-    for (const it of items) {
-      if (!hasId(it)) continue;
-      const i = s.byId.get(it.id);
-      if (i === undefined) append(s, it.id, it);
-      else if (compareMeta(it, s.items[i]!) > 0) s.items[i] = it;
-    }
-    const p = recPrefix(collection);
-    for (const id of old.ids) if (!s.byId.has(id)) this.put(p + id, REMOVE);
-    this.cols.set(collection, s);
-    for (let i = 0; i < s.items.length; i++) this.writeAt(collection, s, i);
-    this.revision++;
-    if (track) {
-      for (const it of items) this.log(collection, it.id, 'upsert', false);
-      this.saveSync();
-    }
+    this.batch(() => {
+      const old = this.col(collection);
+      const s = emptyCol();
+      for (const it of items) {
+        if (!hasId(it)) continue;
+        const i = s.byId.get(it.id);
+        if (i === undefined) append(s, it.id, it);
+        else if (compareMeta(it, s.items[i]!) > 0) s.items[i] = it;
+      }
+      const p = recPrefix(collection);
+      for (const id of old.ids) if (!s.byId.has(id)) this.put(p + id, REMOVE);
+      this.cols.set(collection, s);
+      for (let i = 0; i < s.items.length; i++) this.writeAt(collection, s, i);
+      this.revision++;
+      if (track) for (const it of items) if (hasId(it)) this.log(collection, it.id, 'upsert');
+    });
   }
 
   /**
@@ -372,24 +424,102 @@ export class Repository {
   }
 
   // ----- Änderungsprotokoll -----
+  /**
+   * SyncState (lazy, nach `invalidate` erneut): skalare Felder aus `sync`, die Outbox aus den Schlüsseln `out:<seq>`
+   * aufsteigend nach `seq`. Das Altformat `sync.pending` wird vorher migriert. `nextSeq` liegt über dem höchsten
+   * Outbox-Schlüssel, auch wenn `sync` einen älteren Wert hat. Je target+id bleibt nur der neueste Eintrag; ein
+   * unlesbarer Eintrag wird entfernt und fordert einen Vollabgleich an, weil die Änderung sonst nie hochginge.
+   */
   getSyncState(): SyncState {
-    const v = this.read(SYNC_KEY);
-    if (v !== null && typeof v === 'object' && Array.isArray((v as SyncState).pending)) {
-      const st = v as SyncState;
-      // Felder alter Stände auffüllen
-      if (st.cursor === undefined) st.cursor = null;
-      if (typeof st.fullPushNeeded !== 'boolean') st.fullPushNeeded = false;
-      if (finite(st.fullPushGen) === null) st.fullPushGen = 0;
-      if (!isObj(st.docClock)) st.docClock = {};
-      return st;
+    const hit = this.cache.get(SYNC_KEY) as SyncState | undefined;
+    if (hit) return hit;
+    try {
+      this.migrateOutbox();
+    } catch {
+      /* Rest bleibt in `sync.pending` und wird beim nächsten Laden migriert */
     }
-    const s = emptySync();
+    let v: unknown = null;
+    try {
+      const raw = this.adapter.get(SYNC_KEY);
+      v = raw === null ? null : (JSON.parse(raw) as unknown);
+    } catch {
+      /* unlesbar: leerer Zustand (wie bisher) */
+    }
+    const s = syncFrom(v);
+    const latest = new Map<string, ChangeRecord>();
+    let top = 0;
+    let lost = false;
+    for (const k of this.adapter.keys(OUT_PREFIX)) {
+      top = Math.max(top, outSeq(k) ?? 0);
+      const c = parseOut(k, this.adapter.get(k));
+      if (!c) lost = true;
+      const prev = c ? latest.get(tid(c)) : undefined;
+      if (!c || (prev && prev.seq > c.seq)) this.persist(k, REMOVE);
+      else {
+        if (prev) this.persist(outKey(prev.seq), REMOVE);
+        latest.set(tid(c), c);
+      }
+    }
+    s.pending = [...latest.values()].sort((a, b) => a.seq - b.seq);
+    s.nextSeq = Math.max(s.nextSeq, top + 1, s.lastPushedSeq + 1);
     this.cache.set(SYNC_KEY, s);
+    if (lost) this.markFullPush();
     return s;
   }
 
+  /**
+   * Altformat `sync.pending` in Einzelschlüssel `out:<seq>` überführen; schreibt direkt in den Adapter (unabhängig von
+   * batch()). Abbruchsicher und idempotent wie `migrateLegacy`: Nach jedem Adapter-Aufruf liegt jeder Eintrag in
+   * `sync.pending` oder mit derselben target+id unter `out:`. Rückwärts in Blöcken; nach jedem dauerhaft geschriebenen
+   * Block (`set` ≠ false) wird `pending` auf den Rest davor gekürzt, am Ende bleibt `pending: []`. Liegt target+id schon
+   * unter `out:` (Abbruch, alter Tab hat `sync` erneut geschrieben), bleibt dieser Eintrag; ist nur die Folgenummer
+   * vergeben, bekommt der Eintrag eine neue über allen bekannten.
+   */
+  private migrateOutbox(): void {
+    const raw = this.adapter.get(SYNC_KEY);
+    if (raw === null) return;
+    let v: unknown = null;
+    try {
+      v = JSON.parse(raw) as unknown;
+    } catch {
+      return; // unlesbar: getSyncState beginnt leer (wie bisher)
+    }
+    if (!isObj(v) || !Array.isArray(v.pending) || v.pending.length === 0) return;
+    const legacy: unknown[] = v.pending;
+    const taken = new Set<string>();
+    const used = new Set<number>();
+    let next = finite(v.nextSeq) ?? 1;
+    for (const k of this.adapter.keys(OUT_PREFIX)) {
+      const seq = outSeq(k);
+      if (seq === null) continue;
+      used.add(seq);
+      next = Math.max(next, seq + 1);
+      const c = parseOut(k, this.adapter.get(k));
+      if (c) taken.add(tid(c));
+    }
+    for (const x of legacy) next = Math.max(next, (asChange(x)?.seq ?? 0) + 1);
+    let durable = true;
+    for (let end = legacy.length; end > 0; end -= MIGRATE_CHUNK) {
+      const start = Math.max(0, end - MIGRATE_CHUNK);
+      for (let i = end - 1; i >= start; i--) {
+        const c = asChange(legacy[i]);
+        if (!c || taken.has(tid(c))) continue; // ungültig (bisher verwaist quittiert) bzw. schon migriert
+        taken.add(tid(c));
+        if (used.has(c.seq)) c.seq = next++;
+        used.add(c.seq);
+        if (this.adapter.set(outKey(c.seq), JSON.stringify(c)) === false) durable = false;
+      }
+      if (!durable) continue; // Quelle nie kürzen, solange das Ziel nur flüchtig liegt
+      this.adapter.set(SYNC_KEY, JSON.stringify({ ...v, nextSeq: next, pending: legacy.slice(0, start) }));
+    }
+  }
+
+  /**
+   * Skalare Felder nach `sync`; die Outbox liegt in eigenen Schlüsseln. `pending: []` bleibt stehen, damit eine ältere
+   * Version (Tab, der beim Update offen ist) den Wert weiter als gültigen SyncState liest.
+   */
   private saveSync(): void {
-    this.write(SYNC_KEY, this.getSyncState());
+    this.put(SYNC_KEY, { ...this.getSyncState(), pending: [] });
   }
 
   private listeners = new Set<(target: string, id: string) => void>();
@@ -400,19 +530,26 @@ export class Repository {
     return () => { this.listeners.delete(cb); };
   }
 
-  /** Änderung protokollieren; je target+id zusammengefasst; bei Überlauf → Vollabgleich. */
-  private log(target: string, id: string, op: 'upsert' | 'delete', save = true): void {
+  /**
+   * Änderung protokollieren; je target+id zusammengefasst; bei Überlauf → Vollabgleich. Geschrieben wird nur der neue
+   * Eintrag `out:<seq>` (und das Entfernen des bisherigen derselben target+id), nicht `sync`: `nextSeq` ergibt sich beim
+   * Laden aus dem höchsten Outbox-Schlüssel. `sync` folgt nur, wenn Einträge ohne Nachfolger wegfallen.
+   */
+  private log(target: string, id: string, op: 'upsert' | 'delete'): void {
     const s = this.getSyncState();
-    const i = s.pending.findIndex((c) => c.target === target && c.id === id);
-    if (i >= 0) s.pending.splice(i, 1);
     const rec: ChangeRecord = { seq: s.nextSeq++, target, id, op, at: this.now() };
+    this.put(outKey(rec.seq), rec); // erst der neue Eintrag, dann den alten entfernen
+    const i = s.pending.findIndex((c) => c.target === target && c.id === id);
+    if (i >= 0) this.put(outKey(s.pending.splice(i, 1)[0]!.seq), REMOVE);
     s.pending.push(rec);
     if (s.pending.length > this.maxPending) {
       s.fullPushNeeded = true;
       s.fullPushGen++; // ein laufender Vollabgleich darf das Flag danach nicht löschen
+      const dropped = s.pending;
       s.pending = [];
+      this.saveSync(); // Flag dauerhaft, bevor die Einträge verschwinden
+      for (const c of dropped) this.put(outKey(c.seq), REMOVE);
     }
-    if (save) this.saveSync();
     for (const cb of [...this.listeners]) {
       try { cb(target, id); } catch { /* Listener-Fehler ignorieren */ }
     }
@@ -457,12 +594,17 @@ export class Repository {
     this.saveSync();
   }
 
-  /** Vom Provider bestätigte Änderungen entfernen. */
+  /** Vom Provider bestätigte Änderungen entfernen (je Eintrag ein Schlüssel; `sync` merkt `lastPushedSeq`, `nextSeq`). */
   ackChanges(seqs: number[]): void {
     if (!seqs.length) return;
     const s = this.getSyncState();
     const set = new Set(seqs);
-    s.pending = s.pending.filter((c) => !set.has(c.seq));
+    const rest: ChangeRecord[] = [];
+    for (const c of s.pending) {
+      if (set.has(c.seq)) this.put(outKey(c.seq), REMOVE);
+      else rest.push(c);
+    }
+    s.pending = rest;
     s.lastPushedSeq = Math.max(s.lastPushedSeq, ...seqs);
     this.saveSync();
   }

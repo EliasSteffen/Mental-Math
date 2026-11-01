@@ -245,11 +245,11 @@ test('IndexedDB: Migration im Speicherabbild, zwei Tabs per BroadcastChannel ohn
   c.close();
 });
 
-/** Zählt geschriebene Zeichen je Schlüssel-Art. */
+/** Zählt geschriebene Zeichen je Schlüssel-Art (`rec`, `out` bzw. der Schlüssel selbst). */
 class MeterAdapter extends MemoryAdapter {
   chars = new Map<string, number>();
   override set(k: string, v: string): void {
-    const kind = k.startsWith('rec:') ? 'rec' : k;
+    const kind = k.startsWith('rec:') ? 'rec' : k.startsWith('out:') ? 'out' : k;
     this.chars.set(kind, (this.chars.get(kind) ?? 0) + v.length);
     super.set(k, v);
   }
@@ -277,7 +277,7 @@ test('Benchmark: Upsert (+ trim am Limit wie addAttempt) bei 5.000 Einträgen sc
   }
   const perOpMs = (performance.now() - t1) / ROUNDS;
   const recChars = (mem.chars.get('rec') ?? 0) / ROUNDS;
-  const syncChars = (mem.chars.get('sync') ?? 0) / ROUNDS;
+  const syncChars = ((mem.chars.get('out') ?? 0) + (mem.chars.get('sync') ?? 0)) / ROUNDS;
   const oneRecord = JSON.stringify([N + ROUNDS, rec(N)]).length;
 
   t.diagnostic(`Altformat: ${collectionChars} Zeichen je Upsert, dazu nochmals je trim`);
@@ -286,6 +286,7 @@ test('Benchmark: Upsert (+ trim am Limit wie addAttempt) bei 5.000 Einträgen sc
 
   assert.equal(repo.list('results').length, N);
   assert.ok(recChars <= oneRecord, `nur der eine Datensatz: ${recChars} > ${oneRecord}`);
+  assert.ok(syncChars < 200, `Outbox nur der eine Eintrag: ${syncChars.toFixed(0)} Zeichen`);
   assert.ok(recChars * 1000 < collectionChars, 'mindestens drei Größenordnungen weniger als das Altformat');
   assert.ok(perOpMs < 20, `zu langsam: ${perOpMs.toFixed(2)} ms je Upsert+trim`);
   assert.ok(hydrateMs < 2000, `Laden zu langsam: ${hydrateMs.toFixed(0)} ms`);

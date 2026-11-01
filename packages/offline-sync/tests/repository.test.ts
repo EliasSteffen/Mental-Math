@@ -134,16 +134,21 @@ test('Repository: CRUD, Soft-Delete, Cache', () => {
   assert.equal(repo2.list('results').length, 1);
 });
 
-test('Repository: Speicherschlüssel doc:/rec:/sync/deviceId, ein Schlüssel je Datensatz', () => {
+test('Repository: Speicherschlüssel doc:/rec:/out:/sync/deviceId, ein Schlüssel je Datensatz und Outbox-Eintrag', () => {
   const mem = new MemoryAdapter();
-  const repo = new Repository(mem);
+  const repo = new Repository(mem, { now: () => 9 });
   repo.putDoc('settings', { a: 1 });
   repo.upsert('results', mk('r1'));
   repo.upsert('results', mk('r2'));
   repo.upsert('a:b', mk('x'), false);
   assert.ok(repo.deviceId);
-  assert.deepEqual(mem.keys('').sort(), ['deviceId', 'doc:settings', 'rec:a%3Ab:x', 'rec:results:r1', 'rec:results:r2', 'sync']);
+  assert.deepEqual(mem.keys('').sort(), ['deviceId', 'doc:settings', 'out:1', 'out:2', 'out:3', 'rec:a%3Ab:x', 'rec:results:r1', 'rec:results:r2']);
   assert.deepEqual(JSON.parse(mem.get('rec:results:r2') ?? 'null'), [1, mk('r2')], '[Ordnungsnummer, Datensatz]');
+  assert.deepEqual(JSON.parse(mem.get('out:3') ?? 'null'), { seq: 3, target: 'results', id: 'r2', op: 'upsert', at: 9 });
+  repo.ackChanges([1]);
+  assert.deepEqual(JSON.parse(mem.get('sync') ?? 'null'), {
+    lastPulledAt: null, lastPushedSeq: 1, nextSeq: 4, pending: [], cursor: null, fullPushNeeded: false, fullPushGen: 0, docClock: {},
+  }, 'nur skalare Felder; pending bleibt leer für ältere Versionen');
   assert.equal(mem.get('deviceId'), repo.deviceId);
   assert.deepEqual(new Repository(mem).list('a').length, 0, 'Präfix trifft keine fremde Collection');
 });
