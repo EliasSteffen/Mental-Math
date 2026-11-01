@@ -1,11 +1,10 @@
 // Rundenergebnis (Artboard „Ergebnis“): Kopf, Ergebnis-Segmente, Erkenntnis (E20), Status Line,
-// Aufgabenliste (falsche zuerst, richtige aufklappbar) und Dock mit „Fehler üben“ / „Fertig“ / „Nochmal“.
+// Aufgabenliste (falsche zuerst, richtige aufklappbar) und Dock mit „Fehler üben“ / „Fertig“ / „Ergebnis teilen“ / „Nochmal“.
 import { fmtSeconds } from '../../core/numbers.ts';
 import { SUBTYPES } from '../../core/catalog.ts';
 import { getMethod } from '../../core/methods.ts';
 import { modeName } from '../../core/modes.ts';
 import { dayKey } from '../../core/progress.ts';
-import { dailyShareText } from '../../core/daily.ts';
 import { addSession, getActivity, getSettings, setDailyResult } from '../../data/storage.ts';
 import { go, addCleanup } from '../../router.ts';
 import { toast } from '../../ui/toast.ts';
@@ -19,7 +18,10 @@ import { safeSteps } from '../../ui/widgets.ts';
 import { answerText, givenAnswerText, roundInsight, type RoundInsight } from './diagnosis.ts';
 import type { TrainCtx, TrainResult } from './index.ts';
 import { t } from '../../i18n/index.ts';
-import { publicUrl, shareText } from '../../platform/index.ts';
+import { publicUrl } from '../../platform/index.ts';
+import { maybeAskForReview } from '../../features/app-store.ts';
+import { buildShareCard } from '../../features/share-card.ts';
+import { shareCardButton } from '../../ui/share-card.ts';
 
 /** Gegebene Antwort als Text (Auswahl-Option oder Zahl mit Einheit, wie evaluate() sie gewertet hat). */
 function givenText(r: TrainResult): string {
@@ -77,21 +79,16 @@ export function showResult(ctx: TrainCtx): void {
 
   addSession({ id: ctx.sessionId, ts: ctx.startedAt, mode, n, correct, points: ctx.points, avgTimeMs: Math.round(avg) });
 
-  let shareBtn: HTMLElement | null = null;
-  if (ctx.dailyKey) {
-    const dateKey = ctx.dailyKey;
-    const dres = { n, correct, points: ctx.points, timeMs: totalMs, ts: Date.now() };
-    setDailyResult(dateKey, dres);
-    shareBtn = button({
-      label: t('train.share'), icon: 'upload',
-      onClick: () => {
-        void shareText(dailyShareText(dres, dateKey, publicUrl())).then((r) => {
-          if (r === 'copied') toast(t('train.copied'));
-          else if (r === 'failed') toast(t('train.copyFail'));
-        });
-      },
-    });
-  }
+  const endedAt = Date.now();
+  if (ctx.dailyKey) setDailyResult(ctx.dailyKey, { n, correct, points: ctx.points, timeMs: totalMs, ts: endedAt });
+
+  // Ergebniskarte als Bild teilen; beim Daily begleitet dailyShareText das Bild (ersetzt das reine Text-Teilen)
+  const shareBtn = n
+    ? shareCardButton(buildShareCard({
+      kind: 'train', mode, n, correct, points: ctx.points, totalMs, ts: endedAt, dailyKey: ctx.dailyKey,
+      marks: results.map((r) => r.ev.correct),
+    }, publicUrl()))
+    : null;
 
   // Smart Retry: falsch, übersprungen oder deutlich zu langsam – angeboten wird es nur bei Fehlern
   const weak = results.filter((r) => !r.ev.correct || r.given === null || r.timeMs > 1.5 * r.task.targetMs).map((r) => r.task);
@@ -171,4 +168,6 @@ export function showResult(ctx: TrainCtx): void {
   setTitle(t('common.roundDone'));
   window.scrollTo(0, 0);
   title.focus({ preventScroll: true });
+  // Bitte um eine Bewertung (nur iOS, selten); ein Bestwert setzt hier ohnehin ≥ 80 % voraus (personalBest)
+  addCleanup(maybeAskForReview({ correct, n, newBest: false }));
 }

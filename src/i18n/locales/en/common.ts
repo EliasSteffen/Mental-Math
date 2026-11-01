@@ -16,6 +16,13 @@ export const common: Record<keyof typeof De, string> = {
   correct: 'Correct',
   wrong: 'Wrong',
   roundDone: 'Round complete!',
+  // Share result (ui/share-card.ts)
+  shareResult: 'Share result',
+  shareRendering: 'Creating …',
+  share: 'Share',
+  shareSaved: 'Image saved',
+  shareFailed: 'Sharing not possible',
+  shareRenderFailed: 'Couldn’t create the image',
   answer: 'Answer',
   keypad: 'Number pad',
   keyDelete: 'Delete',
@@ -55,4 +62,7 @@ export const common: Record<keyof typeof De, string> = {
   // App update (platform/web.ts)
   updateReady: 'New version available',
   updateReload: 'Reload',
+  // App update from the App Store (features/app-store.ts)
+  storeUpdate: 'Update available',
+  storeUpdateAction: 'Update',
 };

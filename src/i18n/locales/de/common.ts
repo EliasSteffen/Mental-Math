@@ -14,6 +14,13 @@ export const common = {
   correct: 'Richtig',
   wrong: 'Falsch',
   roundDone: 'Runde beendet!',
+  // Ergebnis teilen (ui/share-card.ts)
+  shareResult: 'Ergebnis teilen',
+  shareRendering: 'Wird erstellt …',
+  share: 'Teilen',
+  shareSaved: 'Bild gespeichert',
+  shareFailed: 'Teilen nicht möglich',
+  shareRenderFailed: 'Bild konnte nicht erstellt werden',
   answer: 'Antwort',
   keypad: 'Zahlentastatur',
   keyDelete: 'Löschen',
@@ -53,4 +60,7 @@ export const common = {
   // App-Update (platform/web.ts)
   updateReady: 'Neue Version verfügbar',
   updateReload: 'Neu laden',
+  // App-Update aus dem App Store (features/app-store.ts)
+  storeUpdate: 'Update verfügbar',
+  storeUpdateAction: 'Aktualisieren',
 } as const;

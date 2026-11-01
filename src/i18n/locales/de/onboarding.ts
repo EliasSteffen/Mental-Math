@@ -1,0 +1,22 @@
+// Namespace 'onboarding' (Deutsch) – Einführung beim ersten Start; Zugriff über t('onboarding.key')
+export const onboarding = {
+  label: 'Einführung',
+  stepOf: 'Schritt {n} von {total}',
+  skip: 'Überspringen',
+  next: 'Weiter',
+  back: 'Zurück',
+  done: 'Los geht’s',
+  createAccount: 'Konto anlegen',
+  openAccount: 'Konto öffnen',
+  replay: 'Einführung ansehen',
+  welcomeTitle: 'Willkommen bei Mental Math',
+  welcomeText: 'Trainiere Kopfrechnen in kurzen Runden – ein paar Minuten am Tag genügen. Alles funktioniert offline und ganz ohne Konto.',
+  todayTitle: 'Heute',
+  todayText: 'Hier startest du die tägliche Challenge und dein Training. Nach den ersten Runden richtet sich die Empfehlung nach dir.',
+  learnTitle: 'Lernen',
+  learnText: 'Methoden und Rechentricks zum Nachschlagen – mit Vorgehen und typischen Fehlern.',
+  progressTitle: 'Fortschritt',
+  progressText: 'Deine Statistik, deine Schwächen und fällige Wiederholungen auf einen Blick.',
+  profileTitle: 'Profil',
+  profileText: 'Erinnerungen, Darstellung und – wenn du willst – ein Konto mit Passkey, um zwischen deinen Geräten zu synchronisieren.',
+} as const;

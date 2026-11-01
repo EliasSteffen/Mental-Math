@@ -2,8 +2,9 @@
 // Feature-Code ruft nur diese Funktionen auf; tests/platform-guard.test.ts verbietet Web-only-APIs außerhalb von src/platform/.
 import { PUBLIC_CONFIG } from '../generated/public-config.ts';
 import type { PasskeyAuthOptions } from '../vendor/auth.ts';
-import { loadNative, nativeIfLoaded, startNative } from './native.ts';
-import { registerSW, webHaptic, webSaveFile, webShareText } from './web.ts';
+import { appStorePlugin, loadNative, nativeIfLoaded, onNativeResume, startNative } from './native.ts';
+import { storeVersionOf } from '../features/app-update.ts';
+import { registerSW, webHaptic, webSaveFile, webShareImage, webShareText } from './web.ts';
 import type { ShareResult } from './web.ts';
 
 export type { ShareResult } from './web.ts';
@@ -63,6 +64,39 @@ export async function shareText(text: string): Promise<ShareResult> {
   }
 }
 
+/** Blob → base64 ohne data:-Präfix (Filesystem.writeFile schreibt base64 ohne encoding als Binärdatei). */
+function blobBase64(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(String(r.result).replace(/^data:[^,]*,/, ''));
+    r.onerror = () => reject(r.error ?? new Error('FileReader'));
+    r.readAsDataURL(blob);
+  });
+}
+
+/**
+ * Bild (PNG) mit Begleittext teilen: im Browser Web Share mit Datei, sonst Download ('saved');
+ * in der App über den Cache ins Teilen-Menü wie saveFile („Bild sichern“ braucht NSPhotoLibraryAddUsageDescription).
+ */
+export async function shareImage(blob: Blob, fileName: string, text: string): Promise<ShareResult> {
+  // synchron bis navigator.share(): die Nutzergeste muss noch gelten
+  if (!isNative()) return webShareImage(blob, fileName, text);
+  let m: Awaited<ReturnType<typeof loadNative>>;
+  let uri: string;
+  try {
+    m = await loadNative();
+    ({ uri } = await m.Filesystem.writeFile({ path: fileName, data: await blobBase64(blob), directory: m.Directory.Cache }));
+  } catch {
+    return 'failed';
+  }
+  try {
+    await m.Share.share({ text, files: [uri] });
+    return 'shared';
+  } catch {
+    return 'cancelled';
+  }
+}
+
 /** Einmal beim Start: Service Worker auf der Website, App-Einrichtung in iOS. */
 export function startPlatform(): void {
   if (isNative()) startNative();
@@ -74,4 +108,54 @@ export async function authOptions(): Promise<PasskeyAuthOptions> {
   if (!isNative()) return {};
   const m = await import('./native-auth.ts');
   return m.nativeAuthOptions();
+}
+
+/* ---------- App Store (nur iOS) ---------- */
+
+/** Apple-ID der App im App Store */
+export const APP_STORE_ID = '6829427727';
+/** App-Seite im App Store (Website: Verweis auf die iOS-App) */
+export const APP_STORE_URL = `https://apps.apple.com/app/id${APP_STORE_ID}`;
+/** Bundle-ID der iOS-App (appId in capacitor.config.json) */
+export const APP_BUNDLE_ID = 'de.eliassteffen.mentalmath';
+
+/** Systemdialog „App bewerten“ anfragen; ob er erscheint, entscheidet iOS. true = angefragt. */
+export async function requestStoreReview(): Promise<boolean> {
+  if (!isNative()) return false;
+  try {
+    const p = await appStorePlugin();
+    return (await p.requestReview()).requested === true;
+  } catch {
+    return false;
+  }
+}
+
+/** App-Seite im App Store öffnen, mit writeReview gleich „Bewertung schreiben“. */
+export async function openStorePage(writeReview: boolean): Promise<void> {
+  if (!isNative()) return;
+  try {
+    const p = await appStorePlugin();
+    await p.openStorePage({ appId: APP_STORE_ID, writeReview });
+  } catch { /* kein App Store (z. B. Simulator) */ }
+}
+
+/** Aktuelle Version im App Store oder null (noch nicht veröffentlicht, offline, Fehler); wirft nie. Natives HTTP: ohne CORS. */
+export async function fetchStoreVersion(): Promise<string | null> {
+  if (!isNative()) return null;
+  try {
+    const m = await loadNative();
+    const res = await m.CapacitorHttp.get({
+      url: `https://itunes.apple.com/lookup?bundleId=${APP_BUNDLE_ID}&country=de&t=${Date.now()}`,
+      connectTimeout: 10_000,
+      readTimeout: 10_000,
+    });
+    return res.status === 200 ? storeVersionOf(res.data) : null;
+  } catch {
+    return null;
+  }
+}
+
+/** App kommt zurück in den Vordergrund (nur iOS; die Website prüft beim Sichtbarwerden selbst). */
+export function onAppResume(fn: () => void): void {
+  if (isNative()) onNativeResume(fn);
 }

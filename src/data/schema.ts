@@ -12,6 +12,8 @@ export const DEFAULT_SETTINGS: Settings = {
   lang: 'auto',
   lastSeenVersion: '',
   timerDisplay: 'calm', breathe: false, confetti: false,
+  lastStoreCheck: 0, updateNotifiedVersion: '', updateNotifiedAt: 0, reviewAskedVersion: '', reviewAskedAt: 0,
+  onboardingDone: false,
 };
 
 export const DEFAULT_PARALLEL_STATS: ParallelStats = { nextStart: 2, bestChains: 0, bestCorrectStreak: 0, rounds: 0 };
@@ -62,6 +64,7 @@ export function normalizeSettings(raw: unknown): Settings {
     timerDisplay: td ?? (s.timer === false ? 'off' : 'calm'),
     breathe: typeof s.breathe === 'boolean' ? s.breathe : DEFAULT_SETTINGS.breathe,
     confetti: typeof s.confetti === 'boolean' ? s.confetti : DEFAULT_SETTINGS.confetti,
+    onboardingDone: s.onboardingDone === true,
   };
 }
 

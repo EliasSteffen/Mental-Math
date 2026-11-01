@@ -4,7 +4,11 @@ import type { MergeContext, SyncSchema } from 'offline-sync';
 import { keepKeys, lwwByKey, lwwDoc, maxByKey } from '../vendor/storage.ts';
 
 /** Einstellungen, die pro Gerät gelten und nie hochgeladen bzw. überschrieben werden. */
-export const DEVICE_LOCAL_SETTINGS: readonly string[] = ['keypad', 'lastSeenVersion'];
+export const DEVICE_LOCAL_SETTINGS: readonly string[] = [
+  'keypad', 'lastSeenVersion',
+  'lastStoreCheck', 'updateNotifiedVersion', 'updateNotifiedAt', 'reviewAskedVersion', 'reviewAskedAt',
+  'onboardingDone',
+];
 
 type Obj = Record<string, unknown>;
 const isObj = (x: unknown): x is Obj => x !== null && typeof x === 'object' && !Array.isArray(x);

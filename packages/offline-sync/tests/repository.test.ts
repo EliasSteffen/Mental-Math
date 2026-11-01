@@ -134,14 +134,23 @@ test('Repository: CRUD, Soft-Delete, Cache', () => {
   assert.equal(repo2.list('results').length, 1);
 });
 
-test('Repository: Speicherschlüssel bleiben doc:/col:/sync/deviceId', () => {
+test('Repository: Speicherschlüssel doc:/rec:/out:/sync/deviceId, ein Schlüssel je Datensatz und Outbox-Eintrag', () => {
   const mem = new MemoryAdapter();
-  const repo = new Repository(mem);
+  const repo = new Repository(mem, { now: () => 9 });
   repo.putDoc('settings', { a: 1 });
   repo.upsert('results', mk('r1'));
+  repo.upsert('results', mk('r2'));
+  repo.upsert('a:b', mk('x'), false);
   assert.ok(repo.deviceId);
-  assert.deepEqual(mem.keys('').sort(), ['col:results', 'deviceId', 'doc:settings', 'sync']);
+  assert.deepEqual(mem.keys('').sort(), ['deviceId', 'doc:settings', 'out:1', 'out:2', 'out:3', 'rec:a%3Ab:x', 'rec:results:r1', 'rec:results:r2']);
+  assert.deepEqual(JSON.parse(mem.get('rec:results:r2') ?? 'null'), [1, mk('r2')], '[Ordnungsnummer, Datensatz]');
+  assert.deepEqual(JSON.parse(mem.get('out:3') ?? 'null'), { seq: 3, target: 'results', id: 'r2', op: 'upsert', at: 9 });
+  repo.ackChanges([1]);
+  assert.deepEqual(JSON.parse(mem.get('sync') ?? 'null'), {
+    lastPulledAt: null, lastPushedSeq: 1, nextSeq: 4, pending: [], cursor: null, fullPushNeeded: false, fullPushGen: 0, docClock: {},
+  }, 'nur skalare Felder; pending bleibt leer für ältere Versionen');
   assert.equal(mem.get('deviceId'), repo.deviceId);
+  assert.deepEqual(new Repository(mem).list('a').length, 0, 'Präfix trifft keine fremde Collection');
 });
 
 test('Repository: Änderungsprotokoll fasst zusammen, trackt jeden Dokumentnamen, Überlauf → Vollabgleich', () => {
@@ -375,7 +384,7 @@ class CountingAdapter extends MemoryAdapter {
   }
 }
 
-test('Repository: 5.000 Upserts neuer IDs im batch() bleiben schnell (Index statt O(n)-Suche, ein Schreibzugriff)', () => {
+test('Repository: 5.000 Upserts neuer IDs im batch() bleiben schnell (Index statt O(n)-Suche, ein Schreibzugriff je Datensatz)', () => {
   const mem = new CountingAdapter();
   const repo = new Repository(mem);
   const t0 = performance.now();
@@ -383,9 +392,10 @@ test('Repository: 5.000 Upserts neuer IDs im batch() bleiben schnell (Index stat
     for (let i = 0; i < 5000; i++) repo.upsert('c', mk(`id${i}`), false);
   });
   const ms = performance.now() - t0;
-  assert.equal(mem.sets.get('col:c'), 1, 'Collection wird genau einmal serialisiert');
+  assert.equal(mem.sets.size, 5000);
+  assert.ok([...mem.sets].every(([k, n]) => k.startsWith('rec:c:') && n === 1), 'jeder Datensatz genau einmal');
   assert.equal(repo.list('c', true).length, 5000);
-  assert.equal((JSON.parse(mem.get('col:c') ?? '[]') as unknown[]).length, 5000);
+  assert.deepEqual(new Repository(mem).list('c').map((x) => x.id), repo.list('c').map((x) => x.id), 'Reihenfolge übersteht Neuladen');
   assert.ok(ms < 2000, `zu langsam: ${Math.round(ms)} ms`);
   for (let i = 0; i < 100; i++) assert.equal(repo.remove('c', `id${i * 50}`), true);
 });
@@ -398,22 +408,25 @@ test('Repository: batch() schreibt jeden Schlüssel einmal am Ende; Lesezugriffe
   // ohne Batch: jeder Aufruf schreibt sofort
   repo.upsert('c', mk('a'), false);
   repo.upsert('c', mk('b'), false);
-  assert.equal(mem.sets.get('col:c'), 2);
+  assert.equal(mem.sets.get('rec:c:a'), 1);
+  assert.equal(mem.sets.get('rec:c:b'), 1);
 
   const rev = repo.revision;
   const n = repo.batch(() => {
     repo.upsert('c', mk('x'), false);
     repo.batch(() => repo.upsert('c', mk('y'), false)); // verschachtelt: erst der äußere Batch schreibt
+    repo.upsert('c', mk('a', 2), false);
     repo.putDoc('d', 1, false);
     assert.deepEqual(idsOf(repo), ['a', 'b', 'x', 'y']);
     assert.equal(repo.getDoc('d'), 1);
-    assert.equal(mem.sets.get('col:c'), 2, 'im Batch noch nicht geschrieben');
+    assert.equal(mem.get('rec:c:x'), null, 'im Batch noch nicht geschrieben');
+    assert.equal(mem.sets.get('rec:c:a'), 1);
     assert.equal(mem.get('doc:d'), null);
     return 42;
   });
   assert.equal(n, 42);
   assert.ok(repo.revision > rev);
-  assert.equal(mem.sets.get('col:c'), 3);
+  assert.deepEqual(['a', 'b', 'x', 'y'].map((id) => mem.sets.get(`rec:c:${id}`)), [2, 1, 1, 1], 'je Schlüssel einmal am Ende');
   assert.equal(mem.sets.get('doc:d'), 1);
   assert.deepEqual(idsOf(new Repository(mem)), ['a', 'b', 'x', 'y']);
 
@@ -438,7 +451,7 @@ test('Repository: batch() schreibt jeden Schlüssel einmal am Ende; Lesezugriffe
     repo.clear();
     repo.upsert('e', mk('k'), false);
   });
-  assert.equal(mem.get('col:c'), null);
+  assert.deepEqual(mem.keys('rec:c:'), []);
   assert.deepEqual(idsOf(new Repository(mem), 'e'), ['k']);
 });
 

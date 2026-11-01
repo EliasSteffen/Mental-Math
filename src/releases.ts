@@ -5,6 +5,18 @@ const DATE = '2026-10-30';
 
 export const RELEASES: Release[] = [
   {
+    version: '1.15.0', date: '2026-11-01',
+    title: { de: 'iPhone-App, Einführung & Teilen', en: 'iPhone app, intro & sharing' },
+    highlights: [
+      { de: 'Mental Math gibt es jetzt als iPhone-App – mit Passkey-Anmeldung, Erinnerungen, einem Hinweis auf neue Versionen im App Store und einer einfachen Möglichkeit, die App zu bewerten.', en: 'Mental Math is now available as an iPhone app – with passkey sign-in, reminders, a notice when a new version is in the App Store and an easy way to rate the app.' },
+      { de: 'Beim ersten Start zeigt dir eine kurze Einführung, wo du was findest. Du kannst sie jederzeit unter Profil → Über erneut ansehen.', en: 'On first launch, a short introduction shows you where to find everything. You can replay it any time under Profile → About.' },
+      { de: 'Teile dein Ergebnis als Bild – mit Trefferquote, Tempo und Punkten, passend zu deinem Theme.', en: 'Share your result as an image – with accuracy, speed and points, matching your theme.' },
+      { de: 'Neue Seiten für Datenschutz, Hilfe und Neuigkeiten – auch in der App unter Profil → Über.', en: 'New pages for privacy, help and news – also in the app under Profile → About.' },
+      { de: 'KI-Erklärungen stellen richtige Antworten nicht mehr als Fehler dar.', en: 'AI explanations no longer present correct answers as mistakes.' },
+      { de: 'Unter der Haube: Speichern geht schneller, weil jede Antwort einzeln abgelegt wird statt der ganzen Historie.', en: 'Under the hood: saving is faster because each answer is stored on its own instead of rewriting your whole history.' },
+    ],
+  },
+  {
     version: '1.14.0', date: '2026-11-01',
     title: { de: 'Zuverlässiger Sync & Updates', en: 'Reliable sync & updates' },
     highlights: [

@@ -35,7 +35,11 @@ test('settings: LWW, geräte-lokale Schlüssel bleiben, updatedAt des Gewinners'
   assert.deepEqual(spec?.toRemote?.(local), { sessionLength: 10, updatedAt: 100 });
   assert.equal(spec?.updatedAt?.(local), 100);
   assert.equal(spec?.updatedAt?.({}), null);
-  assert.deepEqual([...DEVICE_LOCAL_SETTINGS], ['keypad', 'lastSeenVersion']);
+  assert.deepEqual([...DEVICE_LOCAL_SETTINGS], [
+    'keypad', 'lastSeenVersion',
+    'lastStoreCheck', 'updateNotifiedVersion', 'updateNotifiedAt', 'reviewAskedVersion', 'reviewAskedAt',
+    'onboardingDone',
+  ]);
 });
 
 test('dailyResults: mehr Punkte gewinnt, bei Gleichstand früherer ts', () => {
