@@ -29,9 +29,19 @@ export interface NativeAuthPlugin {
 
 let authPlugin: NativeAuthPlugin | null = null;
 
+/** NativeAuth als schlichtes Objekt: Capacitors Plugin-Proxy beantwortet jede Eigenschaft, auch `then`. Liefert ein
+ *  Promise den Proxy selbst, hält await ihn für ein Promise und wartet ewig (kein Passkey-Dialog, keine Meldung). */
 export async function nativeAuthPlugin(): Promise<NativeAuthPlugin> {
   const m = await loadNative();
-  authPlugin ??= m.registerPlugin<NativeAuthPlugin>('NativeAuth');
+  if (!authPlugin) {
+    const p = m.registerPlugin<NativeAuthPlugin>('NativeAuth');
+    authPlugin = {
+      create: (o) => p.create(o),
+      get: (o) => p.get(o),
+      secureGet: (o) => p.secureGet(o),
+      secureSet: (o) => p.secureSet(o),
+    };
+  }
   return authPlugin;
 }
 
