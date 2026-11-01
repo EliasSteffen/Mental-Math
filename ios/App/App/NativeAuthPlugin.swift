@@ -6,7 +6,7 @@ import Security
 
 /// Passkeys (WebAuthn) über AuthenticationServices und ein kleiner Keychain-Speicher für das Refresh-Token.
 /// Gegenstück in JS: src/platform/native.ts (NativeAuthPlugin) und src/platform/native-auth.ts.
-/// Alle Binärwerte als base64url. Fehlercodes: cancelled, not_supported, already_registered, verification_failed.
+/// Alle Binärwerte als base64url. Fehlercodes: cancelled, not_supported, already_registered, not_associated, verification_failed.
 /// Voraussetzung: Associated Domain „webcredentials:<rpId>“ (App.entitlements) und die Datei
 /// /.well-known/apple-app-site-association auf dieser Domain.
 @objc(NativeAuthPlugin)
@@ -164,6 +164,9 @@ private final class Ceremony: NSObject, ASAuthorizationControllerDelegate, ASAut
             code = "cancelled"
         case .notHandled?, .notInteractive?:
             code = "not_supported"
+        case .failed? where Ceremony.isMissingAssociation(error):
+            // 1004: Associated Domain fehlt im signierten Build oder die AASA-Datei ist auf dem Gerät noch nicht geladen
+            code = "not_associated"
         default:
             if #available(iOS 18.0, *), authError?.code == .matchedExcludedCredential {
                 code = "already_registered"
@@ -172,6 +175,13 @@ private final class Ceremony: NSObject, ASAuthorizationControllerDelegate, ASAut
             }
         }
         finish { $0.reject(error.localizedDescription, code) }
+    }
+
+    /// „Application with identifier … is not associated with domain …“ (ASAuthorizationError.failed)
+    private static func isMissingAssociation(_ error: Error) -> Bool {
+        let ns = error as NSError
+        let texts = [ns.localizedDescription, ns.localizedFailureReason ?? ""] + ns.userInfo.values.map { "\($0)" }
+        return texts.contains { $0.localizedCaseInsensitiveContains("not associated") }
     }
 
     private func finish(_ respond: (CAPPluginCall) -> Void) {

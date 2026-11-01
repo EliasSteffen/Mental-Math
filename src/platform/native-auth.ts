@@ -11,7 +11,7 @@ import { nativeAuthPlugin } from './native.ts';
 
 const REFRESH_KEY = 'refresh-token';
 /** Fehlercodes, die das Plugin meldet (call.reject(message, code)); alles andere gilt als fehlgeschlagen */
-const PLUGIN_CODES: readonly AuthErrorCode[] = ['cancelled', 'not_supported', 'already_registered'];
+const PLUGIN_CODES: readonly AuthErrorCode[] = ['cancelled', 'not_supported', 'already_registered', 'not_associated'];
 
 const fallbackRpId = (): string => new URL(PUBLIC_CONFIG.apiOrigin).hostname;
 

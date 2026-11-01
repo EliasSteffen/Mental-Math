@@ -159,6 +159,23 @@ jobs:
           fi
           ls -la "$RUNNER_TEMP/export"
 
+      # Passkeys der App brauchen die Associated Domain im signierten Build (sonst ASAuthorization-Fehler 1004):
+      # Entitlements ausgeben (nichts Geheimes) und ohne webcredentials nicht hochladen.
+      - name: Entitlements der signierten App prüfen
+        if: steps.release.outputs.upload == 'true'
+        shell: bash
+        run: |
+          ipa=$(ls "$RUNNER_TEMP"/export/*.ipa | head -n 1)
+          rm -rf "$RUNNER_TEMP/ipa" && mkdir -p "$RUNNER_TEMP/ipa"
+          unzip -q "$ipa" 'Payload/*' -d "$RUNNER_TEMP/ipa"
+          ents=$(codesign -d --entitlements - --xml "$RUNNER_TEMP"/ipa/Payload/*.app 2>/dev/null | plutil -p -)
+          echo "$ents"
+          rm -rf "$RUNNER_TEMP/ipa"
+          if ! grep -q 'webcredentials:' <<< "$ents"; then
+            echo "::error::Signierte App ohne Associated Domain (webcredentials:…): App-ID in developer.apple.com → Identifiers → Capabilities „Associated Domains“ aktivieren (README → iOS-App)"
+            exit 1
+          fi
+
       - name: Zu App Store Connect hochladen (TestFlight)
         if: steps.release.outputs.upload == 'true'
         shell: bash
