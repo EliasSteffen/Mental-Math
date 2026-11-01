@@ -462,15 +462,17 @@ function logoutStrip(onConfirm: (forget: boolean, btn: HTMLButtonElement) => voi
     onChange: (v) => {
       forget = v;
       ok.classList.toggle('danger', v);
+      strip.classList.toggle('is-neutral', !v); // rot erst, wenn Daten entfernt werden
       setButtonLabel(ok, t(v ? 'account.logoutForget' : 'account.logout'));
     },
   });
   const textId = nextId('confirm');
   setTimeout(() => cancel.focus(), 0);
-  return h('div', { class: 'prof-confirm', role: 'group', 'aria-labelledby': textId },
+  const strip = h('div', { class: 'prof-confirm is-neutral', role: 'group', 'aria-labelledby': textId },
     h('p', { class: 'prof-confirm-text', id: textId }, t('account.logoutConfirm')),
     sw.el,
     h('div', { class: 'prof-confirm-actions' }, cancel, ok));
+  return strip;
 }
 
 const subhead = (text: string): HTMLElement => h('h3', { class: 'prof-subhead' }, text);
