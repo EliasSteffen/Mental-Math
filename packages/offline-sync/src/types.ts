@@ -36,11 +36,15 @@ export interface SyncState {
 }
 
 // ---------- Lokaler Speicher ----------
-/** Schlüssel/Wert-Speicher (synchron). */
+/**
+ * Schlüssel/Wert-Speicher (synchron). Das Repository legt jeden Datensatz unter einem eigenen Schlüssel ab
+ * (`rec:<collection>:<id>`), ein Upsert schreibt also nur diesen einen Wert.
+ */
 export interface StorageAdapter {
   readonly name: string;
   get(key: string): string | null;
-  set(key: string, value: string): void;
+  /** `false`: Wert liegt nur flüchtig vor (z. B. localStorage voll → Memory-Fallback); sonst dauerhaft bzw. eingeplant. */
+  set(key: string, value: string): boolean | void;
   remove(key: string): void;
   keys(prefix: string): string[];
 }

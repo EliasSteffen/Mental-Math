@@ -13,7 +13,8 @@ App ── Repository (sync. Cache + Outbox) ── StorageAdapter ── Indexe
 ```
 
 - `Repository`: `getDoc`/`putDoc` (Dokumente), `list`/`getById`/`upsert`/`remove`/`replaceCollection`/`trim` (Collections mit `SyncMeta`), `getSyncState`, `ackChanges`, `onTrackedChange`. `getById`, Upsert und Remove nutzen einen ID-Index pro Collection (kein O(n)-Suchlauf); `getById` liefert auch Tombstones.
-- Speicherschlüssel: `doc:<name>`, `col:<name>`, `sync` (Outbox, Cursor, Vollabgleich-Flag samt `fullPushGen`, Dokument-Uhr `docClock`), `deviceId`, `wipeAt`.
+- Speicherschlüssel: `doc:<name>`, `rec:<collection>:<id>` (ein Schlüssel je Datensatz, Wert `[ord, record]`; `ord` hält die Reihenfolge von `list()`, der Collection-Name ist per `encodeURIComponent` kodiert), `sync` (Outbox, Cursor, Vollabgleich-Flag samt `fullPushGen`, Dokument-Uhr `docClock`), `deviceId`, `wipeAt`. Ein Upsert serialisiert und schreibt nur seinen Datensatz (getrackt zusätzlich `sync`), `trim` entfernt nur die Opfer-Schlüssel.
+- Altformat `col:<name>` (ganze Collection als ein Wert): Das Repository migriert es beim ersten Laden der Collection, idempotent und abbruchsicher. Es schreibt rückwärts in Blöcken zu 500 und kürzt `col:` nach jedem dauerhaft geschriebenen Block, am Ende ist der Schlüssel weg. Nach jedem Adapter-Aufruf liegt jeder Eintrag in `col:` oder mindestens so neu unter `rec:`. Ein Abbruch an beliebiger Stelle wird beim nächsten Laden zu Ende geführt, doppelte Stände entscheidet `compareMeta`; das gilt auch, wenn ein Tab mit alter Version `col:` erneut schreibt. `StorageAdapter.set` liefert `false`, wenn ein Wert nur flüchtig liegt (localStorage voll → Memory-Fallback); dann kürzt die Migration die Quelle nicht.
 - `SyncEngine`: pro Runde erst Pull (Merge), dann Push (Outbox). `syncNow()` wirft nie.
 - `SyncManager`: plant die Runden und hält den `SyncStatus`.
 
@@ -62,7 +63,7 @@ Reine, kommutative bzw. idempotente Funktionen; kaputte Eingaben zählen als `{}
 
 ## IndexedDB: Hydrate then Cache
 
-`await initStorageAdapter({ prefix })` lädt beim Start alle Schlüssel in ein Speicherabbild. Danach bleibt jeder Zugriff synchron, auch im Repository. Schreiben aktualisiert das Abbild sofort und persistiert gebündelt (150 ms Debounce, eine Transaktion; sofort bei `pagehide` bzw. `visibilitychange: hidden`). Schlägt ein Schreiben fehl, bleiben die Schlüssel dirty und werden mit Backoff wiederholt. Andere Tabs melden Änderungen per `BroadcastChannel('mm-data')`; dann `adapter.onExternalChange(() => repo.invalidate())`. Ohne IndexedDB gilt `LocalStorageAdapter(prefix)` (mit Memory-Fallback bei Quota/Privatmodus). Beim ersten Start wird `prefix*` aus localStorage einmalig nach IndexedDB übernommen.
+`await initStorageAdapter({ prefix })` lädt beim Start alle Schlüssel in ein Speicherabbild. Danach bleibt jeder Zugriff synchron, auch im Repository. Schreiben aktualisiert das Abbild sofort und persistiert gebündelt (150 ms Debounce, eine Transaktion; sofort bei `pagehide` bzw. `visibilitychange: hidden`). Schlägt ein Schreiben fehl, bleiben die Schlüssel dirty und werden mit Backoff wiederholt. Andere Tabs melden Änderungen per `BroadcastChannel('mm-data')`; dann `adapter.onExternalChange(() => repo.invalidate())`. Weil jeder Datensatz ein eigener Schlüssel ist, überschreiben sich zwei Tabs, die gleichzeitig verschiedene Datensätze anlegen, nicht mehr gegenseitig. Ohne IndexedDB gilt `LocalStorageAdapter(prefix)` (mit Memory-Fallback bei Quota/Privatmodus). Beim ersten Start wird `prefix*` aus localStorage einmalig nach IndexedDB übernommen.
 
 ## Sync-Auslöser (SyncManager)
 

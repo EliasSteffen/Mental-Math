@@ -175,7 +175,7 @@ export class IndexedDbAdapter implements PersistentAdapter {
 export async function initStorageAdapter(): Promise<StorageAdapter>   // IDB oder Fallback localStorage, inkl. Migration D4
 ```
 
-- **DB und Store:** DB `mental-math`, Version 1, Object Store `kv` (Schlüssel: String, Wert: String). Jeder `set` wird gebündelt (150 ms), bei `pagehide` bzw. `visibilitychange: hidden` sofort geflusht. Schlägt ein Schreiben fehl, bleiben die Schlüssel dirty und der nächste Flush versucht es erneut. Die App blockiert dabei nie.
+- **DB und Store:** DB `mental-math`, Version 1, Object Store `kv` (Schlüssel: String, Wert: String). Collections liegen als ein Schlüssel je Datensatz (`rec:<collection>:<id>` → `[ord, record]`), ein Upsert schreibt also einen kleinen Wert statt der ganzen Collection (Audit O4). Das frühere `col:<name>` migriert das Repository beim ersten Laden abbruchsicher (Details: `packages/offline-sync/README.md`); eine IDB-Versionserhöhung war dafür nicht nötig. Jeder `set` wird gebündelt (150 ms), bei `pagehide` bzw. `visibilitychange: hidden` sofort geflusht. Schlägt ein Schreiben fehl, bleiben die Schlüssel dirty und der nächste Flush versucht es erneut. Die App blockiert dabei nie.
 - **`ids.ts`:** `setDefaultAdapter(a)`.
 - **`storage.ts`:**
   - `export async function initStorage(): Promise<void>` setzt Adapter und Repository und registriert `onExternalChange` → `invalidateCache()`.
