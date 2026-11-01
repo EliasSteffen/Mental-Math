@@ -1,13 +1,17 @@
-// Toasts (nur Export/Import, Sync-Fehler, Konto – E21): gestapelt unten, im Top-Layer (popover="manual"), damit sie
+// Toasts (nur Export/Import, Sync-Fehler, Konto, App-Update – E21): gestapelt unten, im Top-Layer (popover="manual"), damit sie
 // auch über einem offenen Sheet oder Dialog sichtbar sind. Ohne Popover-API: fester Stapel mit hohem z-index.
 // Die Höhe über dem unteren Rand folgt dem, was dort gerade schwebt (Tab-Leiste, CTA, Dock, Feedback-Sheet).
 // Ansage: nur eine Ebene – jeder Toast ist selbst status bzw. alert, der Stapel ist keine Live-Region (sonst doppelt).
 import { h } from './dom.ts';
 
 export type ToastKind = 'info' | 'success' | 'error';
-export interface ToastOptions { kind?: ToastKind; durationMs?: number }
+/** Knopf im Toast (z. B. „Neu laden“); ein Klick schließt den Toast. */
+export interface ToastAction { label: string; onClick: () => void }
+/** durationMs ≤ 0: bleibt stehen, bis die Aktion gewählt oder die von toast() gelieferte Funktion aufgerufen wird. */
+export interface ToastOptions { kind?: ToastKind; durationMs?: number; action?: ToastAction }
 
 const MAX_VISIBLE = 4;
+const DEFAULT_MS = 3200;
 /** Abstand über dem obersten unten verankerten Element (px). */
 const GAP = 12;
 let stack: HTMLElement | null = null;
@@ -64,15 +68,27 @@ function dismiss(el: HTMLElement): void {
   setTimeout(done, 400); // Fallback (Reduced Motion / keine Animation)
 }
 
-/** Zeigt eine gestapelte Meldung unten über Tab-Leiste, CTA bzw. Dock. */
-export function toast(text: string, opts: ToastOptions = {}): void {
+/** Zeigt eine gestapelte Meldung unten über Tab-Leiste, CTA bzw. Dock. Liefert eine Funktion zum Schließen. */
+export function toast(text: string, opts: ToastOptions = {}): () => void {
   const kind: ToastKind = opts.kind ?? 'info';
+  const durationMs = opts.durationMs ?? DEFAULT_MS;
+  const sticky = durationMs <= 0;
+  const { action } = opts;
   const parent = getStack();
-  const el = h('div', { class: `toast is-${kind}`, role: kind === 'error' ? 'alert' : 'status' }, String(text));
+  const cls = `toast is-${kind}${action ? ' has-action' : ''}${sticky ? ' is-sticky' : ''}`;
+  const el = h('div', { class: cls, role: kind === 'error' ? 'alert' : 'status' },
+    action
+      ? [
+        h('span', { class: 'toast-text' }, String(text)),
+        h('button', { type: 'button', class: 'btn link', onclick: () => { dismiss(el); action.onClick(); } }, action.label),
+      ]
+      : String(text));
   // Erst den Stapel sichtbar machen, dann einfügen: ein Toast in einem noch verborgenen Popover wird sonst nicht angesagt
   raise(parent);
   parent.append(el);
-  const live = parent.querySelectorAll('.toast:not(.is-leaving)');
+  // Stehende Toasts (mit Aktion) verdrängt die Obergrenze nicht
+  const live = parent.querySelectorAll('.toast:not(.is-leaving):not(.is-sticky)');
   for (let i = 0; i < live.length - MAX_VISIBLE; i += 1) dismiss(live[i] as HTMLElement);
-  setTimeout(() => dismiss(el), opts.durationMs ?? 3200);
+  if (!sticky) setTimeout(() => dismiss(el), durationMs);
+  return () => dismiss(el);
 }

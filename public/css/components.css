@@ -513,6 +513,13 @@
   .toast.is-success { border-color:color-mix(in srgb, var(--good) 55%, var(--border)); }
   .toast.is-error { border-color:color-mix(in srgb, var(--bad) 55%, var(--border)); }
   .toast.is-leaving { animation:fade-out var(--dur-exit) var(--ease-out) forwards; }
+  /* Toast mit Aktion (z. B. „Neue Version verfügbar – Neu laden“, features/pwa.ts): Text links, Knopf rechts */
+  .toast.has-action {
+    display:flex; align-items:center; gap:var(--space-3);
+    padding-block:var(--space-1); padding-inline-end:var(--space-1); text-align:start;
+  }
+  .toast.has-action > .toast-text { flex:1 1 auto; min-width:0; }
+  .toast.has-action > .btn { flex:none; }
 
   /* ---------- Feiern (charts.confetti, nur mit Einstellung „Feiern“): einmalig, kein Loop ---------- */
   .confetti { position:fixed; inset:0; z-index:70; pointer-events:none; overflow:hidden; }
