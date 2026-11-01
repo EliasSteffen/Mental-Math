@@ -177,6 +177,8 @@ export interface Settings {
   breathe: boolean;
   /** „Feiern“: Konfetti beim Tagesziel (E4) */
   confetti: boolean;
+  /** Einführung gesehen (abgeschlossen oder übersprungen); geräte-lokal */
+  onboardingDone: boolean;
 }
 
 export interface ReviewItem { box: number; dueAt: number; lastTs: number }
