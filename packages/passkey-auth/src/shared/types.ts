@@ -132,6 +132,12 @@ export interface PasskeyAuthOptions {
   webauthn?: WebAuthnApi;           // Default: client/webauthn.ts
   now?: () => number;
   refreshRetryDelayMs?: number;     // Default 400: zweiter /refresh-Versuch nach 401 (anderer Tab hat evtl. gerade rotiert)
+  locks?: LockManagerLike | null;   // Default navigator.locks, falls vorhanden; null = ohne Lock
+}
+
+/** Ausschnitt der Web Locks API (navigator.locks): exklusiv, wartet auf den Lock. Für Tests injizierbar. */
+export interface LockManagerLike {
+  request<T>(name: string, cb: () => Promise<T>): Promise<T>;
 }
 
 export interface PasskeyAuthClient {
