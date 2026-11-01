@@ -4,6 +4,17 @@ Alle nennenswerten Änderungen an Mental Math. Format nach [Keep a Changelog](ht
 
 <!-- Automatisch erzeugt mit `npm run changelog` aus src/releases.ts – nicht von Hand bearbeiten. -->
 
+## [1.15.0] - 2026-11-01
+
+### iPhone-App, Einführung & Teilen
+
+- Mental Math gibt es jetzt als iPhone-App – mit Passkey-Anmeldung, Erinnerungen, einem Hinweis auf neue Versionen im App Store und einer einfachen Möglichkeit, die App zu bewerten.
+- Beim ersten Start zeigt dir eine kurze Einführung, wo du was findest. Du kannst sie jederzeit unter Profil → Über erneut ansehen.
+- Teile dein Ergebnis als Bild – mit Trefferquote, Tempo und Punkten, passend zu deinem Theme.
+- Neue Seiten für Datenschutz, Hilfe und Neuigkeiten – auch in der App unter Profil → Über.
+- KI-Erklärungen stellen richtige Antworten nicht mehr als Fehler dar.
+- Unter der Haube: Speichern geht schneller, weil jede Antwort einzeln abgelegt wird statt der ganzen Historie.
+
 ## [1.14.0] - 2026-11-01
 
 ### Zuverlässiger Sync & Updates
