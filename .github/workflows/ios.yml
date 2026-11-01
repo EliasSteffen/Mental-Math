@@ -135,7 +135,9 @@ jobs:
           DEVELOPMENT_TEAM="$TEAM_ID" MARKETING_VERSION="$VERSION" CURRENT_PROJECT_VERSION="$BUILD"
           -quiet archive
 
-      - name: Zu App Store Connect hochladen (TestFlight)
+      # Xcode signiert nur und exportiert die .ipa; hochgeladen wird über die App Store Connect API
+      # (Xcodes eigener Upload-Dienst lehnt den Team-Schlüssel mit „Cannot verify client's JWT headers“ ab).
+      - name: Signierte .ipa exportieren
         if: steps.release.outputs.upload == 'true'
         shell: bash
         env:
@@ -155,8 +157,21 @@ jobs:
               | grep -viE 'bearer|eyJ' | cut -c1-400 | tail -n 40 || true
             exit 1
           fi
-          echo "### Hochgeladen: Version ${{ steps.release.outputs.version }} (Build ${{ github.run_number }})" >> "$GITHUB_STEP_SUMMARY"
-          echo "Nach der Verarbeitung (ca. 10–30 Minuten) in App Store Connect → TestFlight bzw. als Build der nächsten Version wählbar." >> "$GITHUB_STEP_SUMMARY"
+          ls -la "$RUNNER_TEMP/export"
+
+      - name: Zu App Store Connect hochladen (TestFlight)
+        if: steps.release.outputs.upload == 'true'
+        shell: bash
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          VERSION: ${{ steps.release.outputs.version }}
+          BUILD: ${{ github.run_number }}
+        run: |
+          ipa=$(ls "$RUNNER_TEMP"/export/*.ipa | head -n 1)
+          node scripts/asc-upload.ts "$ipa" "$VERSION" "$BUILD"
+          echo "### Hochgeladen: Version $VERSION (Build $BUILD)" >> "$GITHUB_STEP_SUMMARY"
+          echo "Der Build erscheint nach der Verarbeitung in App Store Connect → TestFlight und ist dort als Build der Version wählbar." >> "$GITHUB_STEP_SUMMARY"
 
       - name: Schlüssel entfernen
         if: always()
