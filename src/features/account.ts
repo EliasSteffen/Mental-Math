@@ -1,8 +1,11 @@
 // Konto per Passkey: Zustand + lazy geladenes Auth-Modul (src/vendor/auth.ts wird erst bei Bedarf importiert).
-import type { AccountApi, AuthErrorCode, AuthSession, AuthUser, PasskeyAuthClient, PasskeyInfo, RecoveryStatus, SupportInfo } from '../vendor/auth.ts';
+import type {
+  AccountApi, AuthErrorCode, AuthSession, AuthUser, PasskeyAuthClient, PasskeyAuthOptions, PasskeyInfo, RecoveryStatus, SupportInfo,
+} from '../vendor/auth.ts';
 import type { RemoteSyncProvider, SupabaseSyncSchema } from 'offline-sync';
 import { APP_SUPABASE_SCHEMA } from '../data/remote/supabase-schema.ts';
 import { PUBLIC_CONFIG } from '../generated/public-config.ts';
+import { authOptions } from '../platform/index.ts';
 
 /** 'offline': Sitzung beim Start nicht prüfbar (Netz/Server) – Hint bleibt, watchAccountRestore versucht es erneut. */
 export type AccountState =
@@ -14,7 +17,7 @@ export type AccountState =
 
 /** Minimale Struktur des Vendor-Moduls (für Tests injizierbar). */
 export interface VendorModuleLike {
-  createPasskeyAuth(): PasskeyAuthClient;
+  createPasskeyAuth(o?: PasskeyAuthOptions): PasskeyAuthClient;
   createPasskeySupabaseClient(auth: PasskeyAuthClient, url: string, key: string): unknown;
   createAccountApi(db: never): AccountApi;
   createSupabaseSyncProvider(client: never, userId: string, schema: SupabaseSyncSchema): RemoteSyncProvider;
@@ -73,7 +76,7 @@ function load(): Promise<Loaded> {
   const p = (async () => {
     const m: VendorModuleLike = injected ?? (await import('../vendor/auth.ts') as unknown as VendorModuleLike);
     const c = configGetter();
-    const auth = m.createPasskeyAuth();
+    const auth = m.createPasskeyAuth(await authOptions());
     const db = m.createPasskeySupabaseClient(auth, c.supabaseUrl, c.supabaseKey);
     const api = m.createAccountApi(db as never);
     auth.onChange(onSession);

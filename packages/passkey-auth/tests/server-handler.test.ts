@@ -395,3 +395,44 @@ test('Access-Token läuft ab -> 401', async () => {
   const r = await s.h(post('/passkeys/options', {}, { authorization: `Bearer ${reg.json['accessToken']}` }));
   assert.equal(r.status, 401);
 });
+
+const APP = 'capacitor://localhost';
+
+test('App-Origin: nur mit appOrigins erlaubt', async () => {
+  assert.equal((await setup().h(post('/login/options', {}, { origin: APP }))).status, 403);
+  assert.equal((await setup({}, { appOrigins: [APP] }).h(post('/login/options', {}, { origin: APP }))).status, 200);
+});
+
+test('App-Origin: Refresh-Token per Header statt Cookie, Rotation, Logout', async () => {
+  const s = setup({}, { appOrigins: [APP] });
+  const app = { origin: APP };
+  const o = (await (await s.h(post('/register/options', { username: 'Alice' }, app))).json()) as J;
+  const res = await s.h(post('/register/verify', { flowId: o['flowId'], response: regResponse }, app));
+  assert.equal(res.status, 200);
+  assert.equal(res.headers.get('set-cookie'), null);
+  const t1 = res.headers.get('x-refresh-token') ?? '';
+  assert.match(t1, /^[A-Za-z0-9_-]{43}$/);
+  // Von der App-Origin zählt nur der Header, kein Cookie
+  assert.equal((await s.h(post('/refresh', undefined, { ...app, cookie: `mm_rt=${t1}` }))).status, 401);
+  const r1 = await s.h(post('/refresh', undefined, { ...app, 'x-refresh-token': t1 }));
+  assert.equal(r1.status, 200);
+  const t2 = r1.headers.get('x-refresh-token') ?? '';
+  assert.ok(t2 && t2 !== t1);
+  // Von einer Browser-Origin zählt der Header nicht
+  assert.equal((await s.h(post('/refresh', undefined, { 'x-refresh-token': t2 }))).status, 401);
+  const out = await s.h(post('/logout', undefined, { ...app, 'x-refresh-token': t2 }));
+  assert.equal(out.status, 204);
+  assert.equal(out.headers.get('x-refresh-token'), '');
+  assert.equal(out.headers.get('set-cookie'), null);
+  assert.equal(s.store.snapshot().sessions, 0);
+});
+
+test('App-Origin: WebAuthn erwartet zusätzlich https://<rpId>', async () => {
+  const seen: unknown[] = [];
+  const s = setup({ verifyRegistration: (o) => { seen.push(o.expectedOrigin); return verifiedReg(o); } }, { appOrigins: [APP], rpId: 'id.app.example' });
+  for (const origin of [APP, ORIGIN]) {
+    const o = (await (await s.h(post('/register/options', { username: 'Alice' }, { origin }))).json()) as J;
+    await s.h(post('/register/verify', { flowId: o['flowId'], response: regResponse }, { origin }));
+  }
+  assert.deepEqual(seen, [[ORIGIN, 'https://id.app.example'], [ORIGIN]]);
+});

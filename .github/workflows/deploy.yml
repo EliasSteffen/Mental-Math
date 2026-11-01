@@ -45,6 +45,8 @@ jobs:
         env:
           PUBLIC_SUPABASE_URL: ${{ vars.PUBLIC_SUPABASE_URL }}
           PUBLIC_SUPABASE_ANON_KEY: ${{ vars.PUBLIC_SUPABASE_ANON_KEY }}
+          # Passkeys der iOS-App: erzeugt /.well-known/apple-app-site-association (README → iOS-App)
+          APPLE_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
       - uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}

@@ -1,5 +1,5 @@
 // Update-Ablauf des Service Workers ohne DOM und SW-Globals (testbar): wann der Hinweis „Neue Version verfügbar“
-// erscheint, wann die Seite neu lädt. features/pwa.ts verdrahtet ihn mit Registrierung, Toast und Router.
+// erscheint, wann die Seite neu lädt. platform/web.ts verdrahtet ihn mit Registrierung, Toast und Router.
 
 /** Routen einer laufenden Runde: kein Hinweis und kein Neuladen, erst nach dem Routenwechsel. */
 export const ROUND_ROUTES: readonly string[] = ['train', 'parallel', 'chain', 'custom'];

@@ -39,10 +39,11 @@ function main(): void {
     ...DIRS.flatMap((d) => walk(join(DIST, d))),
     ...FILES.map((f) => join(DIST, f)).filter((p) => existsSync(p)),
   ];
-  // Storage-Bundle wird beim Start offline gebraucht (vorladen); das Auth-Bundle braucht ohnehin Netz und bleibt draußen.
+  // Storage-Bundle wird beim Start offline gebraucht (vorladen); das Auth-Bundle braucht ohnehin Netz und bleibt draußen,
+  // das Native-Bundle (Capacitor) läuft nur in der iOS-App.
   const files: string[] = abs
     .map((p) => '/' + relative(DIST, p).split(sep).join('/'))
-    .filter((f) => f !== '/js/vendor/auth.js')
+    .filter((f) => f !== '/js/vendor/auth.js' && f !== '/js/vendor/native.js')
     .sort();
 
   const swPath: string = join(DIST, 'sw.js');

@@ -134,6 +134,11 @@ test('403 ohne/fremder Origin', async () => {
   }
 });
 
+test('iOS-App (capacitor://localhost) darf die KI aufrufen', async () => {
+  const res = await handleExplain(mkReq(goodTask(), { origin: 'capacitor://localhost' }), { GOOGLE_API_KEY: 'k' }, { fetchImpl: okFetch() });
+  assert.equal(res.status, 200);
+});
+
 test('400 bei kaputtem JSON und ungültiger Eingabe', async () => {
   let res = await handleExplain(mkReq('{nope'), { GOOGLE_API_KEY: 'k' }, { fetchImpl: okFetch() });
   assert.equal(res.status, 400);

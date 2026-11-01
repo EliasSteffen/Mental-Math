@@ -1,23 +1,19 @@
 // Rückmeldung (Ruhiger Fokus): kurze Haptik und ein leiser Zweiklang nur bei „richtig“.
 // Kein Fehlerton, kein Vibrationsmuster für Fehler – Feedback informiert statt zu urteilen.
 import { getSettings } from '../data/storage.ts';
+import { haptic as platformHaptic } from '../platform/index.ts';
+import type { HapticKind } from '../platform/index.ts';
 
-export type HapticKind = 'tap' | 'success' | 'soft';
-
-/** Vibrationsdauer in ms je Art (bewusst kurz, nie ein Muster). */
-const HAPTIC_MS: Record<HapticKind, number> = { tap: 8, success: 18, soft: 10 };
+export type { HapticKind } from '../platform/index.ts';
 
 type AudioCtor = typeof AudioContext;
 let ctx: AudioContext | null = null;
 
-/** Kurze Vibration, nur wenn Haptik eingeschaltet ist und das Gerät sie kann. Ohne vorherige Nutzergeste
- * (z. B. Parallel-Stream direkt nach dem Laden) blockiert der Browser vibrate() und meldet einen Fehler – dann still. */
+/** Kurze Haptik, nur wenn sie eingeschaltet ist (Browser: Vibration, iOS-App: Taptic Engine). */
 export function haptic(kind: HapticKind): void {
   try {
     if (!getSettings().haptics) return;
-    if (typeof navigator === 'undefined' || !('vibrate' in navigator)) return;
-    if (navigator.userActivation && !navigator.userActivation.hasBeenActive) return;
-    navigator.vibrate(HAPTIC_MS[kind]);
+    platformHaptic(kind);
   } catch { /* ignorieren */ }
 }
 

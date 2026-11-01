@@ -5,6 +5,7 @@ import { createClient } from '@supabase/supabase-js';
 import { createAuthHandler } from 'passkey-auth/server';
 import type { AuthHandler, AuthStore, ServerConfig } from 'passkey-auth/server';
 import { createSupabaseAuthStore } from 'passkey-auth/supabase';
+import { APP_ORIGIN } from './app-origin.ts';
 import { authChecks, durableLimiter, memoryLimiter } from './rate-limit.ts';
 import type { DoNamespace, RateLimiter } from './rate-limit.ts';
 
@@ -54,6 +55,8 @@ export function readAuthConfig(env: AuthEnv): ServerConfig | null {
     jwt: { key: clean(env.AUTH_JWT_KEY), issuer: `${first}/api/auth` },
     refresh: { secure: first.startsWith('https://') },
     basePath: BASE_PATH,
+    // iOS-App: Refresh-Token per Header, Passkeys mit Origin https://<AUTH_RP_ID>
+    appOrigins: [APP_ORIGIN],
   };
 }
 

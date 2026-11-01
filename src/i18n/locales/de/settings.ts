@@ -26,6 +26,7 @@ export const settings = {
   reminders: 'Erinnerungen',
   remindOn: 'Erinnerungen auf diesem Gerät',
   remindOnHelp: 'Push-Benachrichtigungen, auch wenn die App geschlossen ist.',
+  remindOnHelpApp: 'Mitteilungen zur gewählten Zeit, auch wenn die App geschlossen ist.',
   remindDaily: 'Täglich erinnern',
   remindTime: 'Uhrzeit',
   remindDays: 'Wochentage',
@@ -42,9 +43,11 @@ export const settings = {
   remindTestWait: 'Bitte einen Moment warten, bevor du erneut testest.',
   remindError: 'Das hat nicht geklappt. Bitte später noch einmal versuchen.',
   remindDenied: 'Benachrichtigungen sind blockiert. Erlaube sie in den Browser- bzw. Systemeinstellungen für diese Seite.',
+  remindDeniedApp: 'Benachrichtigungen sind blockiert. Erlaube sie in den iOS-Einstellungen unter „Mental Math“ → Mitteilungen.',
   remindUnsupported: 'Dieser Browser unterstützt keine Push-Benachrichtigungen.',
   remindIos: 'Auf iPhone und iPad: Teilen → „Zum Home-Bildschirm“ und die App von dort öffnen. Dann lassen sich Erinnerungen hier einschalten.',
   remindPrivacy: 'Für Erinnerungen speichert der Server dein Push-Abo, Uhrzeit, Zeitzone und einen knappen Lernstand (Serie, Tagesziel, fällige Wiederholungen, Schwächen). Ausschalten löscht das Abo.',
+  remindPrivacyApp: 'Die Erinnerungen plant dieses Gerät selbst; dafür werden keine Daten gesendet.',
   // Darstellung
   appearance: 'Darstellung',
   theme: 'Theme',
@@ -60,6 +63,7 @@ export const settings = {
   feedback: 'Rückmeldung',
   haptics: 'Haptik',
   hapticsHelp: 'Leichte Vibration auf Android. Farbe und Text zeigen das Ergebnis immer auch allein.',
+  hapticsHelpApp: 'Leichtes Tippen bei jeder Antwort. Farbe und Text zeigen das Ergebnis immer auch allein.',
   sound: 'Ton',
   soundHelp: 'Leiser Zweiklang nur bei richtigen Antworten.',
   // Daten

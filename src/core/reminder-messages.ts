@@ -1,10 +1,10 @@
-// Texte der Push-Erinnerungen (de/en) aus Art + gemeldetem Lernstand. DOM-frei; läuft in der Pages Function.
-import { SUBTYPES, CATEGORIES } from '../src/core/catalog.ts';
-import { getMethod } from '../src/core/methods.ts';
-import { getLang, setLang } from '../src/i18n/index.ts';
-import type { Lang } from '../src/i18n/index.ts';
-import { localDay, reviewsDueAt, streakAtRisk } from '../src/core/reminders.ts';
-import type { ReminderKind, ReminderState } from '../src/core/reminders.ts';
+// Texte der Erinnerungen (de/en) aus Art + Lernstand. DOM-frei: Server (Web Push) und iOS-App (lokale Benachrichtigungen).
+import { SUBTYPES, CATEGORIES } from './catalog.ts';
+import { getMethod } from './methods.ts';
+import { getLang, setLang } from '../i18n/index.ts';
+import type { Lang } from '../i18n/index.ts';
+import { localDay, reviewsDueAt, streakAtRisk } from './reminders.ts';
+import type { ReminderKind, ReminderState } from './reminders.ts';
 
 export interface PushMessage {
   title: string;

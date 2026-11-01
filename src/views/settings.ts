@@ -20,6 +20,7 @@ import type { PasskeyInfo, RecoveryStatus } from '../vendor/auth.ts';
 import * as acct from '../features/account.ts';
 import { getSyncStatus, logoutAndForgetDevice, onSyncStatus, syncNow, syncStatusEntries, wipeCloudData } from '../features/sync.ts';
 import { remindersGroup } from './settings-reminders.ts';
+import { isNative, saveFile } from '../platform/index.ts';
 
 const NAME_MIN = 2;
 const NAME_MAX = 32;
@@ -175,22 +176,12 @@ function appearanceGroup(s: Settings): HTMLElement {
 
 function feedbackGroup(s: Settings): HTMLElement {
   return profGroup(t('settings.feedback'), list([
-    switchRow({ label: t('settings.haptics'), help: t('settings.hapticsHelp'), checked: s.haptics, onChange: (v) => save({ haptics: v }) }).el,
+    switchRow({ label: t('settings.haptics'), help: t(isNative() ? 'settings.hapticsHelpApp' : 'settings.hapticsHelp'), checked: s.haptics, onChange: (v) => save({ haptics: v }) }).el,
     switchRow({ label: t('settings.sound'), help: t('settings.soundHelp'), checked: s.sound, onChange: (v) => save({ sound: v }) }).el,
   ]));
 }
 
 /* ---------- Daten ---------- */
-
-function download(): void {
-  const blob = new Blob([exportJSON()], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = h('a', { href: url, download: 'mental-math-export.json' });
-  document.body.append(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
-}
 
 /** `live`: unsichtbare Statusmeldung der Seite (Export ohne Toast, nur gezeichneter Haken). */
 function dataGroup(live: HTMLElement): HTMLElement {
@@ -198,15 +189,16 @@ function dataGroup(live: HTMLElement): HTMLElement {
   const exportRow = row({
     icon: 'download', label: t('settings.exportBtn'), trailing: done,
     onClick: () => {
-      try {
-        download();
-      } catch {
-        toast(t('settings.exportError'), { kind: 'error' });
-        return;
-      }
-      done.replaceChildren(h('span', { class: 'draw' }, icon('check', 20))); // neues Element → Haken zeichnet sich erneut
-      live.textContent = '';
-      requestAnimationFrame(() => { live.textContent = t('settings.exported'); });
+      const failed = (): void => { toast(t('settings.exportError'), { kind: 'error' }); };
+      let text: string;
+      try { text = exportJSON(); } catch { failed(); return; }
+      // Browser: Download; iOS-App: Teilen-Menü (abgebrochen → kein Haken)
+      void saveFile('mental-math-export.json', 'application/json', text).then((ok) => {
+        if (!ok) return;
+        done.replaceChildren(h('span', { class: 'draw' }, icon('check', 20))); // neues Element → Haken zeichnet sich erneut
+        live.textContent = '';
+        requestAnimationFrame(() => { live.textContent = t('settings.exported'); });
+      }, failed);
     },
   });
 

@@ -4,7 +4,7 @@ import { _resetPushState, allowedEndpoint, handlePush, parseSubscription } from 
 import type { PushDeps, PushEnv, PushRow, PushStore } from '../server/push.ts';
 import { b64uEncode, concat, validVapidKeys } from '../server/push-crypto.ts';
 import type { Bytes, FetchLike, VapidKeys } from '../server/push-crypto.ts';
-import { clip, composeMessage, pickTipSubtype } from '../server/push-messages.ts';
+import { clip, composeMessage, pickTipSubtype } from '../src/core/reminder-messages.ts';
 import { DEFAULT_REMINDER_PREFS } from '../src/core/reminders.ts';
 import type { ReminderState } from '../src/core/reminders.ts';
 

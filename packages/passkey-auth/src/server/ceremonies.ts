@@ -8,13 +8,14 @@ import { PasskeyAuthError } from '../shared/errors.ts';
 import { fromBase64Url, toBase64Url } from '../shared/base64url.ts';
 import { normalizeUsername } from '../shared/username.ts';
 import { generateRecoveryCode, normalizeRecoveryCode } from '../shared/recovery.ts';
+import { REFRESH_HEADER } from '../shared/refresh.ts';
 import { uuidToBytes } from './ids.ts';
 import { clearCookie, parseCookies, serializeCookie } from './cookies.ts';
 import { hashToken, newRefreshToken } from './tokens.ts';
 import type { TokenService } from './tokens.ts';
 import { isFlowId, parseAuthenticationResponse, parseRegistrationResponse } from './validate.ts';
 
-export interface Reply { status: number; body?: unknown; cookies?: string[] }
+export interface Reply { status: number; body?: unknown; cookies?: string[]; headers?: Record<string, string> }
 
 export interface Ctx {
   config: ServerConfig;
@@ -28,6 +29,8 @@ export interface Ctx {
   basePath: string;
   req: Request;
   body: Record<string, unknown>;
+  /** Anfrage einer nativen App-Hülle (Origin in config.appOrigins) */
+  app: boolean;
 }
 
 const TIMEOUT = 120000;
@@ -39,6 +42,23 @@ const cookieSecure = (c: Ctx): boolean => c.config.refresh?.secure ?? true;
 const refreshTtlSec = (c: Ctx): number => c.config.refresh?.ttlSec ?? 30 * 24 * 3600;
 const absoluteTtlSec = (c: Ctx): number => c.config.refresh?.absoluteTtlSec ?? 90 * 24 * 3600;
 const clear = (c: Ctx): string => clearCookie(cookieName(c), { path: cookiePath(c), secure: cookieSecure(c) });
+
+/** Refresh-Token an den Client: Browser per HttpOnly-Cookie, native App per Header (null = löschen). */
+function withRefresh(c: Ctx, r: Reply, token: string | null): Reply {
+  if (c.app) return { ...r, headers: { [REFRESH_HEADER]: token ?? '' } };
+  const cookie = token === null
+    ? clear(c)
+    : serializeCookie(cookieName(c), token, { path: cookiePath(c), maxAgeSec: Math.min(refreshTtlSec(c), absoluteTtlSec(c)), secure: cookieSecure(c) });
+  return { ...r, cookies: [cookie] };
+}
+
+/** Refresh-Token der Anfrage: native App per Header, Browser per Cookie. */
+const readRefresh = (c: Ctx): string | undefined =>
+  (c.app ? c.req.headers.get(REFRESH_HEADER) : parseCookies(c.req.headers.get('cookie'))[cookieName(c)]) || undefined;
+
+/** Erwartete WebAuthn-Origins: native iOS-Passkeys melden https://<rpId>. */
+const webauthnOrigins = (c: Ctx): string[] =>
+  c.app ? [...new Set([...c.config.origins, `https://${c.config.rpId}`])] : c.config.origins;
 
 async function newChallenge(
   c: Ctx, purpose: ChallengePurpose, userId: string | null, username: string | null,
@@ -77,10 +97,7 @@ async function issueSession(c: Ctx, user: AuthUser, rotatedFrom?: string): Promi
     await c.store.createSession(user.id, await hashToken(refresh), now + ttl * 1000, now + absoluteTtlSec(c) * 1000);
   }
   const body: SessionRes = { user, accessToken: token, expiresAt };
-  return {
-    status: 200, body,
-    cookies: [serializeCookie(cookieName(c), refresh, { path: cookiePath(c), maxAgeSec: ttl, secure: cookieSecure(c) })],
-  };
+  return withRefresh(c, { status: 200, body }, refresh);
 }
 
 /** Neuen Wiederherstellungscode erzeugen und als Hash speichern (ersetzt einen vorhandenen). */
@@ -124,7 +141,7 @@ async function verifyNewPasskey(
   let v: Awaited<ReturnType<typeof verifyRegistrationResponse>>;
   try {
     v = await c.verifyRegistration({
-      response, expectedChallenge, expectedOrigin: c.config.origins,
+      response, expectedChallenge, expectedOrigin: webauthnOrigins(c),
       expectedRPID: c.config.rpId, requireUserVerification: true,
     });
   } catch (e) {
@@ -190,7 +207,7 @@ export async function loginVerify(c: Ctx): Promise<Reply> {
   let v: Awaited<ReturnType<typeof verifyAuthenticationResponse>>;
   try {
     v = await c.verifyAuthentication({
-      response, expectedChallenge: ch.challenge, expectedOrigin: c.config.origins,
+      response, expectedChallenge: ch.challenge, expectedOrigin: webauthnOrigins(c),
       expectedRPID: c.config.rpId, requireUserVerification: true,
       credential: { id: pk.credentialId, publicKey: fromBase64Url(pk.publicKey), counter: pk.counter, transports: pk.transports },
     });
@@ -207,7 +224,7 @@ export async function loginVerify(c: Ctx): Promise<Reply> {
 }
 
 export async function refresh(c: Ctx): Promise<Reply> {
-  const old = parseCookies(c.req.headers.get('cookie'))[cookieName(c)];
+  const old = readRefresh(c);
   // Kein Clear-Cookie bei 401: Ein anderer Tab kann gerade rotiert haben; dessen neues Cookie darf nicht überschrieben werden
   const denied: Reply = { status: 401, body: { error: { code: 'unauthorized' } } };
   if (!old) return denied;
@@ -219,16 +236,13 @@ export async function refresh(c: Ctx): Promise<Reply> {
   if (!user) return denied;
   const { token, expiresAt } = await c.tokens.sign(user);
   const body: SessionRes = { user, accessToken: token, expiresAt };
-  return {
-    status: 200, body,
-    cookies: [serializeCookie(cookieName(c), next, { path: cookiePath(c), maxAgeSec: ttl, secure: cookieSecure(c) })],
-  };
+  return withRefresh(c, { status: 200, body }, next);
 }
 
 export async function logout(c: Ctx): Promise<Reply> {
-  const old = parseCookies(c.req.headers.get('cookie'))[cookieName(c)];
+  const old = readRefresh(c);
   if (old) await c.store.deleteSession(await hashToken(old));
-  return { status: 204, cookies: [clear(c)] };
+  return withRefresh(c, { status: 204 }, null);
 }
 
 export async function passkeysOptions(c: Ctx): Promise<Reply> {

@@ -10,3 +10,6 @@
 
 /manifest.webmanifest
   Content-Type: application/manifest+json
+
+/.well-known/apple-app-site-association
+  Content-Type: application/json

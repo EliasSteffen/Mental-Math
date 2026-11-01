@@ -1,7 +1,7 @@
 /// <reference lib="webworker" />
 // Service Worker. Precache-Liste kommt aus /precache.json ({ version, files }), das scripts/precache.ts beim Build erzeugt.
 // Dasselbe Skript setzt die Version auch hier ein: so ändert sich sw.js mit jedem Deploy, der Browser installiert die neue
-// Version im Hintergrund, und sie wartet, bis die Seite sie anfordert (Hinweis „Neu laden“, features/pwa.ts).
+// Version im Hintergrund, und sie wartet, bis die Seite sie anfordert (Hinweis „Neu laden“, platform/web.ts).
 const sw = self as unknown as ServiceWorkerGlobalScope;
 
 interface PrecacheManifest { version: string; files: string[] }
@@ -108,7 +108,7 @@ sw.addEventListener('message', (event) => {
   }
 });
 
-/* ---------- Push-Erinnerungen (Texte kommen fertig vom Server, siehe server/push-messages.ts) ---------- */
+/* ---------- Push-Erinnerungen (Texte kommen fertig vom Server, siehe src/core/reminder-messages.ts) ---------- */
 
 interface PushPayload { title: string; body: string; url: string; tag: string }
 

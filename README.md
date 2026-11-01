@@ -21,6 +21,7 @@ Details: [docs/SPEC.md](docs/SPEC.md)
 - **Verlauf pro Kategorie** (14 Tage) auf der Analyse-Seite
 - **Themes** (Neon, OLED, Pastel, System), Einstellungen, Haptik/Sound, ±-Taste für Minus auf iOS
 - **PWA**: auf dem Handy installierbar, funktioniert offline (außer KI)
+- **iOS-App** aus demselben Code (Capacitor), gebaut und zu App Store Connect hochgeladen von GitHub Actions – siehe [iOS-App](#ios-app-app-store)
 
 ## Lokal starten
 
@@ -157,9 +158,72 @@ Mehr ist nicht nötig: Die VAPID-Schlüssel erzeugt der Server beim ersten Aufru
 
 - **Adresse des Takts:** Standard ist `https://mental-math.pages.dev/api/push/tick` (gleiche Production-Deployment wie die eigene Domain, aber ohne deren Bot-Schutz, der Aufrufe von Supabase sonst blockieren könnte). Anderes Pages-Projekt: `update public.push_config set tick_url = 'https://<projekt>.pages.dev/api/push/tick' where id = 1;`
 - **iPhone/iPad** (ab iOS 16.4): Web Push gibt es nur in der installierten App – erst *Teilen → Zum Home-Bildschirm*, dann in der App einschalten.
+- **iOS-App:** braucht nichts davon. Dort plant das Gerät die Erinnerungen selbst als lokale Benachrichtigungen (`src/core/reminder-plan.ts` spielt dieselben Regeln aus `src/core/reminders.ts` durch, zwei Wochen im Voraus).
 - **Optional:** Pages-Variable `PUSH_SUBJECT` (`mailto:…` oder `https://…`) als Kontakt für die Push-Dienste; Standard ist die eigene Origin.
 - **Takt prüfen:** `select status, return_message, start_time from cron.job_run_details order by start_time desc limit 5;` und `select status_code, content::text from net._http_response order by created desc limit 5;` – erwartet ist `200` mit `{"claimed":…,"sent":…}`.
 - **Takt stoppen:** `select cron.unschedule('mental-math-push');`
+
+## iOS-App (App Store)
+
+Dieselbe Web-App läuft als native iOS-App ([Capacitor](https://capacitorjs.com)). `ios/` enthält das Xcode-Projekt; die Web-Dateien aus `dist/` kopiert `npx cap sync ios` bei jedem Build hinein. **Bei Änderungen an der App ist an der iOS-Seite nichts anzupassen** – die Pipeline baut sie mit.
+
+**Was in der App anders ist** – alles in `src/platform/` (Feature-Code ruft nur `src/platform/index.ts` auf):
+
+| | Website | iOS-App |
+|---|---|---|
+| Erinnerungen | Web Push, der Server plant | lokale Benachrichtigungen, das Gerät plant (gleiche Regeln) |
+| Haptik | `navigator.vibrate` (nur Android) | Taptic Engine |
+| Export | Download | Teilen-Menü („In Dateien sichern“) |
+| Externe Links | neuer Tab | In-App-Browser |
+| API | relative Pfade | `PUBLIC_API_ORIGIN` (Standard `https://mental-math.elias-steffen.de`); CORS nur für `capacitor://localhost` (`functions/api/_middleware.ts`) |
+| Konto | Passkey im Browser, Refresh-Token als HttpOnly-Cookie | Passkey über AuthenticationServices (`ios/App/App/NativeAuthPlugin.swift`), Refresh-Token im Keychain (Header statt Cookie) |
+
+`tests/platform-guard.test.ts` schlägt fehl, sobald außerhalb von `src/platform/` eine Browser-API benutzt wird, die in der App nicht funktioniert (z. B. `navigator.vibrate`, `fetch('/api/…')`, Web Push). Dann die Funktion in `src/platform/index.ts` ergänzen (Web- und App-Variante) und von dort aufrufen.
+
+**Lokal** (Xcode nötig):
+
+```bash
+npm run ios:sync
+```
+
+```bash
+npm run ios:open
+```
+
+**Pipeline** (`.github/workflows/ios.yml`, macOS-Runner – für öffentliche Repos kostenlos): Bei jedem Push und Pull Request laufen Typprüfung, Tests und ein Simulator-Build. Steigt auf `main` die Version in `package.json`, wird die App signiert, archiviert und zu App Store Connect hochgeladen (Version = `package.json`, Build-Nummer = Lauf-Nummer). Per Hand: *Actions → iOS → Run workflow*. Danach in App Store Connect den Build der Version zuordnen und zur Prüfung einreichen.
+
+### Einmalige Einrichtung
+
+1. **Apple Developer Program** (99 €/Jahr). Team-ID notieren: developer.apple.com → *Membership details*.
+2. **App anlegen:** App Store Connect → *Apps → +* → iOS, Name, Primärsprache Deutsch, Bundle-ID `de.eliassteffen.mentalmath` (fehlt sie in der Liste: developer.apple.com → *Identifiers → +*, Capability **Associated Domains** an).
+3. **API-Schlüssel:** App Store Connect → *Benutzer und Zugriff → Integrationen → App Store Connect API → Team-Schlüssel*, Rolle **Admin** (damit Xcode Zertifikate und Profile selbst verwalten darf). Die `.p8`-Datei lässt sich nur einmal laden.
+4. **GitHub** (*Settings → Secrets and variables → Actions*):
+   - Secrets `ASC_KEY_ID`, `ASC_ISSUER_ID` und `ASC_KEY_P8` (Inhalt der `.p8`-Datei)
+   - Variable `APPLE_TEAM_ID` – damit erzeugt auch die Website-Pipeline `/.well-known/apple-app-site-association`, die die Passkeys der App mit der Domain verknüpft
+   - optional Secrets `IOS_CERT_P12_BASE64` und `IOS_CERT_PASSWORD`: das „Apple Development“-Zertifikat aus der Schlüsselbundverwaltung als `.p12` (`base64 -i zertifikat.p12 | pbcopy`). Ohne legt Xcode bei jedem Upload ein neues Entwicklungszertifikat an.
+
+   ```bash
+   gh variable set APPLE_TEAM_ID
+   ```
+
+   ```bash
+   gh secret set ASC_KEY_P8 < AuthKey_XXXXXXXXXX.p8
+   ```
+
+5. **Passkeys:** `AUTH_RP_ID` muss `mental-math.elias-steffen.de` sein, die Domain aus `ios/App/App/App.entitlements`. Nach dem nächsten Website-Deploy prüfen:
+
+   ```bash
+   curl -i https://mental-math.elias-steffen.de/.well-known/apple-app-site-association
+   ```
+
+### Vor der ersten Einreichung (App Store Connect)
+
+- **URLs:** Datenschutzerklärung und Support
+- **App-Datenschutz:** ohne Konto keine Daten; mit Konto Nutzer-ID und Trainingsdaten (mit der Identität verknüpft, App-Funktionalität), kein Tracking. KI-Erklärungen schicken nur Aufgabendaten an Google Gemini. `ios/App/App/PrivacyInfo.xcprivacy` entsprechend prüfen.
+- **Screenshots** 6,9″ (z. B. iPhone 17 Pro Max im Simulator), Kategorie *Bildung*, Altersfreigabe
+- **Hinweise für die Prüfung:** Die App funktioniert ohne Konto; Konto (Passkey) und KI-Erklärungen sind optional; Erinnerungen unter *Profil → Erinnerungen*
+- **EU:** Händlerstatus nach dem Digital Services Act angeben
+- Exportkonformität ist im `Info.plist` erledigt (`ITSAppUsesNonExemptEncryption = NO`)
 
 ## Daten
 
@@ -180,7 +244,10 @@ src/
                     methods, scoring, review, progress, modes, daily, chain
   data/storage.ts   localStorage (Schema + Migration)
   ui/               dom, charts, icons, keypad, fx, theme, toast
-  features/         ai-client, activity, pwa, push (Erinnerungen)
+  features/         ai-client, activity, account, sync, reminder-input
+  platform/         Website vs. iOS-App: index (einzige Schnittstelle), web, native (Capacitor),
+                    reminders (web-push | native-reminders), native-auth
+  vendor/           esbuild-Einstiege: auth, storage, native (Capacitor-Plugins, nur in der App)
   views/            home, lernen, analyse, settings, daily, chain, train/
   router.ts  app.ts
   sw.ts             Service Worker (→ dist/sw.js)
@@ -192,10 +259,14 @@ functions/api/explain.ts    ← Cloudflare Pages Function (KI-Endpoint, bleibt i
 server/explain.ts           ← Validierung, Prompt (de/en), Gemini-Aufruf
 server/rate-limit.ts        ← Rate-Limit-Logik (In-Memory-Fallback + Durable-Object-Client)
 functions/api/push/[[path]].ts ← Push-Erinnerungen (Abo, Einstellungen, Test, Cron-Takt)
-server/push*.ts             ← Push-Handler, Web-Push-Verschlüsselung + VAPID, Texte, Supabase-Speicher
+server/push*.ts             ← Push-Handler, Web-Push-Verschlüsselung + VAPID, Supabase-Speicher (Texte: src/core/reminder-messages.ts)
+server/app-origin.ts        ← CORS für die iOS-App (capacitor://localhost), functions/api/_middleware.ts
+ios/                        ← Xcode-Projekt der iOS-App (Capacitor), eigenes Plugin NativeAuthPlugin.swift
+capacitor.config.json       ← App-ID, Name, WebView-Optionen
 sql/                        ← Supabase-SQL der App (Trainingsdaten, Push + Cron)
 workers/rate-limiter/       ← Worker mit dem Durable Object RateLimiter (eigener Deploy-Workflow)
 tests/                      ← node --test (*.test.ts)
 docs/                       ← SPEC, ARCHITECTURE, PLAN-v5
 .github/workflows/deploy.yml  ← CI/CD: Tests + Build + Deploy auf Cloudflare Pages
+.github/workflows/ios.yml     ← iOS: Simulator-Build bei jedem Push, Upload zu App Store Connect bei neuer Version
 ```

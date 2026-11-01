@@ -50,7 +50,7 @@ export const common = {
   streakOne: '{n} Tag Serie',
   streakMany: '{n} Tage Serie',
   xpGain: '{n} XP',
-  // App-Update (features/pwa.ts)
+  // App-Update (platform/web.ts)
   updateReady: 'Neue Version verfügbar',
   updateReload: 'Neu laden',
 } as const;

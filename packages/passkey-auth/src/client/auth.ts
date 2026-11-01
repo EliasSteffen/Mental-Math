@@ -12,7 +12,7 @@ const REFRESH_MARGIN_MS = 60_000;
 
 export function createAuthCore(o: PasskeyAuthOptions & { webauthn: WebAuthnApi }): PasskeyAuthClient {
   const fetchImpl = o.fetch ?? globalThis.fetch.bind(globalThis);
-  const api = createApi(o.baseUrl ?? '/api/auth', fetchImpl);
+  const api = createApi(o.baseUrl ?? '/api/auth', fetchImpl, o.refreshStore);
   const now = o.now ?? Date.now;
   const webauthn = o.webauthn;
 
@@ -59,7 +59,12 @@ export function createAuthCore(o: PasskeyAuthOptions & { webauthn: WebAuthnApi }
         return setSession(await postRefresh());
       } catch (e) {
         if (!is401(e)) throw e;
-        if (attempt >= 1) { clear(); return null; }
+        if (attempt >= 1) {
+          // Token ungültig: auch aus der nativen Ablage entfernen
+          await o.refreshStore?.set(null).catch(() => undefined);
+          clear();
+          return null;
+        }
         await new Promise<void>((r) => setTimeout(r, retryDelay));
       }
     }
@@ -134,6 +139,8 @@ export function createAuthCore(o: PasskeyAuthOptions & { webauthn: WebAuthnApi }
 
     async logout() {
       try { await api.post<void>('/logout'); } catch { /* Fehler ignorieren */ }
+      // Offline-Abmeldung: Token lokal trotzdem verwerfen
+      await o.refreshStore?.set(null).catch(() => undefined);
       clear();
     },
 
