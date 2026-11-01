@@ -18,6 +18,25 @@ export const DEFAULT_PARALLEL_STATS: ParallelStats = { nextStart: 2, bestChains:
 
 export const isObj = (x: unknown): x is Record<string, unknown> => x !== null && typeof x === 'object' && !Array.isArray(x);
 
+const isStr = (v: unknown): v is string => typeof v === 'string';
+const isNum = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
+
+/**
+ * Pflichtfelder eines Versuchs – eine Quelle der Wahrheit für Import, Migration und Sync-Push (asResult).
+ * Alle App-Versionen seit v1 schreiben diese Felder vollständig (`unit` ggf. ''), daher keine Reparatur.
+ */
+export function isValidAttempt(x: unknown): x is Attempt {
+  return isObj(x)
+    && [x.sessionId, x.mode, x.category, x.subtype, x.prompt, x.unit].every(isStr)
+    && [x.ts, x.timeMs, x.targetMs, x.points, x.expected, x.weight].every(isNum)
+    && typeof x.correct === 'boolean';
+}
+
+/** Pflichtfelder einer Runde (`id` fehlt bei Bedarf → wird neu vergeben). */
+export function isValidSession(x: unknown): x is Session {
+  return isObj(x) && isStr(x.mode) && [x.ts, x.n, x.correct, x.points, x.avgTimeMs].every(isNum);
+}
+
 /** Gültige Theme-Einstellungen (Reihenfolge wie im Profil). */
 export const THEME_SETTINGS: readonly ThemeSetting[] = ['system', 'paper', 'night', 'oled', 'aurora', 'neon'];
 const TIMER_DISPLAYS: readonly TimerDisplay[] = ['calm', 'precise', 'off'];
@@ -60,14 +79,17 @@ export function normalizeParallel(p: unknown): ParallelStats {
   return { nextStart: ns, bestChains: num(p.bestChains, 0), bestCorrectStreak: num(p.bestCorrectStreak, 0), rounds: num(p.rounds, 0) };
 }
 
-/** Beliebige (auch alte v1-)Daten → gültiger State v2. Fehlende Felder werden mit Defaults ergänzt. */
+/**
+ * Beliebige (auch alte v1-)Daten → gültiger State v2. Fehlende Felder werden mit Defaults ergänzt;
+ * unvollständige Versuche/Runden fallen weg (sonst scheitert später der Sync-Push).
+ */
 export function normalize(s: unknown): State {
   const d = defaults();
   if (!isObj(s)) return d;
   return {
     version: 2,
-    attempts: Array.isArray(s.attempts) ? (s.attempts as Attempt[]) : d.attempts,
-    sessions: Array.isArray(s.sessions) ? (s.sessions as Session[]) : d.sessions,
+    attempts: Array.isArray(s.attempts) ? s.attempts.filter(isValidAttempt) : d.attempts,
+    sessions: Array.isArray(s.sessions) ? s.sessions.filter(isValidSession) : d.sessions,
     settings: normalizeSettings(s.settings),
     reviews: isObj(s.reviews) ? (s.reviews as Reviews) : d.reviews,
     activity: isObj(s.activity) ? (s.activity as Activity) : d.activity,

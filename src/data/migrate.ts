@@ -25,6 +25,7 @@ export function migrateV1(repo: Repository, legacy: LegacyStore, now: number = D
     legacy.remove(LEGACY_KEY);
     return 'invalid';
   }
+  // normalize verwirft unvollständige Versuche/Runden (isValidAttempt/isValidSession) – sie kämen sonst in die Outbox
   const s = normalize(parsed);
   const dev = repo.deviceId;
 
@@ -32,11 +33,8 @@ export function migrateV1(repo: Repository, legacy: LegacyStore, now: number = D
     ...createMeta(now, dev), displayName: null, cloudUserId: null, schemaVersion: 3,
   };
   const settings: AppSettings = { ...s.settings, updatedAt: now };
-  const results: GameResult[] = s.attempts
-    .filter((a) => a !== null && typeof a === 'object')
-    .map((a) => ({ ...a, ...createMeta(a.ts, dev, newId()) }));
+  const results: GameResult[] = s.attempts.map((a) => ({ ...a, ...createMeta(a.ts, dev, newId()) }));
   const sessions: SessionStats[] = s.sessions
-    .filter((x) => x !== null && typeof x === 'object')
     .map((x) => ({ ...x, ...createMeta(x.ts, dev, typeof x.id === 'string' && x.id ? x.id : newId()) }));
 
   // Schreiben ersetzt (kein Anhängen) → ein abgebrochener Lauf lässt sich gefahrlos wiederholen.

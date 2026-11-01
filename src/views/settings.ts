@@ -14,11 +14,11 @@ import { CATEGORIES } from '../core/catalog.ts';
 import { fmt } from '../core/numbers.ts';
 import { app, h, appendChildren, type Child } from '../ui/dom.ts';
 import { rerender, addCleanup } from '../router.ts';
-import { button, group, icon, largeTitle, list, row, segmented, stepper, switchRow, type SwitchControl } from '../ui/kit.ts';
+import { button, group, icon, largeTitle, list, row, segmented, setButtonLabel, stepper, switchRow, type SwitchControl } from '../ui/kit.ts';
 import { openSheet, type SheetHandle } from '../ui/sheet.ts';
 import type { PasskeyInfo, RecoveryStatus } from '../vendor/auth.ts';
 import * as acct from '../features/account.ts';
-import { getSyncStatus, onSyncStatus, syncNow, syncStatusEntries, wipeCloudData } from '../features/sync.ts';
+import { getSyncStatus, logoutAndForgetDevice, onSyncStatus, syncNow, syncStatusEntries, wipeCloudData } from '../features/sync.ts';
 import { remindersGroup } from './settings-reminders.ts';
 
 const NAME_MIN = 2;
@@ -232,12 +232,16 @@ function dataGroup(live: HTMLElement): HTMLElement {
     if (!res.ok) { toast(res.error, { kind: 'error' }); return; }
     applyTheme(getSettings().theme);
     setLang(detectLang(getSettings().lang));
-    toast(t('settings.importDone', { attempts: res.attempts, sessions: res.sessions }), { kind: 'success' });
+    const counts = { attempts: res.attempts, sessions: res.sessions, skipped: res.skipped };
+    if (res.skipped > 0) toast(t('settings.importDoneSkipped', counts), { kind: 'info', durationMs: 6000 });
+    else toast(t('settings.importDone', counts), { kind: 'success' });
     rerender({ keepScroll: true }); // alle Einstellungen können sich geändert haben
   }
 
   const onReset = (): void => {
-    const cloud = acct.getAccountState().status === 'signed-in';
+    // Auch 'offline' (A1) ist ein verknüpftes Konto: ohne Cloud-Löschung kämen die Daten beim nächsten Sync zurück
+    const status = acct.getAccountState().status;
+    const cloud = status === 'signed-in' || status === 'offline';
     void confirmDialog(t(cloud ? 'settings.resetConfirmCloud' : 'settings.resetConfirm'),
       { title: t('settings.resetTitle'), confirmLabel: t('settings.deleteLabel'), danger: true }).then(async (yes) => {
       if (!yes) return;
@@ -445,6 +449,27 @@ function confirmStrip(text: string, confirmLabel: string, onConfirm: (btn: HTMLB
   setTimeout(() => cancel.focus(), 0);
   return h('div', { class: 'prof-confirm', role: 'group', 'aria-labelledby': textId },
     h('p', { class: 'prof-confirm-text', id: textId }, text),
+    h('div', { class: 'prof-confirm-actions' }, cancel, ok));
+}
+
+/** Abmelden an Ort und Stelle: Schalter „Daten von diesem Gerät entfernen“ (A5); aus = Verhalten wie bisher. */
+function logoutStrip(onConfirm: (forget: boolean, btn: HTMLButtonElement) => void, onCancel: () => void): HTMLElement {
+  let forget = false;
+  const cancel = button({ label: t('account.cancel'), kind: 'quiet', onClick: onCancel });
+  const ok = button({ label: t('account.logout'), onClick: () => onConfirm(forget, ok) });
+  const sw = switchRow({
+    label: t('account.forgetDevice'), help: t('account.forgetDeviceHelp'), checked: false,
+    onChange: (v) => {
+      forget = v;
+      ok.classList.toggle('danger', v);
+      setButtonLabel(ok, t(v ? 'account.logoutForget' : 'account.logout'));
+    },
+  });
+  const textId = nextId('confirm');
+  setTimeout(() => cancel.focus(), 0);
+  return h('div', { class: 'prof-confirm', role: 'group', 'aria-labelledby': textId },
+    h('p', { class: 'prof-confirm-text', id: textId }, t('account.logoutConfirm')),
+    sw.el,
     h('div', { class: 'prof-confirm-actions' }, cancel, ok));
 }
 
@@ -695,20 +720,34 @@ function signedInContent(ctx: SheetCtx, username: string): { nodes: Child[]; onU
       action);
   }
 
-  // Abmelden / Konto löschen (Erfolg → Kontozustand wechselt, das Sheet schließt sich)
+  // Abmelden (optional mit Entfernen der lokalen Daten, A5) / Konto löschen
+  // (Erfolg → Kontozustand wechselt, das Sheet schließt sich)
   const footer = h('div', { class: 'prof-sheet-actions' });
-  function drawFooter(confirming: boolean): void {
-    if (confirming) {
+  const signOut = async (forget: boolean): Promise<void> => {
+    if (!forget) { await acct.logout(); toast(t('account.loggedOut'), { kind: 'info' }); return; }
+    // Bleibt nach dem Sync etwas offen: zweite, deutliche Nachfrage (Dialog liegt im Top-Layer über dem Sheet)
+    const done = await logoutAndForgetDevice({
+      confirmLoss: (n) => confirmDialog(t('account.forgetLossText', { n }), {
+        title: t('account.forgetLossTitle'), confirmLabel: t('account.forgetLossConfirm'), danger: true,
+      }),
+    });
+    if (done) toast(t('account.loggedOutForgot'), { kind: 'info' });
+  };
+  function drawFooter(mode: 'idle' | 'logout' | 'delete'): void {
+    if (mode === 'delete') {
       footer.replaceChildren(confirmStrip(t('account.deleteAccountConfirm'), t('account.deleteAccount'),
         (btn) => { void runBusy(btn, async () => { await acct.deleteAccount(); toast(t('account.accountDeleted'), { kind: 'info' }); }, onError); },
-        () => { drawFooter(false); footer.querySelector<HTMLElement>('.danger')?.focus(); }));
+        () => { drawFooter('idle'); footer.querySelector<HTMLElement>('.danger')?.focus(); }));
       return;
     }
-    const out = button({ label: t('account.logout'), full: true });
-    out.addEventListener('click', () => {
-      void runBusy(out, async () => { await acct.logout(); toast(t('account.loggedOut'), { kind: 'info' }); }, onError);
-    });
-    const del = button({ label: t('account.deleteAccount'), kind: 'quiet', icon: 'trash', full: true, tone: 'danger', onClick: () => drawFooter(true) });
+    if (mode === 'logout') {
+      footer.replaceChildren(logoutStrip(
+        (forget, btn) => { void runBusy(btn, () => signOut(forget), onError); },
+        () => { drawFooter('idle'); footer.querySelector<HTMLElement>('button')?.focus(); }));
+      return;
+    }
+    const out = button({ label: t('account.logout'), full: true, onClick: () => drawFooter('logout') });
+    const del = button({ label: t('account.deleteAccount'), kind: 'quiet', icon: 'trash', full: true, tone: 'danger', onClick: () => drawFooter('delete') });
     footer.replaceChildren(out, del);
   }
 
@@ -716,7 +755,7 @@ function signedInContent(ctx: SheetCtx, username: string): { nodes: Child[]; onU
   drawSync();
   drawPasskeys();
   drawRecovery(false);
-  drawFooter(false);
+  drawFooter('idle');
   void reload();
 
   return {
@@ -779,6 +818,7 @@ function syncRow(): HTMLElement {
   let el: HTMLElement;
   if (!acct.accountEnabled() || st.status === 'disabled') el = row({ icon: 'sync', label, value: t('account.syncSoon') });
   else if (st.status === 'loading') el = row({ icon: 'sync', label });
+  else if (st.status === 'offline') el = row({ icon: 'sync', label, sub: t('account.sync.offline') });
   else if (st.status === 'signed-out') el = row({ icon: 'sync', label, value: t('account.syncSignedOut') });
   else el = row({ icon: 'sync', label, sub: syncStatusEntries(getSyncStatus()).map((e) => t(e.key, e.params)).join(' · ') });
   el.classList.add('prof-sync');
@@ -792,6 +832,13 @@ function accountHead(st: acct.AccountState): HTMLElement | null {
   if (st.status === 'loading') {
     return h('div', { class: 'prof-acct' }, avatar(icon('person', 22)),
       h('span', { class: 'prof-acct-text' }, h('span', { class: 'prof-acct-sub' }, t('account.loading'))));
+  }
+  // Offline-Kaltstart (A1): Hinweis statt Anmelden – die Sitzung kommt automatisch zurück
+  if (st.status === 'offline') {
+    return h('div', { class: 'prof-acct', role: 'status' }, avatar(icon('person', 22)),
+      h('span', { class: 'prof-acct-text' },
+        h('span', { class: 'prof-acct-name' }, t('account.offlineTitle')),
+        h('span', { class: 'prof-acct-sub' }, t('account.offlineHint'))));
   }
   const text = st.status === 'signed-in'
     ? h('span', { class: 'prof-acct-text' }, h('span', { class: 'prof-acct-name' }, st.user.username), passkeySub())
