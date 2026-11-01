@@ -186,6 +186,8 @@ export interface Settings {
   /** App-Version und Zeitpunkt der letzten Bitte um eine Bewertung */
   reviewAskedVersion: string;
   reviewAskedAt: number;
+  /** Einführung gesehen (abgeschlossen oder übersprungen); geräte-lokal */
+  onboardingDone: boolean;
 }
 
 export interface ReviewItem { box: number; dueAt: number; lastTs: number }

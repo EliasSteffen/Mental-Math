@@ -19,6 +19,17 @@ let uid = 0;
 /** True, solange mindestens ein Dialog offen ist (für Shortcuts). */
 export function isModalOpen(): boolean { return openCount > 0; }
 
+/** Eigener Dialog (z. B. Einführung) zählt bei isModalOpen() mit; die Rückgabe gibt genau diese Zählung frei (idempotent). */
+export function trackModal(): () => void {
+  openCount += 1;
+  let released = false;
+  return () => {
+    if (released) return;
+    released = true;
+    openCount = Math.max(0, openCount - 1);
+  };
+}
+
 export function openModal(o: ModalOptions): { close(): void } {
   const id = `modal-${++uid}`;
   const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;

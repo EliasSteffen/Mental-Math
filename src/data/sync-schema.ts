@@ -7,6 +7,7 @@ import { keepKeys, lwwByKey, lwwDoc, maxByKey } from '../vendor/storage.ts';
 export const DEVICE_LOCAL_SETTINGS: readonly string[] = [
   'keypad', 'lastSeenVersion',
   'lastStoreCheck', 'updateNotifiedVersion', 'updateNotifiedAt', 'reviewAskedVersion', 'reviewAskedAt',
+  'onboardingDone',
 ];
 
 type Obj = Record<string, unknown>;

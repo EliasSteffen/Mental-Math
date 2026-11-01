@@ -61,6 +61,7 @@ test('Defaults, alte Daten werden ergänzt (In-Memory)', () => {
     autoSubmit: false, numpadLayout: 'calculator', estimateMode: false, ghost: true, autoFail: false,
     lang: 'auto', lastSeenVersion: '', timerDisplay: 'calm', breathe: false, confetti: false,
     lastStoreCheck: 0, updateNotifiedVersion: '', updateNotifiedAt: 0, reviewAskedVersion: '', reviewAskedAt: 0,
+    onboardingDone: false,
   });
   assert.deepEqual(getReviews(), {});
   assert.deepEqual(getActivity(), {});

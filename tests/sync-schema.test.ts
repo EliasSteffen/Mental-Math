@@ -38,6 +38,7 @@ test('settings: LWW, geräte-lokale Schlüssel bleiben, updatedAt des Gewinners'
   assert.deepEqual([...DEVICE_LOCAL_SETTINGS], [
     'keypad', 'lastSeenVersion',
     'lastStoreCheck', 'updateNotifiedVersion', 'updateNotifiedAt', 'reviewAskedVersion', 'reviewAskedAt',
+    'onboardingDone',
   ]);
 });
 
