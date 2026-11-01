@@ -4,7 +4,17 @@ import type {
 } from '../shared/types.ts';
 import { PasskeyAuthError } from '../shared/errors.ts';
 
-interface SessionRow { userId: string; expiresAt: number }
+/** Gnadenfrist für den Vorgänger-Hash nach einer Rotation; wie in pa_rotate_session (sql/001) */
+export const ROTATION_GRACE_MS = 60_000;
+
+// Wie public.auth_sessions; absoluteExpiresAt null = unbegrenzt (Altbestand)
+interface SessionRow {
+  userId: string;
+  expiresAt: number;
+  absoluteExpiresAt: number | null;
+  prevHash: string | null;
+  rotatedAt: number | null;
+}
 
 export class MemoryAuthStore implements AuthStore {
   private readonly now: () => number;
@@ -79,19 +89,43 @@ export class MemoryAuthStore implements AuthStore {
     return Promise.resolve();
   }
 
-  async createSession(userId: string, tokenHash: string, expiresAt: number): Promise<void> {
-    this.sessions.set(tokenHash, { userId, expiresAt });
+  async createSession(userId: string, tokenHash: string, expiresAt: number, absoluteExpiresAt?: number): Promise<void> {
+    this.sessions.set(tokenHash, {
+      userId, expiresAt, absoluteExpiresAt: absoluteExpiresAt ?? null, prevHash: null, rotatedAt: null,
+    });
     return Promise.resolve();
   }
 
   async rotateSession(oldHash: string, newHash: string, expiresAt: number): Promise<AuthUser | null> {
-    const s = this.sessions.get(oldHash);
-    this.sessions.delete(oldHash); // abgelaufen: trotzdem löschen
-    if (!s || s.expiresAt <= this.now()) return Promise.resolve(null);
-    const username = this.users.get(s.userId);
-    if (username === undefined) return Promise.resolve(null);
-    this.sessions.set(newHash, { userId: s.userId, expiresAt });
-    return Promise.resolve({ id: s.userId, username });
+    const now = this.now();
+    const expired = (s: SessionRow): boolean =>
+      s.expiresAt <= now || (s.absoluteExpiresAt !== null && s.absoluteExpiresAt <= now);
+    const capped = (s: SessionRow): number => Math.min(expiresAt, s.absoluteExpiresAt ?? expiresAt);
+    const userOf = (s: SessionRow): AuthUser | null => {
+      const username = this.users.get(s.userId);
+      return username === undefined ? null : { id: s.userId, username };
+    };
+
+    // 1. Aktueller Hash: rotieren, alter Hash wird Vorgänger
+    const cur = this.sessions.get(oldHash);
+    if (cur) {
+      this.sessions.delete(oldHash);
+      if (expired(cur)) return Promise.resolve(null); // abgelaufen: Zeile bleibt gelöscht
+      this.sessions.set(newHash, { ...cur, prevHash: oldHash, rotatedAt: now, expiresAt: capped(cur) });
+      return Promise.resolve(userOf(cur));
+    }
+
+    // 2. Vorgänger-Hash: Gnadenfrist ab der letzten echten Rotation, sonst Wiederverwendung
+    for (const [hash, s] of this.sessions) {
+      if (s.prevHash !== oldHash) continue;
+      this.sessions.delete(hash);
+      if (expired(s) || s.rotatedAt === null || now - s.rotatedAt >= ROTATION_GRACE_MS) {
+        return Promise.resolve(null); // Wiederverwendung (Diebstahlsignal) oder abgelaufen: Session gelöscht
+      }
+      this.sessions.set(newHash, { ...s, expiresAt: capped(s) }); // prevHash/rotatedAt unverändert: Frist gleitet nicht
+      return Promise.resolve(userOf(s));
+    }
+    return Promise.resolve(null);
   }
 
   async deleteSession(tokenHash: string): Promise<void> {

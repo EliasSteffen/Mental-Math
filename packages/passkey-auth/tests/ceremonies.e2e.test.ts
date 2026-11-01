@@ -133,7 +133,13 @@ test('2: register, logout, login ergibt dieselbe User-ID; Counter bleibt 0', asy
   assert.equal(pk?.counter, 0);
 });
 
-test('3: restore nach Reload nutzt /refresh; altes Cookie ist danach ungültig', async () => {
+// /refresh mit einem bestimmten Cookie am Cookie-Jar vorbei (Antwort erreicht den Client nicht)
+const refreshRaw = (s: Awaited<ReturnType<typeof setup>>, cookie: string): Promise<Response> =>
+  s.handler(new Request(`${BASE}/refresh`, {
+    method: 'POST', headers: { Origin: ORIGIN, Cookie: `${COOKIE}=${cookie}`, 'Content-Type': 'application/json' }, body: '{}',
+  }));
+
+test('3: restore nach Reload nutzt /refresh; altes Cookie ist nach der Gnadenfrist ungültig', async () => {
   const s = await setup();
   const reg = await s.auth.register('Anna');
   const oldCookie = s.jar.get(COOKIE)!;
@@ -142,10 +148,10 @@ test('3: restore nach Reload nutzt /refresh; altes Cookie ist danach ungültig',
   const restored = await reloaded.restore();
   assert.equal(restored?.user.id, reg.user.id);
   assert.notEqual(s.jar.get(COOKIE), oldCookie);
-  const replay = await s.handler(new Request(`${BASE}/refresh`, {
-    method: 'POST', headers: { Origin: ORIGIN, Cookie: `${COOKIE}=${oldCookie}`, 'Content-Type': 'application/json' }, body: '{}',
-  }));
+  s.clock.t += 61_000;
+  const replay = await refreshRaw(s, oldCookie);
   assert.equal(replay.status, 401);
+  assert.equal(s.store.snapshot().sessions, 0, 'Wiederverwendung löscht die Session');
 });
 
 test('4: zweiter Passkey per addPasskey; Login mit beiden; excludeCredentials greift', async () => {
@@ -298,4 +304,33 @@ test('14: recover mit ungültigem Code; Code neu erzeugen macht den alten ungül
   await rejectsWith(s.auth.recover(reg.recoveryCode ?? ''), 'invalid_recovery_code');
   s.ctl.soft = createSoftAuthenticator({ origin: ORIGIN });
   assert.equal((await s.auth.recover(fresh)).user.id, reg.user.id);
+});
+
+test('15: verlorene /refresh-Antwort: zweiter Refresh mit altem Cookie innerhalb von 60 s, danach Diebstahlsignal', async () => {
+  const s = await setup();
+  const reg = await s.auth.register('Anna');
+  const c1 = s.jar.get(COOKIE)!;
+  assert.equal((await refreshRaw(s, c1)).status, 200); // Server rotiert, der Jar behält c1
+  s.clock.t += 20_000;
+  const reloaded = s.newClient();
+  assert.equal((await reloaded.restore())?.user.id, reg.user.id, 'kein Zwangs-Logout');
+  assert.notEqual(s.jar.get(COOKIE), c1);
+  assert.equal(s.store.snapshot().sessions, 1);
+  // Das alte Cookie taucht nach der Frist erneut auf (z. B. gestohlen): Session weg, auch für den Client
+  s.clock.t += 60_000;
+  assert.equal((await refreshRaw(s, c1)).status, 401);
+  assert.equal(s.store.snapshot().sessions, 0);
+  assert.equal(await s.newClient().restore(), null);
+});
+
+test('16: absolute Sitzungsdauer (90 Tage) greift trotz regelmäßiger Rotation', async () => {
+  const s = await setup();
+  const reg = await s.auth.register('Anna');
+  for (let day = 20; day <= 80; day += 20) {
+    s.clock.t += 20 * DAY;
+    assert.equal((await s.newClient().restore())?.user.id, reg.user.id, `Tag ${day}`);
+  }
+  s.clock.t += 10 * DAY;
+  assert.equal(await s.newClient().restore(), null);
+  assert.equal(s.store.snapshot().sessions, 0);
 });

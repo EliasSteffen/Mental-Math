@@ -5,7 +5,7 @@ import { MemoryAuthStore } from 'passkey-auth/server';
 import { handleAuth, readAuthConfig } from '../server/auth.ts';
 import type { AuthEnv } from '../server/auth.ts';
 
-const VALID: Required<AuthEnv> = {
+const VALID: Required<Omit<AuthEnv, 'RATE_LIMITER'>> = {
   SUPABASE_URL: 'https://example.supabase.co',
   SUPABASE_SERVICE_ROLE_KEY: 'test-service-key',
   AUTH_JWT_KEY: '{"kty":"EC"}',
