@@ -13,7 +13,7 @@ Leitplanken aus [PLAN-v5.md](PLAN-v5.md) gelten weiter: strict TS, `.ts`-Imports
 | D1 | **Der Server prüft und speichert Passkeys, nie der Client.** Vorgabe Schritt 3 („Client speichert Credential ID in `passkeys`“) wird so umgesetzt: Der Client schickt die Attestation an den Server, der Server verifiziert und schreibt mit `service_role`. | Dürfte der Client selbst in `passkeys` schreiben, könnte jeder einen beliebigen Public Key an fremde Konten hängen. `authenticated`/`anon` haben **kein INSERT** auf `passkeys`. |
 | D2 | **Supabase Auth (`auth.users`) wird nicht genutzt.** Der Server stellt nach erfolgreicher Prüfung selbst ein Supabase-kompatibles Access-JWT aus (`sub = users.id`, `role = authenticated`, `aud = authenticated`, TTL 15 min). | Supabase Auth bietet keinen Login nur mit Benutzername und Passkey und kann für einen bestehenden User ohne E-Mail keine Session erzeugen. PostgREST/RLS braucht nur ein gültig signiertes JWT, denn `auth.uid()` liest den `sub`-Claim. |
 | D3 | **Signatur des JWT: ES256 mit eigenem, in Supabase importiertem Schlüssel** (`AUTH_JWT_KEY` = privater JWK mit `kid`). Der Server signiert mit `jose` und setzt `alg: 'ES256'` und `kid` im Header. Den HS256-Pfad (Secret-String) unterstützt der Code für andere Projekte weiterhin. | Das Projekt `anrfpvgcaplyjkmraald` nutzt asymmetrische Signing Keys (ES256), ein gemeinsames Secret gibt es also nicht. Laut Supabase-Doku akzeptiert die Data API einen importierten Key, sobald er rotiert und damit „current“ ist. Ein Standby-Key reicht nicht. |
-| D4 | **Eigener Refresh-Token** (zufällig, 32 Byte, in der DB nur als SHA-256) als **HttpOnly-Cookie** `mm_rt` (`Secure`, `SameSite=Strict`, `Path=/api/auth`), Rotation bei jeder Nutzung, 30 Tage gültig. Das Access-Token liegt nur im Speicher. | Ohne Supabase Auth gibt es auch keine Refresh-Tokens von Supabase. Das Cookie ist für JS unlesbar. Das funktioniert nur same-origin, siehe D5. |
+| D4 | **Eigener Refresh-Token** (zufällig, 32 Byte, in der DB nur als SHA-256) als **HttpOnly-Cookie** `mm_rt` (`Secure`, `SameSite=Strict`, `Path=/api/auth`), Rotation bei jeder Nutzung, 30 Tage gleitend, höchstens 90 Tage ab Anmeldung (absolute Dauer). Der alte Token gilt nach einer Rotation noch 60 s (Gnadenfrist); kommt er später, wird die Session gelöscht (Wiederverwendungserkennung). Das Access-Token liegt nur im Speicher. | Ohne Supabase Auth gibt es auch keine Refresh-Tokens von Supabase. Das Cookie ist für JS unlesbar. Das funktioniert nur same-origin, siehe D5. Die Gnadenfrist fängt verlorene `/refresh`-Antworten und parallele Tabs ab; ein später wieder auftauchender alter Token ist dagegen ein Diebstahlsignal. |
 | D5 | **Die Auth-Endpunkte laufen als Cloudflare Pages Function** (`/api/auth/*`) auf derselben Origin wie die App. Der Paket-Kern ist ein reiner Fetch-API-Handler `(Request) => Promise<Response>` und läuft unverändert auch in Supabase Edge Functions (Deno), Workers oder Node 20+. | Same-origin bedeutet: kein CORS, das Cookie funktioniert, die Pipeline und das Secret-Handling sind vorhanden (wie bei `/api/explain`). Andere Projekte können den Handler woanders mounten. |
 | D6 | **Login ohne Benutzername** (Discoverable Credential): `residentKey: 'required'`, `allowCredentials: []`, `userVerification: 'required'`. Der Benutzername ist nur Anzeigename und `user.name` im Passkey-Dialog. Als WebAuthn-`user.id` dient die User-UUID (16 Byte, keine personenbezogenen Daten). | Weil Namen doppelt vorkommen dürfen, kann der Name nicht zum Login dienen. Der Login identifiziert ausschließlich über `credential_id`, abgeglichen mit dem `userHandle`. |
 | D7 | **Der User wird erst nach erfolgreicher Prüfung angelegt.** `register/options` erzeugt die UUID und legt sie nur in der Challenge-Zeile ab. `register/verify` legt `users` und `passkeys` in **einer** SQL-Funktion (Transaktion) an. | Abgebrochene Registrierungen hinterlassen keine verwaisten User. supabase-js kennt keine Transaktionen, deshalb übernehmen RPC-Funktionen diese Schritte. |
@@ -46,7 +46,7 @@ Leitplanken aus [PLAN-v5.md](PLAN-v5.md) gelten weiter: strict TS, `.ts`-Imports
   - `AUTH_ORIGINS`
 
   Öffentlich und zur Build-Zeit über CI-Variablen: `PUBLIC_SUPABASE_URL` und `PUBLIC_SUPABASE_ANON_KEY` (oder `sb_publishable_…`).
-- **O4** (empfohlen) Cloudflare-Rate-Limit-Regel auf `POST /api/auth/*/options`, zum Beispiel 20 Anfragen pro Minute und IP. Ohne E-Mail und Captcha ist das der wichtigste Schutz gegen massenhaft angelegte Konten.
+- **O4** ✅ im Code umgesetzt: `server/auth.ts` begrenzt alle Routen unter `/api/auth/*` auf 30 Anfragen pro Minute und IP (darüber 429 `rate_limited`), global über das Durable Object aus `workers/rate-limiter` (eigene Instanz „auth“, teilt nichts mit `/api/explain`), ohne Binding pro Instanz. Ohne E-Mail und Captcha ist das der wichtigste Schutz gegen massenhaft angelegte Konten. Eine zusätzliche Cloudflare-WAF-Regel auf `POST /api/auth/*/options` bleibt optional.
 
 ---
 
@@ -89,11 +89,16 @@ create table public.auth_sessions (                   -- nur service_role
   id           uuid primary key default gen_random_uuid(),
   user_id      uuid not null references public.users(id) on delete cascade,
   token_hash   text not null unique,                  -- SHA-256(refresh token), base64url
-  expires_at   timestamptz not null,
+  expires_at   timestamptz not null,                  -- gleitend, je Rotation neu (höchstens absolute_expires_at)
   created_at   timestamptz not null default now(),
-  last_used_at timestamptz
+  last_used_at timestamptz,
+  prev_hash    text,                                  -- Hash vor der letzten Rotation (Gnadenfrist, Wiederverwendung)
+  rotated_at   timestamptz,                           -- Zeitpunkt der letzten Rotation über token_hash
+  absolute_expires_at timestamptz                     -- harte Grenze ab Login; null = unbegrenzt (Altbestand)
 );
 ```
+
+Die drei letzten Spalten (samt Index auf `prev_hash`) rüstet das Skript per `add column if not exists` nach; es ist idempotent und wird nach einem Update erneut ausgeführt.
 
 Warum `text` statt `bytea`: Die Vorgabe erlaubt beides. Über PostgREST/supabase-js kommt `bytea` als Hex-String `\x…` an. base64url-Text spart Konvertierungsfehler und ist direkt WebAuthn-JSON-kompatibel.
 
@@ -132,7 +137,7 @@ Alle Funktionen sind `security definer`, haben `set search_path = ''` und voll q
 |---|---|---|
 | `pa_consume_challenge(p_id uuid, p_purpose text)` → Zeile oder leer | service_role | `delete … where id = p_id and purpose = p_purpose returning *`. Liefert nur, wenn `expires_at > now()`. Räumt dabei abgelaufene Challenges ab (`delete where expires_at < now() - interval '1 hour'`). |
 | `pa_create_user_with_passkey(p_user_id, p_username, p_credential_id, p_public_key, p_counter, p_transports, p_device_type, p_backed_up, p_name)` | service_role | Legt beide Zeilen in **einer** Transaktion an (D7). |
-| `pa_rotate_session(p_old_hash text, p_new_hash text, p_expires_at timestamptz)` → `(user_id, username)` oder leer | service_role | Sperrt die alte Session (`for update`), prüft das Ablaufdatum, löscht sie und legt die neue an. Wird ein unbekannter oder schon rotierter Hash vorgelegt, gibt es ein leeres Ergebnis (der Server antwortet dann mit 401). |
+| `pa_rotate_session(p_old_hash text, p_new_hash text, p_expires_at timestamptz)` → `(user_id, username)` oder leer | service_role | Sperrt die Session (`for update`) und rotiert in derselben Zeile: neuer Hash in `token_hash`, der alte in `prev_hash`, `rotated_at = now()`, `expires_at` höchstens bis `absolute_expires_at`. Ein Treffer über `prev_hash` innerhalb von 60 s seit `rotated_at` rotiert erneut (Gnadenfrist, die Frist gleitet nicht); danach gilt er als Wiederverwendung und die Session wird gelöscht. Abgelaufen (gleitend oder absolut) → löschen. Unbekannter Hash, Ablauf oder Wiederverwendung ergeben ein leeres Ergebnis (der Server antwortet dann mit 401). |
 | `pa_delete_passkey(p_id uuid)` | authenticated | Sperrt alle Passkeys von `auth.uid()` (`for update`). Bei ≤ 1 bricht sie mit `raise exception 'last_passkey'` ab. Sonst löscht sie `where id = p_id and user_id = auth.uid()`. |
 | `pa_delete_account()` | authenticated | `delete from public.users where id = auth.uid()`. Passkeys und Sessions werden per Cascade mitgelöscht. |
 
@@ -146,7 +151,8 @@ pa_consume_challenge(p_id uuid, p_purpose text) returns setof public.auth_challe
 pa_create_user_with_passkey(p_user_id uuid, p_username text, p_credential_id text, p_public_key text,
   p_counter bigint, p_transports text, p_device_type text, p_backed_up boolean) returns void
 pa_rotate_session(p_old_hash text, p_new_hash text, p_expires_at timestamptz)
-  returns table (user_id uuid, username text)   -- leer, wenn alter Hash unbekannt oder abgelaufen (abgelaufen → trotzdem löschen)
+  returns table (user_id uuid, username text)   -- leer, wenn alter Hash unbekannt oder abgelaufen (abgelaufen → trotzdem löschen);
+  -- prev_hash-Treffer: ≤ 60 s nach rotated_at erneut rotieren, sonst Session löschen (Wiederverwendung)
 -- authenticated
 pa_delete_passkey(p_id uuid) returns void        -- raise exception 'last_passkey' using errcode = 'P0001'; fremde/unbekannte id → 'not_found' (P0002)
 pa_delete_account() returns void
@@ -158,7 +164,7 @@ Direkte Tabellenzugriffe von A6 mit service_role:
 - `select passkeys.*, users(username)` über `credential_id`
 - `select credential_id` über `user_id`
 - `update passkeys set counter, last_used_at = now()` über `id`
-- `insert auth_sessions(user_id, token_hash, expires_at)`
+- `insert auth_sessions(user_id, token_hash, expires_at, absolute_expires_at)` (ohne `absolute_expires_at`, solange die Spalte fehlt)
 - `delete auth_sessions` über `token_hash`
 
 `transports` wird als CSV gespeichert, `expires_at` ist `timestamptz` (ISO-String ↔ ms epoch im Adapter).
@@ -249,7 +255,7 @@ export interface AuthStore {
 export interface ServerConfig {
   rpId: string; rpName: string; origins: string[];
   jwt: { key: string /* HS256-Secret oder privater JWK als JSON */; issuer: string; ttlSec?: number /* 900 */ };
-  refresh?: { ttlSec?: number /* 30 d */; cookieName?: string /* mm_rt */; cookiePath?: string /* /api/auth */ };
+  refresh?: { ttlSec?: number /* 30 d */; absoluteTtlSec?: number /* 90 d */; cookieName?: string /* mm_rt */; cookiePath?: string /* /api/auth */ };
   challengeTtlSec?: number;  // 300
   basePath?: string;         // '/api/auth'
 }
@@ -264,7 +270,7 @@ export interface ServerConfig {
 | `POST /register/verify` | – | Verbraucht die Challenge (falls nicht vorhanden: `challenge_expired`). Dann `verifyRegistrationResponse` mit expectedChallenge, `expectedOrigin = origins`, `expectedRPID`, `requireUserVerification: true`. Anschließend `createUserWithPasskey` und Session ausstellen. |
 | `POST /login/options` | – | Challenge mit `login`, `allowCredentials: []`, `userVerification: 'required'`. |
 | `POST /login/verify` | – | Verbraucht die Challenge und sucht `findPasskey(response.id)` (fehlt er: `unknown_credential`). Wenn `userHandle` vorhanden ist, muss er zu `userId` passen, sonst `verification_failed`. Dann `verifyAuthenticationResponse` mit dem gespeicherten Key und Counter. **Counter-Regel:** Sind beide Werte > 0 und ist der neue ≤ dem alten, wird abgelehnt (geklonter Authenticator); synchronisierte Passkeys liefern 0. Danach `touchPasskey` und Session ausstellen. |
-| `POST /refresh` | Cookie | `rotateSession` liefert bei Erfolg neues Cookie und neues Access-Token, sonst 401 und das Cookie wird gelöscht. |
+| `POST /refresh` | Cookie | `rotateSession` liefert bei Erfolg neues Cookie (`Max-Age` höchstens bis zur absoluten Grenze) und neues Access-Token, sonst 401 und das Cookie wird gelöscht. Der alte Token wirkt 60 s nach (Gnadenfrist), danach löscht seine Wiederverwendung die Session. |
 | `POST /logout` | Cookie | `deleteSession` und Cookie löschen (`Max-Age=0`). Antwortet immer mit 204. |
 | `POST /passkeys/options` | Bearer | Prüft das JWT (eigener Key). Challenge mit `add` und `userId`. `excludeCredentials = listCredentialIds`. |
 | `POST /passkeys/verify` | Bearer | Wie register/verify, ruft am Ende aber `addPasskey` auf. |
@@ -295,7 +301,7 @@ export class PasskeyAuthError extends Error { readonly code: AuthErrorCode }
 ```
 
 - **`webauthn.ts`:** `createCredential(optionsJSON, signal)` und `getCredential(optionsJSON, { mediation, signal })`. Die Konvertierung JSON ↔ ArrayBuffer läuft nativ (`parseCreationOptionsFromJSON`, `toJSON`), mit Fallback auf `base64url.ts`. Fehler werden zugeordnet: `NotAllowedError`/`AbortError` → `cancelled`, `InvalidStateError` → `verification_failed` (Passkey schon registriert), `SecurityError` → `not_supported`.
-- **`session.ts`:** Hält die Session im Speicher und deduppliziert parallele Refreshes (ein laufendes Promise). Bei 401 wird die Session entfernt und `onChange(null)` ausgelöst.
+- **`session.ts`:** Hält die Session im Speicher und deduppliziert parallele Refreshes (ein laufendes Promise). Über Tabs hinweg läuft `/refresh` nacheinander unter dem Web Lock `pa-refresh` (sofern vorhanden). Bei 401 wird die Session entfernt und `onChange(null)` ausgelöst.
 - **`api.ts`:** `postJSON`, `credentials: 'same-origin'` und Fehler-Mapping. Ein Netzwerkfehler wird zu `network`.
 
 ### 2.4 Supabase-Adapter – `passkey-auth/supabase`
@@ -342,7 +348,7 @@ App → supabase-js (accessToken: getAccessToken) → PostgREST prüft JWT → R
 
 ## 4. Einbindung in Mental Math
 
-- **Function:** `functions/api/auth/[[path]].ts` → `server/auth.ts`. Dort Env-Validierung und der Aufbau von `createAuthHandler(config, createSupabaseAuthStore(createClient(url, serviceKey)))`, einmal pro Isolate gecacht. Fehlende Env-Variablen führen zu 503 `server_error`.
+- **Function:** `functions/api/auth/[[path]].ts` → `server/auth.ts`. Dort Env-Validierung und der Aufbau von `createAuthHandler(config, createSupabaseAuthStore(createClient(url, serviceKey)))`, einmal pro Isolate gecacht. Fehlende Env-Variablen führen zu 503 `server_error`. Vor dem Handler greift das Rate-Limit (30 Anfragen/min je IP, Durable-Object-Instanz „auth“, siehe O4).
 - **Öffentliche Konfiguration:** `scripts/build-info.ts` schreibt zusätzlich `src/generated/public-config.ts` (`PUBLIC_SUPABASE_URL`, `PUBLIC_SUPABASE_ANON_KEY` aus `process.env`, leer, wenn nicht gesetzt). Ist sie leer, blendet die App das Konto-Feature aus.
 - **Vendor-Bundle (D11):**
   - `src/vendor/auth.ts` re-exportiert `createPasskeyAuth`, `createPasskeySupabaseClient` und `createAccountApi`.
@@ -369,7 +375,7 @@ App → supabase-js (accessToken: getAccessToken) → PostgREST prüft JWT → R
 | Ebene | Was | Wo |
 |---|---|---|
 | Unit Paket | base64url (Roundtrip, Padding, URL-Zeichen), Username-Regeln, Fehler-Mapping, Session-Refresh-Deduplizierung, JWT-Claims (TTL, `role`, `aud`, `sub`), Cookie-Attribute, Origin- und Methoden-Abwehr | `packages/passkey-auth/tests/*.test.ts` |
-| Zeremonien Ende-zu-Ende | **Soft-Authenticator** (ES256 per WebCrypto, eigener kleiner CBOR-Encoder, `fmt: 'none'`) gegen `createAuthHandler` plus `MemoryAuthStore`, mit diesen Fällen:<br>• registrieren, abmelden, anmelden<br>• zweiter Passkey<br>• Challenge-Replay wird abgelehnt<br>• abgelaufene Challenge<br>• falsche Origin<br>• fremder `userHandle`<br>• Counter-Rückschritt<br>• Refresh-Rotation, alter Refresh-Token ungültig<br>• Logout | `tests/ceremonies.e2e.test.ts` |
+| Zeremonien Ende-zu-Ende | **Soft-Authenticator** (ES256 per WebCrypto, eigener kleiner CBOR-Encoder, `fmt: 'none'`) gegen `createAuthHandler` plus `MemoryAuthStore`, mit diesen Fällen:<br>• registrieren, abmelden, anmelden<br>• zweiter Passkey<br>• Challenge-Replay wird abgelehnt<br>• abgelaufene Challenge<br>• falsche Origin<br>• fremder `userHandle`<br>• Counter-Rückschritt<br>• Refresh-Rotation, alter Refresh-Token nach der Gnadenfrist ungültig<br>• verlorene `/refresh`-Antwort: alter Token innerhalb von 60 s, danach Diebstahlsignal<br>• absolute Sitzungsdauer (90 Tage) trotz Rotation<br>• Logout | `tests/ceremonies.e2e.test.ts` |
 | Adapter | `SupabaseAuthStore` gegen ein Fake-`SupabaseLike`: richtige Tabellen, RPC-Namen und Parameter, Zuordnung der Zeilen | `tests/supabase-store.test.ts` |
 | SQL/RLS | `sql/tests/rls_test.sql` im Supabase-SQL-Editor (O2) | manuell, Nutzer oder Phase 3 |
 | App | Typecheck, alle bestehenden Tests, i18n-Parität mit `account` | wie bisher |

@@ -82,7 +82,7 @@ export interface RemoteSyncProvider {
   upsertRecords(collection: SyncCollection, items: readonly SyncRecord[]): Promise<void>;
   upsertDocs(docs: readonly RemoteDoc[]): Promise<void>;
   pull(cursor: string | null, o: { limit: number; rewind: boolean }): Promise<PullPage>;
-  deleteAll(): Promise<void>;
+  deleteAll(): Promise<number | void>;   // Zahl = at, Lösch-Markierung serverseitig gesetzt (§7)
 }
 
 export type SyncPhase = 'disabled' | 'idle' | 'syncing' | 'offline' | 'error';
@@ -144,7 +144,7 @@ create table public.user_documents (
   - Zuerst alles von `anon` und `authenticated` entziehen.
   - `authenticated` bekommt `select`, `insert` und `update`, jeweils mit der Policy `user_id = (select auth.uid())`, bei Insert und Update auch als `with check`.
   - **Kein** `delete`, gelöscht wird per Soft-Delete über `deleted_at`.
-- **`mm_delete_my_data()`:** `security definer`, `search_path = ''`, nur für `authenticated`. Löscht alle Zeilen von `auth.uid()` aus den drei Tabellen. Gebraucht wird das für „Alle Daten löschen“ im angemeldeten Zustand.
+- **`mm_delete_my_data()`:** `security definer`, `search_path = ''`, nur für `authenticated`. Löscht alle Zeilen von `auth.uid()` aus den drei Tabellen, setzt im selben Aufruf die Lösch-Markierung und gibt `at` zurück (§7). Gebraucht wird das für „Alle Daten löschen“ im angemeldeten Zustand.
 - **Konto löschen:** Über `pa_delete_account` greift der FK mit `on delete cascade` und entfernt auch alle Trainingsdaten.
 
 **Tests:** `tests/data-sql.test.ts` mit PGlite. Als Vorspann laufen `packages/passkey-auth/tests/helpers/supabase-sim.sql` und das passkey-Schema 001. Geprüft werden:
@@ -214,7 +214,7 @@ export function createSupabaseSyncProvider(client: SupabaseClient, userId: strin
 ### C – Sync (`src/data/{repository,sync,merge,sync-manager}.ts`)
 
 **Repository:**
-- `SyncState` bekommt `cursor` und `fullPushNeeded`; fehlen sie in alten Daten, gelten Defaults.
+- `SyncState` bekommt `cursor` und `fullPushNeeded` (später auch `fullPushGen` und `docClock`, siehe §7, Nachträge); fehlen sie in alten Daten, gelten Defaults.
 - Überlauf setzt nach D10 `fullPushNeeded` und leert `pending`.
 - Neu sind `markFullPush()`, `setCursor(c)` und `onTrackedChange(cb)`. `onTrackedChange` meldet nur protokollierte Änderungen, also keine angewendeten Remote-Daten.
 
@@ -334,8 +334,8 @@ Auf Wunsch des Nutzers wird der generische Teil zu einem wiederverwendbaren Work
   - `getAppliedWipe(): number` liefert 0, wenn nichts gesetzt ist; dazu `setAppliedWipe(at)`. Beides liegt unter dem Adapter-Schlüssel `wipeAt`.
   - `clear(keep)` behält **immer** `deviceId` und `wipeAt`.
 - **`SyncEngine.wipeRemote()`:**
-  1. `provider.deleteAll()`
-  2. `upsertDocs([{ name: 'wipe', data: { at }, updatedAt: at, deviceId }])`
+  1. `provider.deleteAll()` (`Promise<number | void>`). Liefert der Provider eine Zahl, hat der Server in **einem** Aufruf gelöscht und die Markierung geschrieben; die Zahl ist `at` (Serveruhr). In der App erledigt das `mm_delete_my_data()`: Sie löscht, fügt `wipe` (`{ at }`, `updated_at = at`, `device_id 'server'`) ein und gibt `at` als `bigint` zurück. So gibt es keinen Zustand „gelöscht, aber ohne Markierung“, in dem andere Geräte ihre Daten wieder hochladen.
+  2. Nur ohne Rückgabe (Provider ohne Zahl oder alte SQL-Fassung mit `void`) folgt der Zweischritt: `at = now()`, dann `upsertDocs([{ name: 'wipe', data: { at }, updatedAt: at, deviceId }])`. Deshalb ist die Reihenfolge von SQL- und App-Update egal.
   3. `setAppliedWipe(at)` und `setCursor(null)`
 - **Pull:**
   - Enthält eine Seite `wipe` mit `at > getAppliedWipe()`, ruft die Engine `onRemoteWipe()` auf. Default ist `repo.clear()`, die App übergibt `resetAll`.
@@ -348,3 +348,10 @@ Auf Wunsch des Nutzers wird der generische Teil zu einem wiederverwendbaren Work
 - Die Namensregel in `user_documents` erlaubt zusätzlich `wipe`. Das SQL ändert den Constraint idempotent mit `drop constraint if exists` und `add constraint`.
 - `features/sync.ts`: `onRemoteWipe` ruft `resetAll()` auf, dann `emitDataChange('remote')` und einen Toast „Deine Daten wurden auf einem anderen Gerät gelöscht“.
 - Der Bestätigungstext verspricht wieder das Löschen auf allen Geräten, ab dem nächsten Sync.
+- `mm_delete_my_data` wechselt den Rückgabetyp von `void` auf `bigint`. Weil `create or replace` das nicht kann, entfernt das Skript die alte Fassung vorher (`drop function if exists`); es bleibt idempotent.
+
+### Nachträge aus dem Audit (1.14.0)
+
+- **Hybride Dokument-Uhr:** Der Server-Trigger verwirft Dokumente, deren `(updatedAt, deviceId)` nicht größer ist. Für `DocSpec`s **ohne** eigene `updatedAt`-Funktion sendet die Engine daher `max(jetzt, docClock + 1)`; `docClock` im SyncState merkt sich pro Dokument den höchsten gesehenen Remote-Stand, auch wenn `merge` nichts ändert. Ein Gerät mit nachgehender Uhr verliert so kein gemergtes Dokument. Specs mit eigener `updatedAt`-Funktion (z. B. Einstellungen) senden weiter deren Wert.
+- **`fullPushGen`:** `markFullPush()` und ein Überlauf erhöhen den Zähler. Der Push löscht `fullPushNeeded` erst nach allen Paketen und nur per `clearFullPushIf(gen)`, also nicht, wenn währenddessen ein neuer Vollabgleich angefordert wurde. Fehler oder ein geschlossener Tab mitten im Push lassen den Vollabgleich stehen.
+- **Reihenfolge beim Kürzen (`trim`):** Weg fallen genau `length − limit` Einträge: erst Tombstones, dann schon hochgeladene, zuletzt noch ausstehende (Outbox bzw. bei offenem Vollabgleich die eigenen), jeweils die ältesten (`createdAt`) zuerst. Ältere fremde Datensätze aus dem Pull verdrängen so keine eigenen, die noch nicht oben sind.

@@ -1,4 +1,5 @@
-// Worker „mental-math-rate-limiter“: stellt das Durable Object RateLimiter für die Pages Function /api/explain bereit.
+// Worker „mental-math-rate-limiter“: stellt das Durable Object RateLimiter für die Pages Functions /api/explain und
+// /api/auth bereit (je eine Objekt-Instanz „explain“ bzw. „auth“ mit eigenen Schlüsseln).
 // Pages kann Durable Objects nicht selbst definieren, nur per Binding aus einem Worker nutzen (Binding-Name RATE_LIMITER).
 // Der Worker selbst hat keine öffentliche Route (workers_dev = false); erreichbar ist nur das Durable Object über das Binding.
 import { DAY, hitLimits, parseChecks } from '../../../server/rate-limit.ts';
