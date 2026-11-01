@@ -5,6 +5,18 @@ const DATE = '2026-10-30';
 
 export const RELEASES: Release[] = [
   {
+    version: '1.14.0', date: '2026-11-01',
+    title: { de: 'Zuverlässiger Sync & Updates', en: 'Reliable sync & updates' },
+    highlights: [
+      { de: 'Der Sync verliert keine Daten mehr, auch bei großen Beständen oder wenn er abbricht. Ein fehlerhafter Eintrag hält ihn nicht mehr auf.', en: 'Sync no longer loses data, even with a large history or when it gets interrupted. A single broken entry no longer holds it up.' },
+      { de: 'Offline gestartet bleibst du angemeldet; sobald das Netz zurück ist, verbindet sich dein Konto wieder.', en: 'Start the app offline and you stay signed in; your account reconnects as soon as you are back online.' },
+      { de: 'Neue Versionen kündigen sich mit einem Hinweis an und laden erst, wenn du tippst – nie mitten in einer Runde. Bei schlechtem Netz startet die App schneller.', en: 'New versions show a notice and load only when you tap it – never in the middle of a round. On a weak connection the app starts faster.' },
+      { de: 'Beim Abmelden kannst du deine Daten von diesem Gerät entfernen; Ausstehendes wird vorher noch synchronisiert.', en: 'When signing out, you can remove your data from this device; anything pending is synced first.' },
+      { de: 'Import prüft die Einträge, überspringt unvollständige und sagt dir, wie viele es waren.', en: 'Import checks your entries, skips incomplete ones and tells you how many.' },
+      { de: 'Unter der Haube: Anmeldung besser gegen Missbrauch geschützt, Sitzungen enden nach spätestens 90 Tagen, mehrere offene Tabs melden dich nicht mehr ab.', en: 'Under the hood: sign-in is better protected against abuse, sessions end after 90 days at most, and several open tabs no longer sign you out.' },
+    ],
+  },
+  {
     version: '1.13.0', date: '2026-10-31',
     title: { de: 'Erinnerungen', en: 'Reminders' },
     highlights: [

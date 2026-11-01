@@ -4,6 +4,17 @@ Alle nennenswerten Änderungen an Mental Math. Format nach [Keep a Changelog](ht
 
 <!-- Automatisch erzeugt mit `npm run changelog` aus src/releases.ts – nicht von Hand bearbeiten. -->
 
+## [1.14.0] - 2026-11-01
+
+### Zuverlässiger Sync & Updates
+
+- Der Sync verliert keine Daten mehr, auch bei großen Beständen oder wenn er abbricht. Ein fehlerhafter Eintrag hält ihn nicht mehr auf.
+- Offline gestartet bleibst du angemeldet; sobald das Netz zurück ist, verbindet sich dein Konto wieder.
+- Neue Versionen kündigen sich mit einem Hinweis an und laden erst, wenn du tippst – nie mitten in einer Runde. Bei schlechtem Netz startet die App schneller.
+- Beim Abmelden kannst du deine Daten von diesem Gerät entfernen; Ausstehendes wird vorher noch synchronisiert.
+- Import prüft die Einträge, überspringt unvollständige und sagt dir, wie viele es waren.
+- Unter der Haube: Anmeldung besser gegen Missbrauch geschützt, Sitzungen enden nach spätestens 90 Tagen, mehrere offene Tabs melden dich nicht mehr ab.
+
 ## [1.13.0] - 2026-10-31
 
 ### Erinnerungen
