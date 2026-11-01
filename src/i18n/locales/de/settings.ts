@@ -90,6 +90,8 @@ export const settings = {
   news: 'Neuigkeiten',
   version: 'Version',
   sourceCode: 'Quellcode',
+  help: 'Hilfe & Kontakt',
+  privacy: 'Datenschutz',
   build: 'Build',
   deviceId: 'Geräte-ID',
   profileId: 'Profil-ID',

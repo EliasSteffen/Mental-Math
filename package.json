@@ -10,7 +10,7 @@
     "clean": "node scripts/clean.ts",
     "changelog": "node scripts/changelog.ts",
     "build:pkg": "npm run build --workspaces",
-    "build": "npm run build:pkg && node scripts/build-info.ts && node scripts/clean.ts && tsc -p tsconfig.json && tsc -p tsconfig.sw.json && node scripts/vendor.ts && node scripts/copy-static.ts && node scripts/precache.ts",
+    "build": "npm run build:pkg && node scripts/build-info.ts && node scripts/clean.ts && tsc -p tsconfig.json && tsc -p tsconfig.sw.json && node scripts/vendor.ts && node scripts/copy-static.ts && node scripts/pages.ts && node scripts/precache.ts",
     "typecheck": "npm run build:pkg && node scripts/build-info.ts && tsc -p tsconfig.check.json",
     "test": "npm run build:pkg && node scripts/build-info.ts && node --test tests/*.test.ts && npm test --workspaces",
     "dev": "npm run build && python3 -m http.server 8080 -d dist",
