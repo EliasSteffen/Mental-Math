@@ -1,8 +1,9 @@
 // Tests für die reinen Build-Helfer (ohne vollen Build-Lauf).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { validPublicKey, validPublicUrl } from '../scripts/build-info.ts';
-import { addConnectSrc, appleAppSiteAssociation } from '../scripts/copy-static.ts';
+import { readFileSync } from 'node:fs';
+import { deployChannel, validPublicKey, validPublicUrl } from '../scripts/build-info.ts';
+import { addConnectSrc, addNoIndex, appleAppSiteAssociation, previewManifest } from '../scripts/copy-static.ts';
 
 const URL_OK = 'https://anrfpvgcaplyjkmraald.supabase.co';
 const CSP_LINE = "  Content-Security-Policy: default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
@@ -60,4 +61,29 @@ test('apple-app-site-association: webcredentials nur mit gültiger Team-ID', () 
   assert.deepEqual(JSON.parse(aasa ?? 'null'), { webcredentials: { apps: ['ABCDE12345.de.example.app'] } });
   assert.equal(appleAppSiteAssociation('abc', 'de.example.app'), null);
   assert.equal(appleAppSiteAssociation('ABCDE12345', 'de example'), null);
+});
+
+test('Kanal: nur DEPLOY_CHANNEL=preview ergibt eine Vorschau', () => {
+  assert.equal(deployChannel('preview'), 'preview');
+  assert.equal(deployChannel(' preview '), 'preview');
+  assert.equal(deployChannel(undefined), 'production');
+  assert.equal(deployChannel(''), 'production');
+  assert.equal(deployChannel('Preview'), 'production');
+});
+
+test('Vorschau: noindex im Block /*, genau einmal; ohne Block wird einer angelegt', () => {
+  const out = addNoIndex(HEADERS);
+  const lines = out.split('\n');
+  assert.equal(lines[0], '/*');
+  assert.ok(lines.slice(1, lines.indexOf('')).includes('  X-Robots-Tag: noindex'), 'im Block für alle Pfade');
+  assert.ok(lines.indexOf('  X-Robots-Tag: noindex') < lines.indexOf('/sw.js'));
+  assert.equal(addNoIndex(out), out);
+  assert.match(addNoIndex('/sw.js\n  Cache-Control: no-cache\n'), /^\/\*\n {2}X-Robots-Tag: noindex\n\n\/sw\.js/);
+  const real = readFileSync(new URL('../public/_headers', import.meta.url), 'utf8');
+  assert.equal(addNoIndex(real).split('X-Robots-Tag').length, 2);
+});
+
+test('Vorschau: eigener Name im Manifest, Rest unverändert', () => {
+  const m = JSON.parse(previewManifest(JSON.stringify({ name: 'Mental Math', short_name: 'Mental Math', start_url: '/' }))) as Record<string, string>;
+  assert.deepEqual(m, { name: 'Mental Math (Preview)', short_name: 'MM Preview', start_url: '/' });
 });

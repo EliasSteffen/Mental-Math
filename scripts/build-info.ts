@@ -1,8 +1,10 @@
-// Schreibt src/generated/build-info.ts (Version aus package.json, Git-Kurz-Hash, Datum)
+// Schreibt src/generated/build-info.ts (Version aus package.json, Git-Kurz-Hash, Datum, Kanal)
 // und src/generated/public-config.ts (öffentliche Supabase-Werte aus PUBLIC_* in process.env).
+// Kanal: DEPLOY_CHANNEL=preview für Vorschau-Builds (Pull Requests, develop), sonst Produktion.
 import { execSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import type { BuildChannel } from '../src/types.ts';
 
 const ROOT: string = fileURLToPath(new URL('..', import.meta.url));
 
@@ -18,6 +20,11 @@ export function validApiOrigin(origin: string): boolean {
   } catch {
     return false;
   }
+}
+
+/** Vorschau oder Produktion; nur der exakte Wert 'preview' ergibt eine Vorschau. */
+export function deployChannel(raw: string | undefined): BuildChannel {
+  return (raw ?? '').trim() === 'preview' ? 'preview' : 'production';
 }
 
 function gitHash(): string {
@@ -72,7 +79,7 @@ export function readPublicConfig(): PublicConfig {
 
 function main(): void {
   const pkg = JSON.parse(readFileSync(`${ROOT}package.json`, 'utf8')) as { version: string };
-  const info = { version: pkg.version, build: gitHash(), date: today() };
+  const info = { version: pkg.version, build: gitHash(), date: today(), channel: deployChannel(process.env.DEPLOY_CHANNEL) };
 
   const out = `// AUTOMATISCH ERZEUGT von scripts/build-info.ts – nicht bearbeiten, nicht versionieren.
 import type { BuildInfo } from '../types.ts';
@@ -88,7 +95,7 @@ export const PUBLIC_CONFIG: { supabaseUrl: string; supabaseKey: string; apiOrigi
   mkdirSync(`${ROOT}src/generated`, { recursive: true });
   writeFileSync(`${ROOT}src/generated/build-info.ts`, out);
   writeFileSync(`${ROOT}src/generated/public-config.ts`, publicOut);
-  console.log(`build-info: ${info.version} (${info.build}, ${info.date})`);
+  console.log(`build-info: ${info.version} (${info.build}, ${info.date}, ${info.channel})`);
   console.log(`public-config: Supabase-URL ${cfg.supabaseUrl ? 'gesetzt' : 'leer'}, Schlüssel ${cfg.supabaseKey ? 'gesetzt' : 'leer'}`);
 }
 

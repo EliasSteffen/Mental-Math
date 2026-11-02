@@ -54,7 +54,15 @@ npm test           # Tests (node --test, TypeScript direkt per Type-Stripping)
 - **Cloudflare-Pages-Projekt:** `mental-math` (→ `mental-math.pages.dev`)
 - **Domain:** `mental-math.elias-steffen.de`
 
-Jeder Push auf `main` startet [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml). Der Workflow führt erst die Tests aus und deployt dann `dist/` (Build-Ausgabe aus `public/` + `src/`) auf Cloudflare Pages. Schlagen die Tests fehl, wird nichts deployt. Manuell anstoßen lässt er sich über **Actions → Deploy → Run workflow**.
+[`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) führt erst Typprüfung und Tests aus und deployt dann `dist/` (Build-Ausgabe aus `public/` + `src/`) auf Cloudflare Pages. Schlagen die Tests fehl, wird nichts deployt. Das Ziel hängt vom Anlass ab:
+
+| Anlass | Ziel | Adresse |
+|---|---|---|
+| Pull Request (aus diesem Repo) | Vorschau | `https://pr-<nr>.mental-math.pages.dev` – im PR unter „View deployment“ |
+| Push auf `develop` | Vorschau der nächsten Version | `https://preview.mental-math.elias-steffen.de` (= `develop.mental-math.pages.dev`) |
+| Push auf `main` | Produktion, **nur mit iOS-Build desselben Codes** | `https://mental-math.elias-steffen.de` |
+
+Vorschauen bauen mit `DEPLOY_CHANNEL=preview`: Suchmaschinen bleiben draußen (`X-Robots-Tag: noindex`), unter *Profil → Über* steht „Vorschau“ und auf dem Home-Bildschirm „MM Preview“. Supabase nutzen sie nur über die eigenen Variablen `PREVIEW_SUPABASE_URL`/`PREVIEW_SUPABASE_ANON_KEY`, nie die der Produktion; ohne sie laufen Vorschauen ohne Konto und Sync. Pull Requests aus Forks bekommen keine Secrets und damit nur Tests. Ablauf von Release und Hotfix: [Branches, Vorschau & Release](#branches-vorschau--release).
 
 ### Einmalige Einrichtung
 
@@ -95,6 +103,52 @@ npx wrangler pages deploy dist --project-name=mental-math
 ```
 
 `public/_headers` (landet über `dist/_headers` im Deployment) setzt Security-Header (u. a. eine strikte Content-Security-Policy). Die App lädt nichts von externen Quellen.
+
+### Branches, Vorschau & Release
+
+- **`main`** ist, was live ist (Website und App Store).
+- **`develop`** ist die nächste Version, immer unter der Vorschau-Adresse erreichbar.
+- Neue Arbeit kommt per Pull Request nach `develop`. Jeder PR bekommt seine eigene Vorschau.
+
+**Release** – die Website geht erst live, wenn genau dieser Code als iOS-Build in TestFlight liegt:
+
+1. Auf `develop` die Version in `package.json` erhöhen, Release Notes in `src/releases.ts` ergänzen, `npm run changelog`.
+2. Push auf `develop`. [`ios.yml`](.github/workflows/ios.yml) lädt einen Build zu TestFlight hoch. Das passiert bei jedem Push auf `develop`, solange die Version neuer ist als auf `main`; TestFlight hat also immer den aktuellen Stand. Testen auf iPhone und iPad.
+3. Release-PR `develop` → `main` öffnen. Die Prüfung **Release-Gate** ([`release-gate.yml`](.github/workflows/release-gate.yml), [`scripts/release-gate.ts`](scripts/release-gate.ts)) sucht einen erfolgreichen TestFlight-Upload mit demselben Git-Tree. Läuft der iOS-Build noch, wartet sie bis zu 45 Minuten darauf.
+4. Mergen. `deploy.yml` prüft das Gate noch einmal und deployt die Produktion.
+5. In App Store Connect den Build der Version zuordnen und zur Prüfung einreichen.
+
+Kommt nach dem iOS-Build noch ein Commit dazu, lädt `ios.yml` einen neuen Build hoch, und das Gate wartet auf ihn. Ein Commit direkt auf `main` ohne iOS-Build hält das Deploy an.
+
+**Hotfix:** Branch `hotfix/<name>` von `main`, Patch-Version erhöhen, pushen (lädt zu TestFlight hoch), PR nach `main`, mergen und danach `main` in `develop` mergen. **Notfall** ohne iOS-Build: *Actions → Deploy → Run workflow* auf `main` mit „ohne iOS-Build desselben Codes deployen“.
+
+#### Einmalige Einrichtung der Vorschau
+
+1. **Standard-Branch** (empfohlen): *Settings → General → Default branch* → `develop`, damit neue PRs dorthin zeigen.
+2. **Regeln für `main`:** *Settings → Rules → Rulesets* (oder *Branches*) mit diesen Vorgaben:
+   - Pull Request erforderlich
+   - erforderliche Prüfungen `Release-Gate / iOS-Build desselben Codes`, `Deploy / test` und `iOS / ios`
+3. **Domain:** Cloudflare → Pages-Projekt `mental-math` → *Custom domains → Set up a custom domain* → `preview.mental-math.elias-steffen.de` → *Activate*. Danach im DNS der Zone `elias-steffen.de` das Ziel des CNAME `preview` von `mental-math.pages.dev` auf **`develop.mental-math.pages.dev`** ändern. Voraussetzungen:
+   - ein erfolgreiches Deploy von `develop`
+   - die Zone liegt bei Cloudflare-DNS; mit externem DNS landet die Adresse auf der Produktion
+4. **Functions der Vorschau:** Cloudflare → `mental-math` → *Settings → Variables and Secrets*, Umgebung **Preview**:
+   - **KI:** `GOOGLE_API_KEY`, optional; es reicht derselbe Gratis-Schlüssel.
+   - **Konto:** ein eigenes Supabase-Projekt mit denselben SQL-Skripten wie unter [Daten](#daten), nie die Produktionsdaten. Dafür `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` und ein eigener `AUTH_JWT_KEY` für dieses Projekt. Dazu `AUTH_RP_ID=preview.mental-math.elias-steffen.de` und `AUTH_ORIGINS=https://preview.mental-math.elias-steffen.de`.
+   - **Rate-Limit:** unter *Bindings → Preview* optional `RATE_LIMITER` wie in der Produktion.
+   - PR-Vorschauen (`*.pages.dev`) haben bewusst keine Passkeys (docs/PLAN-auth.md, D12).
+5. **GitHub-Variablen** für den Build der Vorschau: `PREVIEW_SUPABASE_URL` und `PREVIEW_SUPABASE_ANON_KEY` des Vorschau-Projekts.
+
+   ```bash
+   gh variable set PREVIEW_SUPABASE_URL
+   ```
+
+   ```bash
+   gh variable set PREVIEW_SUPABASE_ANON_KEY
+   ```
+
+6. **Optional:** die Vorschau mit Cloudflare Access (Zero Trust) auf dich beschränken. So verbraucht niemand sonst das KI-Kontingent.
+
+Alte PR-Vorschauen bleiben bei Cloudflare liegen. Löschen geht im Dashboard unter *Deployments* oder mit `npx wrangler pages deployment delete`.
 
 ## KI-Erklärungen (optional)
 
@@ -190,7 +244,7 @@ npm run ios:sync
 npm run ios:open
 ```
 
-**Pipeline** (`.github/workflows/ios.yml`, macOS-Runner – für öffentliche Repos kostenlos): Bei jedem Push und Pull Request laufen Typprüfung, Tests und ein Simulator-Build. Steigt auf `main` die Version in `package.json`, wird die App signiert, archiviert und zu App Store Connect hochgeladen (Version = `package.json`, Build-Nummer = Lauf-Nummer). Vorher prüft `scripts/asc-check.ts` Schlüssel und App. Xcode signiert und exportiert nur die `.ipa`; hochgeladen wird mit `scripts/asc-upload.ts` über die App Store Connect API, denn Xcodes eigener Upload lehnt den Team-Schlüssel mit „Cannot verify client's JWT headers“ ab. Das Skript wartet, bis Apple den Build verarbeitet hat, und meldet Ablehnungsgründe im Log. Vor dem Upload gibt die Pipeline die Entitlements der signierten App aus und bricht ab, wenn die Associated Domain `webcredentials:` fehlt (ohne sie scheitern die Passkeys der App). Per Hand: *Actions → iOS → Run workflow*. Danach in App Store Connect den Build der Version zuordnen und zur Prüfung einreichen.
+**Pipeline** (`.github/workflows/ios.yml`, macOS-Runner – für öffentliche Repos kostenlos): Bei jedem Push und Pull Request laufen Typprüfung, Tests und ein Simulator-Build. Bei jedem Push auf `develop` oder `hotfix/*` mit einer Version in `package.json`, die neuer ist als auf `main`, wird die App signiert, archiviert und zu App Store Connect hochgeladen (Release-Kandidat; Version = `package.json`, Build-Nummer = Lauf-Nummer). `main` selbst lädt nicht hoch, das [Release-Gate](#branches-vorschau--release) verlangt den Build vorher. Vorher prüft `scripts/asc-check.ts` Schlüssel und App. Xcode signiert und exportiert nur die `.ipa`; hochgeladen wird mit `scripts/asc-upload.ts` über die App Store Connect API, denn Xcodes eigener Upload lehnt den Team-Schlüssel mit „Cannot verify client's JWT headers“ ab. Das Skript wartet, bis Apple den Build verarbeitet hat, und meldet Ablehnungsgründe im Log. Vor dem Upload gibt die Pipeline die Entitlements der signierten App aus und bricht ab, wenn die Associated Domain `webcredentials:` fehlt (ohne sie scheitern die Passkeys der App). Per Hand: *Actions → iOS → Run workflow*. Danach in App Store Connect den Build der Version zuordnen und zur Prüfung einreichen.
 
 ### Einmalige Einrichtung
 
@@ -266,7 +320,8 @@ capacitor.config.json       ← App-ID, Name, WebView-Optionen
 sql/                        ← Supabase-SQL der App (Trainingsdaten, Push + Cron)
 workers/rate-limiter/       ← Worker mit dem Durable Object RateLimiter (eigener Deploy-Workflow)
 tests/                      ← node --test (*.test.ts)
-docs/                       ← SPEC, ARCHITECTURE, PLAN-v5
-.github/workflows/deploy.yml  ← CI/CD: Tests + Build + Deploy auf Cloudflare Pages
-.github/workflows/ios.yml     ← iOS: Simulator-Build bei jedem Push, Upload zu App Store Connect bei neuer Version
+docs/                       ← SPEC, ARCHITECTURE, PLAN-*
+.github/workflows/deploy.yml  ← CI/CD: Tests + Build + Deploy auf Cloudflare Pages (PR- und develop-Vorschau, Produktion mit Release-Gate)
+.github/workflows/release-gate.yml ← Produktion nur mit iOS-Build desselben Codes (scripts/release-gate.ts)
+.github/workflows/ios.yml     ← iOS: Simulator-Build bei jedem Push, TestFlight-Upload für Release-Kandidaten auf develop/hotfix/*
 ```
