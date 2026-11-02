@@ -292,7 +292,8 @@ function aboutGroup(): HTMLElement {
   return profGroup(t('settings.about'),
     list([news, intro, help, privacy, store, source]),
     h('dl', { class: 'prof-meta' },
-      meta(t('settings.build'), `${BUILD_INFO.build} · ${fmtIsoDate(BUILD_INFO.date)}`),
+      meta(t('settings.build'), [BUILD_INFO.build, fmtIsoDate(BUILD_INFO.date), BUILD_INFO.channel === 'preview' ? t('settings.channelPreview') : '']
+        .filter(Boolean).join(' · ')),
       meta(t('settings.deviceId'), short(profile.deviceId), profile.deviceId),
       meta(t('settings.profileId'), short(profile.id), profile.id)));
 }

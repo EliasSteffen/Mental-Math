@@ -1,0 +1,36 @@
+# Release-Gate: Die Website geht nur live, wenn genau dieser Code (gleicher Git-Tree) schon als iOS-Build in TestFlight
+# liegt – hochgeladen von ios.yml auf develop/hotfix/* oder per Run workflow. Siehe scripts/release-gate.ts.
+# - in Pull Requests auf main als Prüfung: in den Branch-Regeln von main als erforderlich eintragen
+#   („Release-Gate / iOS-Build desselben Codes“), dann lässt sich ein Release erst mit fertigem iOS-Build mergen
+# - vor jedem Produktions-Deploy: deploy.yml ruft diesen Workflow auf
+# Läuft der passende iOS-Build noch, wartet das Gate bis zu 45 Minuten auf ihn.
+name: Release-Gate
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_call:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: release-gate-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ios-build:
+    name: iOS-Build desselben Codes
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+      - run: node scripts/release-gate.ts
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          GATE_SHA: ${{ github.sha }}
+          GATE_TIMEOUT_MIN: '45'

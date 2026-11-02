@@ -96,6 +96,7 @@ export const settings = {
   rateApp: 'App bewerten',
   iosApp: 'iOS-App',
   build: 'Build',
+  channelPreview: 'Vorschau',
   deviceId: 'Geräte-ID',
   profileId: 'Profil-ID',
   // Erweitert

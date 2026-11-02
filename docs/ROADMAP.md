@@ -14,6 +14,7 @@ Leitplanken aus [PLAN-v5.md](PLAN-v5.md), [PLAN-v8.md](PLAN-v8.md) und [DESIGN-M
 | jetzt | iPhone und iPad aus demselben Binary, kein Mac (Xcode-Projekt, Ausrichtungen, Schutz-Test) | ✅ erledigt (Branch `claude/ecstatic-feynman-yvfbb7`) |
 | jetzt | Lernstand-Modell als Paket `packages/learning-engine`, App unverändert im Verhalten | ✅ erledigt |
 | jetzt | Labor: Simulation, Replay echter Exporte, Tuning, Qualitäts-Schranken | ✅ erledigt |
+| jetzt | Vorschau je PR und für `develop` (preview.mental-math.elias-steffen.de), Release-Gate: Produktion nur mit iOS-Build desselben Codes | ✅ erledigt; Einrichtung bei Cloudflare/GitHub offen (README → Branches, Vorschau & Release) |
 | 1.16 | Release „iPad“: Store-Screenshots, Gerätetests, Release Notes | offen (Checkliste §1.2) |
 | 1.17 | Genauere Schwächen (E1–E3) + Einstufungstest (F1) | offen, im Labor vorbereitet |
 | 1.18 | Interview-Plan (F2/F3) + Vorhersage-Modell (E4) + Vergessen (E5) | offen |
@@ -50,7 +51,7 @@ Leitplanken aus [PLAN-v5.md](PLAN-v5.md), [PLAN-v8.md](PLAN-v8.md) und [DESIGN-M
   - [ ] Externes Keyboard: Tippen, Enter und Esc im Training, solange das Bildschirm-Tastenfeld sichtbar ist
   - [ ] Stage Manager und Split View ⅓ bis ½ beim Drehen während einer Runde (Fokus-Modus, Sheets)
   - [ ] Apple Pencil (Scribble) im Antwortfeld, wenn das Tastenfeld aus ist
-- [ ] **Release Notes** in `src/releases.ts` (de/en), Version 1.16.0 in `package.json`. Der Upload startet dann automatisch (`ios.yml`).
+- [ ] **Release Notes** in `src/releases.ts` (de/en), Version 1.16.0 in `package.json` – auf `develop`. Der TestFlight-Upload startet dann automatisch (`ios.yml`); danach Release-PR `develop` → `main`, das Release-Gate wartet auf den Build.
 - [ ] **App-Beschreibung** ums iPad ergänzen; die Seite `/hilfe` ebenso.
 
 ### 1.3 Verbesserungen für große Bildschirme und Tastatur
