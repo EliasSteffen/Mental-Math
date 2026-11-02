@@ -1,0 +1,29 @@
+{
+  "name": "learning-engine",
+  "version": "0.1.0",
+  "description": "Lernstand-Modell für Übungs-Apps: Skill je Aufgabentyp, Schwächen-Diagnose, adaptive Stufe, Leitner-Wiederholung, Empfehlung. Dazu ein Labor (Simulation, Replay, Tuning), um das Modell getrennt von der App zu trainieren und zu testen. Framework-frei, ohne Abhängigkeiten.",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./lab": {
+      "types": "./dist/lab/index.d.ts",
+      "default": "./dist/lab/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\"",
+    "build": "npm run clean && tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.check.json",
+    "test": "node --test tests/*.test.ts",
+    "lab": "node scripts/lab.ts"
+  }
+}
