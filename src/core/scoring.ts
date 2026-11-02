@@ -2,9 +2,12 @@
 import type {
   Attempt, CategoryId, DifficultySetting, ErrorPatterns, EvaluateOptions, Evaluation, Level, SkillStats, SubtypeId, Task, Weakness,
 } from '../types.ts';
-import { SUBTYPES, CATEGORIES, activeCategories } from './catalog.ts';
+import { SUBTYPES, CATEGORIES, activeCategoryIds } from './catalog.ts';
 import { t } from '../i18n/index.ts';
 import { unitFactor } from './numbers.ts';
+import {
+  DEFAULT_CONFIG, adaptiveLevel, errorPatterns as countErrors, findDeficits, overallStats, skillStats, statsBy,
+} from '../vendor/learning.ts';
 
 const clamp = (x: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, x));
 const mean = (xs: number[]): number => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0);
@@ -69,95 +72,53 @@ export function evaluate(
   return { correct: false, errorType: 'falsch', points: 0, timeFactor: tf };
 }
 
-export function skill(attempts: Attempt[] | null | undefined, window = 25): SkillStats {
-  const list = (attempts || []).slice(-window);
-  const n = list.length;
-  if (n === 0) return { n: 0, accuracy: 0, speed: 0, score: null, avgTimeMs: 0, avgTargetMs: 0 };
-  const right = list.filter((a) => a.correct);
-  const accuracy = list.reduce((sum, a) => sum + (a.correct ? (a.assisted ? 0.5 : 1) : 0), 0) / n;
-  const timedRight = right.filter((a) => !a.untimed);
-  const timed = list.filter((a) => !a.untimed);
-  const speed = timedRight.length ? mean(timedRight.map((a) => Math.min(1, a.targetMs / a.timeMs))) : 0;
-  return {
-    n,
-    accuracy,
-    speed,
-    score: n < 3 ? null : Math.round(100 * (0.7 * accuracy + 0.3 * speed)),
-    avgTimeMs: mean(timed.map((a) => a.timeMs)),
-    avgTargetMs: mean(timed.map((a) => a.targetMs)),
-  };
+// Lernstand-Modell (Skill, Stufe, Schwächen): packages/learning-engine. Hier nur die App-Sicht darauf – Katalog,
+// aktive Kategorien und Texte (Name, Diagnose, Tipp). Bewertung einer Antwort (evaluate) bleibt App-Sache.
+
+export function skill(attempts: Attempt[] | null | undefined, window = DEFAULT_CONFIG.window): SkillStats {
+  return skillStats(attempts || [], DEFAULT_CONFIG, window);
 }
 
 // Schwierigkeit für einen Subtyp: setting 'auto' | 1 | 2 | 3
 export function levelFor(subtypeId: SubtypeId, attempts: Attempt[] | null | undefined, setting: DifficultySetting | string | number = 'auto'): Level {
   const n = Number(setting);
   if (n === 1 || n === 2 || n === 3) return n;
-  const sk = skill((attempts || []).filter((a) => a.subtype === subtypeId));
-  if (sk.score === null || sk.score < 60) return 1;
-  return sk.score >= 85 ? 3 : 2;
-}
-
-function groupBy(attempts: Attempt[] | null | undefined, key: 'category' | 'subtype'): Record<string, Attempt[]> {
-  const g: Record<string, Attempt[]> = {};
-  for (const a of attempts || []) (g[a[key]] ||= []).push(a);
-  return g;
+  return adaptiveLevel(subtypeId, attempts || []);
 }
 
 export function categoryStats(attempts: Attempt[] | null | undefined): Record<string, SkillStats> {
-  const g = groupBy(attempts, 'category');
-  return Object.fromEntries(CATEGORIES.map((c) => [c.id, skill(g[c.id] || [])]));
+  return statsBy(attempts || [], 'category', CATEGORIES.map((c) => c.id));
 }
 
 export function subtypeStats(attempts: Attempt[] | null | undefined): Record<string, SkillStats> {
-  const g = groupBy(attempts, 'subtype');
-  return Object.fromEntries(Object.keys(SUBTYPES).map((id) => [id, skill(g[id] || [])]));
+  return statsBy(attempts || [], 'subtype', Object.keys(SUBTYPES));
 }
 
 export function overall(attempts: Attempt[] | null | undefined): SkillStats {
-  return skill(attempts, 100);
+  return overallStats(attempts || []);
 }
-
 
 export function weaknesses(
   attempts: Attempt[] | null | undefined,
   limit = 3,
   { enabledCategories = null }: { enabledCategories?: CategoryId[] | null } = {},
 ): Weakness[] {
-  const g = groupBy(attempts, 'subtype');
-  const active = new Set<string>(activeCategories(enabledCategories).map((c) => c.id));
-  const out: Weakness[] = [];
-  for (const [id, list] of Object.entries(g)) {
-    const s = SUBTYPES[id];
-    if (!s || !active.has(s.category)) continue;
-    const sk = skill(list);
-    if (sk.n < 3 || sk.score === null || sk.score >= 85) continue;
-    const nullen = list.slice(-25).filter((a) => a.errorType === 'nullen').length;
-    const reason = nullen >= 2 ? 'nullen' : sk.accuracy < 0.8 ? 'ungenau' : 'langsam';
-    out.push({
-      subtype: id,
-      name: s.name,
-      category: s.category,
-      categoryName: CATEGORIES.find((c) => c.id === s.category)?.name ?? s.category,
-      score: sk.score,
-      accuracy: sk.accuracy,
-      speed: sk.speed,
-      avgTimeMs: sk.avgTimeMs,
-      avgTargetMs: sk.avgTargetMs,
-      targetMs: s.targetMs,
-      n: sk.n,
-      reason,
-      label: t(`core.label.${reason}`),
-      tip: s.tip,
-    });
-  }
-  out.sort((a, b) => (a.score ?? 0) - (b.score ?? 0));
-  return out.slice(0, limit);
+  const found = findDeficits(attempts || [], { catalog: SUBTYPES, categories: activeCategoryIds(enabledCategories), limit });
+  return found.map((d): Weakness => {
+    const s = SUBTYPES[d.subtype];
+    return {
+      ...d,
+      category: d.category as CategoryId,
+      name: s?.name ?? d.subtype,
+      categoryName: CATEGORIES.find((c) => c.id === d.category)?.name ?? d.category,
+      label: t(`core.label.${d.reason}`),
+      tip: s?.tip ?? '',
+    };
+  });
 }
 
 export function errorPatterns(attempts: Attempt[] | null | undefined): ErrorPatterns {
-  const r: ErrorPatterns = { nullen: 0, knapp: 0, falsch: 0, skip: 0 };
-  for (const a of attempts || []) if (a.errorType && a.errorType in r) r[a.errorType]++;
-  return r;
+  return countErrors(attempts || []);
 }
 
 export interface SessionSummary { n: number; correct: number; accuracy: number; points: number; avgTimeMs: number }

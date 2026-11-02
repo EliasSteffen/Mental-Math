@@ -3,9 +3,8 @@ import type {
   Activity, ApmPoint, Attempt, CategoryId, DailyPoint, HeatCell, Mode, PersonalBest, Recommendation, Reviews, Session, StreakInfo, XpInfo,
 } from '../types.ts';
 import { t } from '../i18n/index.ts';
-import { SUBTYPES, activeCategories, mixCategories } from './catalog.ts';
-import { weaknesses } from './scoring.ts';
-import { dueReviews } from './review.ts';
+import { SUBTYPES, activeCategoryIds, mixCategories } from './catalog.ts';
+import { nextStep } from '../vendor/learning.ts';
 
 const pad = (n: number): string => String(n).padStart(2, '0');
 const keyOf = (d: Date): string => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
@@ -107,34 +106,39 @@ export function recommendation(
   now: number = Date.now(),
   { enabledCategories = null }: { enabledCategories?: CategoryId[] | null } = {},
 ): Recommendation {
-  const cats = activeCategories(enabledCategories);
-  const active = new Set<string>(cats.map((c) => c.id));
-  const due = dueReviews(reviews, now).filter((r) => {
-    const s = SUBTYPES[r.subtype];
-    return Boolean(s && active.has(s.category));
+  // Rangfolge (Wiederholung > Schwäche > Neues > gemischt) aus packages/learning-engine; hier nur Modus und Texte.
+  // Neues nur aus den Kategorien gemischter Runden (keine Drills wie das 1×1).
+  const step = nextStep(attempts || [], reviews, now, {
+    catalog: SUBTYPES,
+    categories: activeCategoryIds(enabledCategories),
+    newCategories: mixCategories(enabledCategories).map((c) => c.id),
   });
-  if (due.length) {
-    return {
-      kind: 'review', mode: 'review', subtype: null,
-      title: t('core.rec.review.title'),
-      reason: t(due.length === 1 ? 'core.rec.review.one' : 'core.rec.review.many', { n: due.length }),
-    };
+  switch (step.kind) {
+    case 'review': {
+      const n = step.due.length;
+      return {
+        kind: 'review', mode: 'review', subtype: null,
+        title: t('core.rec.review.title'),
+        reason: t(n === 1 ? 'core.rec.review.one' : 'core.rec.review.many', { n }),
+      };
+    }
+    case 'weak': {
+      const { subtype, accuracy } = step.deficit;
+      return {
+        kind: 'weak', mode: subtype, subtype,
+        title: SUBTYPES[subtype]?.name ?? subtype,
+        reason: t('core.rec.weak.reason', { pct: Math.round(accuracy * 100) }),
+      };
+    }
+    case 'new':
+      return {
+        kind: 'new', mode: step.subtype, subtype: step.subtype,
+        title: SUBTYPES[step.subtype]?.name ?? step.subtype,
+        reason: t('core.rec.new.reason'),
+      };
+    case 'mixed':
+      return { kind: 'mixed', mode: 'all', subtype: null, title: t('core.rec.mixed.title'), reason: t('core.rec.mixed.reason') };
   }
-  const weak = weaknesses(attempts, 1, { enabledCategories })[0];
-  if (weak) {
-    return {
-      kind: 'weak', mode: weak.subtype, subtype: weak.subtype,
-      title: weak.name,
-      reason: t('core.rec.weak.reason', { pct: Math.round(weak.accuracy * 100) }),
-    };
-  }
-  const seen = new Set((attempts || []).map((a) => a.subtype));
-  // Neues nur aus den Kategorien gemischter Runden vorschlagen (keine Drills wie das 1×1)
-  for (const c of mixCategories(enabledCategories)) {
-    const s = Object.values(SUBTYPES).find((x) => x.category === c.id && !seen.has(x.id));
-    if (s) return { kind: 'new', mode: s.id, subtype: s.id, title: s.name, reason: t('core.rec.new.reason') };
-  }
-  return { kind: 'mixed', mode: 'all', subtype: null, title: t('core.rec.mixed.title'), reason: t('core.rec.mixed.reason') };
 }
 
 /** Beste Session eines Modus: niedrigste Ø-Zeit je Aufgabe bei ≥ 5 Aufgaben und ≥ 80 % richtig */

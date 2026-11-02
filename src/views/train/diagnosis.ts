@@ -1,8 +1,12 @@
 // Fehlerdiagnose (E15) und Runden-Erkenntnis (E20) als reine Funktionen – ohne DOM, damit sie testbar sind.
 // Feedback informiert statt zu urteilen: Titel = Diagnose, Detail = was konkret anders war.
-import type { ErrorType, Evaluation, Task } from '../../types.ts';
+import type { Evaluation, Task } from '../../types.ts';
 import { fmt, fmtSeconds, unitFactor } from '../../core/numbers.ts';
 import { t } from '../../i18n/index.ts';
+import { roundInsight as engineRoundInsight } from '../../vendor/learning.ts';
+import type { RoundInsight } from '../../vendor/learning.ts';
+
+export type { RoundInsight } from '../../vendor/learning.ts';
 
 export type FeedbackKind = 'good' | 'bad' | 'skip';
 
@@ -100,37 +104,9 @@ export function diagnose({ task, given, ev, timeMs, timedOut = false, showPoints
 
 /* ---------- Runden-Erkenntnis (E20) ---------- */
 
-export interface RoundInsight {
-  type: ErrorType;
-  count: number;
-  /** Häufigster Subtyp unter den Fehlern dieses Typs (für den Tipp) */
-  subtype: string;
-}
-
-/** Bei Gleichstand gewinnt der aussagekräftigere Fehlertyp. */
-const TYPE_ORDER: readonly ErrorType[] = ['nullen', 'knapp', 'falsch', 'skip'];
-
-/** Häufigster Fehlertyp der Runde – erst ab 2 Fehlern, sonst null. */
+/** Häufigster Fehlertyp der Runde samt häufigstem Subtyp – erst ab 2 Fehlern, sonst null (packages/learning-engine). */
 export function roundInsight(
   results: ReadonlyArray<{ task: Pick<Task, 'subtype'>; ev: Pick<Evaluation, 'correct' | 'errorType'> }>,
 ): RoundInsight | null {
-  const wrong = results.filter((r) => !r.ev.correct);
-  if (wrong.length < 2) return null;
-  const byType = new Map<ErrorType, string[]>();
-  for (const r of wrong) {
-    const type: ErrorType = r.ev.errorType ?? 'falsch';
-    byType.set(type, [...(byType.get(type) ?? []), r.task.subtype]);
-  }
-  let best: ErrorType | null = null;
-  for (const type of TYPE_ORDER) {
-    const n = byType.get(type)?.length ?? 0;
-    if (n > 0 && (best === null || n > (byType.get(best)?.length ?? 0))) best = type;
-  }
-  if (best === null) return null;
-  const subs = byType.get(best) ?? [];
-  const counts = new Map<string, number>();
-  for (const s of subs) counts.set(s, (counts.get(s) ?? 0) + 1);
-  let subtype = subs[0] ?? '';
-  for (const [s, n] of counts) if (n > (counts.get(subtype) ?? 0)) subtype = s;
-  return { type: best, count: subs.length, subtype };
+  return engineRoundInsight(results.map((r) => ({ subtype: r.task.subtype, correct: r.ev.correct, errorType: r.ev.errorType })));
 }

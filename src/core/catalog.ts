@@ -105,6 +105,11 @@ export function activeCategories(enabled?: readonly CategoryId[] | null): Catego
   return list.length ? list : visible;
 }
 
+/** IDs der aktiven Kategorien als Menge (für Filter im Lernstand-Modell). */
+export function activeCategoryIds(enabled?: readonly CategoryId[] | null): Set<string> {
+  return new Set<string>(activeCategories(enabled).map((c) => c.id));
+}
+
 /** Kategorien für gemischte Runden („Alle“, Daily): aktive ohne Drills; nur Drills aktiv → die Drills. */
 export function mixCategories(enabled?: readonly CategoryId[] | null): Category[] {
   const active = activeCategories(enabled);
