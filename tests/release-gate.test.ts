@@ -101,10 +101,22 @@ test('Workflows passen zusammen: ios.yml hat den Upload-Schritt, Deploy und PRs 
   assert.match(ios, /branches: \[main, develop, 'hotfix\/\*\*'\]/);
   const deploy = read('deploy.yml');
   assert.match(deploy, /uses: \.\/\.github\/workflows\/release-gate\.yml/);
-  // Vorschau nie mit den Supabase-Werten der Produktion
-  const preview = deploy.slice(deploy.indexOf('- name: Bauen (Vorschau)'), deploy.indexOf('- uses: cloudflare/wrangler-action'));
-  assert.match(preview, /DEPLOY_CHANNEL: preview/);
-  assert.match(preview, /vars\.PREVIEW_SUPABASE_URL/);
-  assert.doesNotMatch(preview, /vars\.PUBLIC_SUPABASE/);
+  const step = (name: string): string => {
+    const start = deploy.indexOf(`- name: ${name}`);
+    assert.ok(start >= 0, `Schritt „${name}“ fehlt`);
+    const next = deploy.indexOf('\n      - ', start + 1);
+    return deploy.slice(start, next < 0 ? undefined : next);
+  };
+  // develop-Vorschau: Vorschau-Kanal, aber dasselbe Supabase wie die Produktion (Konto mit Passkeys)
+  const develop = step('Bauen (Vorschau mit Konto, develop)');
+  assert.match(develop, /DEPLOY_CHANNEL: preview/);
+  assert.match(develop, /vars\.PUBLIC_SUPABASE_URL/);
+  assert.match(develop, /account == 'true'/);
+  // PR-Vorschauen (*.pages.dev): keine Passkeys möglich, also gar kein Supabase
+  const pr = step('Bauen (Vorschau ohne Konto, Pull Requests)');
+  assert.match(pr, /DEPLOY_CHANNEL: preview/);
+  assert.doesNotMatch(pr, /SUPABASE/);
+  assert.match(deploy, /if \[ "\$EVENT" = pull_request \]; then\n\s+branch="pr-\$PR"; channel=preview; account=false/);
+  assert.doesNotMatch(step('Bauen (Produktion)'), /DEPLOY_CHANNEL/);
   assert.match(read('release-gate.yml'), /pull_request:\n {4}branches: \[main\]/);
 });

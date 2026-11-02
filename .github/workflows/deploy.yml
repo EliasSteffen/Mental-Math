@@ -3,7 +3,9 @@
 #   Push auf develop  → Vorschau   https://develop.mental-math.pages.dev  = https://preview.mental-math.elias-steffen.de
 #   Push auf main     → Produktion https://mental-math.elias-steffen.de  – nur mit iOS-Build desselben Codes (Release-Gate)
 # Vorschauen bauen mit DEPLOY_CHANNEL=preview (noindex, „Vorschau“ unter Profil → Über, eigener Name auf dem
-# Home-Bildschirm) und nur mit den PREVIEW_*-Variablen, nie mit den Supabase-Werten der Produktion.
+# Home-Bildschirm). Die develop-Vorschau nutzt dasselbe Supabase und dieselben Passkeys wie die Produktion
+# (RP-ID mental-math.elias-steffen.de gilt auch für preview.…); PR-Vorschauen (*.pages.dev) laufen ohne Konto,
+# weil Passkeys dort nicht gehen.
 # Einrichtung: README.md → Deployment und → Branches, Vorschau & Release.
 name: Deploy
 
@@ -73,18 +75,23 @@ jobs:
           PR: ${{ github.event.pull_request.number }}
           REF_NAME: ${{ github.ref_name }}
         run: |
+          # account: Konto (Supabase + Passkeys) nur in Produktion und auf preview.mental-math.elias-steffen.de
           if [ "$EVENT" = pull_request ]; then
-            branch="pr-$PR"; channel=preview
+            branch="pr-$PR"; channel=preview; account=false
           elif [ "$REF_NAME" = main ]; then
-            branch=main; channel=production
+            branch=main; channel=production; account=true
             echo "url=https://mental-math.elias-steffen.de" >> "$GITHUB_OUTPUT"
+          elif [ "$REF_NAME" = develop ]; then
+            branch=develop; channel=preview; account=true
+            echo "url=https://preview.mental-math.elias-steffen.de" >> "$GITHUB_OUTPUT"
           else
             # Branch-Alias wie bei Cloudflare: klein, nur a–z, 0–9 und Bindestrich, höchstens 28 Zeichen
-            branch=$(printf '%s' "$REF_NAME" | tr 'A-Z' 'a-z' | tr -c 'a-z0-9-' '-' | cut -c1-28); channel=preview
+            branch=$(printf '%s' "$REF_NAME" | tr 'A-Z' 'a-z' | tr -c 'a-z0-9-' '-' | cut -c1-28); channel=preview; account=false
           fi
           echo "branch=$branch" >> "$GITHUB_OUTPUT"
           echo "channel=$channel" >> "$GITHUB_OUTPUT"
-          echo "Ziel: $channel (Branch-Alias $branch)"
+          echo "account=$account" >> "$GITHUB_OUTPUT"
+          echo "Ziel: $channel (Branch-Alias $branch, Konto: $account)"
 
       - name: Bauen (Produktion)
         if: steps.target.outputs.channel == 'production'
@@ -95,14 +102,20 @@ jobs:
           # Passkeys der iOS-App: erzeugt /.well-known/apple-app-site-association (README → iOS-App)
           APPLE_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
 
-      - name: Bauen (Vorschau)
-        if: steps.target.outputs.channel == 'preview'
+      - name: Bauen (Vorschau mit Konto, develop)
+        if: steps.target.outputs.channel == 'preview' && steps.target.outputs.account == 'true'
         run: npm run build
         env:
           DEPLOY_CHANNEL: preview
-          # Eigenes Supabase-Projekt für Vorschauen; leer = Vorschau ohne Konto und Sync
-          PUBLIC_SUPABASE_URL: ${{ vars.PREVIEW_SUPABASE_URL }}
-          PUBLIC_SUPABASE_ANON_KEY: ${{ vars.PREVIEW_SUPABASE_ANON_KEY }}
+          # Dasselbe Supabase wie die Produktion: gleiche Konten, gleiche Daten
+          PUBLIC_SUPABASE_URL: ${{ vars.PUBLIC_SUPABASE_URL }}
+          PUBLIC_SUPABASE_ANON_KEY: ${{ vars.PUBLIC_SUPABASE_ANON_KEY }}
+
+      - name: Bauen (Vorschau ohne Konto, Pull Requests)
+        if: steps.target.outputs.channel == 'preview' && steps.target.outputs.account != 'true'
+        run: npm run build
+        env:
+          DEPLOY_CHANNEL: preview
 
       - uses: cloudflare/wrangler-action@v3
         id: deploy
