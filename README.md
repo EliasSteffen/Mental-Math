@@ -21,7 +21,7 @@ Details: [docs/SPEC.md](docs/SPEC.md)
 - **Verlauf pro Kategorie** (14 Tage) auf der Analyse-Seite
 - **Themes** (Neon, OLED, Pastel, System), Einstellungen, Haptik/Sound, ±-Taste für Minus auf iOS
 - **PWA**: auf dem Handy installierbar, funktioniert offline (außer KI)
-- **App für iPhone, iPad und Mac** (Apple Silicon, „Designed for iPad“) aus demselben Code (Capacitor), gebaut und zu App Store Connect hochgeladen von GitHub Actions – siehe [iOS-App](#ios-app-app-store)
+- **App für iPhone und iPad** aus demselben Code (Capacitor), gebaut und zu App Store Connect hochgeladen von GitHub Actions – siehe [iOS-App](#ios-app-app-store)
 
 ## Lokal starten
 
@@ -168,7 +168,7 @@ Mehr ist nicht nötig: Die VAPID-Schlüssel erzeugt der Server beim ersten Aufru
 
 Dieselbe Web-App läuft als native iOS-App ([Capacitor](https://capacitorjs.com)). `ios/` enthält das Xcode-Projekt; die Web-Dateien aus `dist/` kopiert `npx cap sync ios` bei jedem Build hinein. **Bei Änderungen an der App ist an der iOS-Seite nichts anzupassen** – die Pipeline baut sie mit.
 
-**iPhone, iPad und Mac aus einem Binary:** Das Target unterstützt iPhone und iPad (`TARGETED_DEVICE_FAMILY = "1,2"`; iPad in allen Ausrichtungen, also mit Split View und Stage Manager; iPhone im Hochformat). Auf Macs mit Apple Silicon läuft dieselbe App als „Designed for iPad“ (`SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD`), ohne Mac Catalyst. Ab 768 px zeigt die Oberfläche die Seitenleiste; ohne Touch (Mac) entfällt das Bildschirm-Tastenfeld. `tests/ios-devices.test.ts` schützt diese Einstellungen. Lokal testen: in Xcode als Ziel einen iPad-Simulator oder „My Mac (Designed for iPad)“ wählen. Offene Punkte vor dem ersten iPad-Release: [docs/ROADMAP.md](docs/ROADMAP.md) §1.2.
+**iPhone und iPad aus einem Binary, kein Mac:** Das Target unterstützt iPhone und iPad (`TARGETED_DEVICE_FAMILY = "1,2"`). Das iPad läuft in allen Ausrichtungen, also mit Split View und Stage Manager; das iPhone bleibt im Hochformat. Mac Catalyst und „Designed for iPad“ auf Apple-Silicon-Macs sind aus (`SUPPORTS_MACCATALYST`, `SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD` = `NO`). Ab 768 px zeigt die Oberfläche die Seitenleiste. `tests/ios-devices.test.ts` schützt diese Einstellungen. Lokal testen: in Xcode einen iPad-Simulator als Ziel wählen. Offene Punkte vor dem ersten iPad-Release: [docs/ROADMAP.md](docs/ROADMAP.md) §1.2.
 
 **Was in der App anders ist** – alles in `src/platform/` (Feature-Code ruft nur `src/platform/index.ts` auf):
 
@@ -224,7 +224,7 @@ npm run ios:open
 - **URLs:** Datenschutz `https://mental-math.elias-steffen.de/datenschutz`, Support `https://mental-math.elias-steffen.de/hilfe`, Marketing (optional) `https://mental-math.elias-steffen.de/neuigkeiten`. Die Seiten erzeugt `scripts/pages.ts` beim Build (Deutsch und Englisch, Neuigkeiten aus `src/releases.ts`); in der App verlinkt unter Profil → Über.
 - **App-Datenschutz:** ohne Konto keine Daten; mit Konto Nutzer-ID und Trainingsdaten (mit der Identität verknüpft, App-Funktionalität), kein Tracking. KI-Erklärungen schicken nur Aufgabendaten an Google Gemini. `ios/App/App/PrivacyInfo.xcprivacy` entsprechend prüfen.
 - **Screenshots** 6,9″ (z. B. iPhone 17 Pro Max im Simulator) und iPad 13″ (z. B. iPad Pro 13-inch (M4); Pflicht, weil die App das iPad unterstützt), Kategorie *Bildung*, Altersfreigabe
-- **Mac:** unter *Preise und Verfügbarkeit* „iPhone- und iPad-Apps auf Apple-Silicon-Macs“ aktiviert lassen, dann erscheint die App auch im Mac App Store
+- **Kein Mac:** unter *Preise und Verfügbarkeit* „iPhone- und iPad-Apps auf Apple-Silicon-Macs“ abwählen, sonst bietet der Mac App Store die iPad-App trotzdem an
 - **Hinweise für die Prüfung:** Die App funktioniert ohne Konto; Konto (Passkey) und KI-Erklärungen sind optional; Erinnerungen unter *Profil → Erinnerungen*
 - **EU:** Händlerstatus nach dem Digital Services Act angeben
 - Exportkonformität ist im `Info.plist` erledigt (`ITSAppUsesNonExemptEncryption = NO`)
@@ -265,7 +265,7 @@ server/rate-limit.ts        ← Rate-Limit-Logik (In-Memory-Fallback + Durable-O
 functions/api/push/[[path]].ts ← Push-Erinnerungen (Abo, Einstellungen, Test, Cron-Takt)
 server/push*.ts             ← Push-Handler, Web-Push-Verschlüsselung + VAPID, Supabase-Speicher (Texte: src/core/reminder-messages.ts)
 server/app-origin.ts        ← CORS für die iOS-App (capacitor://localhost), functions/api/_middleware.ts
-ios/                        ← Xcode-Projekt der App für iPhone, iPad und Mac (Capacitor), eigene Plugins NativeAuthPlugin.swift, AppStorePlugin.swift
+ios/                        ← Xcode-Projekt der App für iPhone und iPad (Capacitor), eigene Plugins NativeAuthPlugin.swift, AppStorePlugin.swift
 packages/learning-engine/   ← Lernstand-Modell (Skill, Schwächen, Stufe, Wiederholung, Empfehlung) + Labor (Simulation, Replay, Tuning)
 packages/offline-sync/      ← Offline-first Speicher mit Outbox und Sync (Supabase-Adapter)
 packages/passkey-auth/      ← Konto per Passkey (Client, Server, Supabase)

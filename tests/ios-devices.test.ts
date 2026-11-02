@@ -1,5 +1,6 @@
-// iPhone, iPad und Mac (Apple Silicon, „Designed for iPad“) aus einem Binary: schützt die Projekt-Einstellungen dafür.
-// Xcode schreibt project.pbxproj und Info.plist gern beim Öffnen um; fällt dabei das iPad weg, schlägt dieser Test fehl.
+// iPhone und iPad aus einem Binary, kein Mac: schützt die Projekt-Einstellungen dafür.
+// Xcode schreibt project.pbxproj und Info.plist gern beim Öffnen um; fällt dabei das iPad weg oder kommt der Mac dazu,
+// schlägt dieser Test fehl.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -32,14 +33,14 @@ test('App-Target: iPhone und iPad (TARGETED_DEVICE_FAMILY = "1,2") in Debug und 
   for (const c of configs) assert.match(c, /TARGETED_DEVICE_FAMILY = "1,2";/);
 });
 
-test('Mac: als iPad-App auf Apple-Silicon-Macs, kein Mac Catalyst', () => {
+test('kein Mac: weder Mac Catalyst noch „Designed for iPad“ auf Apple-Silicon-Macs', () => {
   for (const c of targetConfigs()) {
-    assert.match(c, /SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = YES;/);
+    assert.match(c, /SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;/);
     assert.match(c, /SUPPORTS_MACCATALYST = NO;/);
   }
 });
 
-test('iPad: alle vier Ausrichtungen (Split View, Stage Manager, frei skalierbares Mac-Fenster)', () => {
+test('iPad: alle vier Ausrichtungen (Split View, Stage Manager)', () => {
   const ipad = plistArray('UISupportedInterfaceOrientations~ipad');
   assert.ok(ipad, 'UISupportedInterfaceOrientations~ipad fehlt');
   assert.deepEqual([...ipad].sort(), [
@@ -58,7 +59,7 @@ test('iPhone bleibt im Hochformat', () => {
   assert.deepEqual(plistArray('UISupportedInterfaceOrientations'), ['UIInterfaceOrientationPortrait']);
 });
 
-test('App-Icon: ein universelles 1024er-Icon deckt iPhone, iPad und Mac ab', () => {
+test('App-Icon: ein universelles 1024er-Icon deckt iPhone und iPad ab', () => {
   const icon = JSON.parse(readFileSync(new URL('ios/App/App/Assets.xcassets/AppIcon.appiconset/Contents.json', ROOT), 'utf8')) as {
     images: Array<{ idiom?: string; size?: string; platform?: string }>;
   };

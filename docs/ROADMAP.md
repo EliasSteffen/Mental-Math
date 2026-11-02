@@ -1,7 +1,7 @@
 # Roadmap – nach 1.15.0
 
 Stand: 2026-11-02. Es geht um drei Dinge.
-1. Die App auf iPad und Mac bringen.
+1. Die App aufs iPad bringen (iPhone und iPad, bewusst kein Mac).
 2. Das Lernstand-Modell als eigenes Paket weiterentwickeln, mit Messungen statt Bauchgefühl.
 3. Die nächsten Funktionen und technischen Anpassungen.
 
@@ -11,27 +11,28 @@ Leitplanken aus [PLAN-v5.md](PLAN-v5.md), [PLAN-v8.md](PLAN-v8.md) und [DESIGN-M
 
 | Wann | Was | Status |
 |---|---|---|
-| jetzt | iPad und Mac aus demselben Binary (Xcode-Projekt, Ausrichtungen, Schutz-Test) | ✅ erledigt (Branch `claude/ecstatic-feynman-yvfbb7`) |
+| jetzt | iPhone und iPad aus demselben Binary, kein Mac (Xcode-Projekt, Ausrichtungen, Schutz-Test) | ✅ erledigt (Branch `claude/ecstatic-feynman-yvfbb7`) |
 | jetzt | Lernstand-Modell als Paket `packages/learning-engine`, App unverändert im Verhalten | ✅ erledigt |
 | jetzt | Labor: Simulation, Replay echter Exporte, Tuning, Qualitäts-Schranken | ✅ erledigt |
-| 1.16 | Release „iPad & Mac“: Store-Screenshots, Gerätetests, Release Notes | offen (Checkliste §1.2) |
+| 1.16 | Release „iPad“: Store-Screenshots, Gerätetests, Release Notes | offen (Checkliste §1.2) |
 | 1.17 | Genauere Schwächen (E1–E3) + Einstufungstest (F1) | offen, im Labor vorbereitet |
 | 1.18 | Interview-Plan (F2/F3) + Vorhersage-Modell (E4) + Vergessen (E5) | offen |
-| später | Zweispaltige Layouts, Widgets, Mac Catalyst, weitere Sprachen | Ideen |
+| später | Zweispaltige Layouts, Widgets, weitere Sprachen | Ideen |
 
 ---
 
-## 1. iPad und Mac
+## 1. iPad
 
 ### 1.1 Umgesetzt
 
-- **Ein Binary für iPhone, iPad und Mac.** `TARGETED_DEVICE_FAMILY = "1,2"` macht die App zu einer echten iPad-App, nicht mehr nur hochskaliert. `SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = YES` lässt dieselbe App auf Apple-Silicon-Macs laufen („Designed for iPad“). `SUPPORTS_MACCATALYST = NO` bleibt vorerst so, siehe §1.4.
-- **Ausrichtungen.** Das iPhone bleibt im Hochformat. Auf dem iPad gehen alle vier Ausrichtungen (`UISupportedInterfaceOrientations~ipad`). Das ist Voraussetzung für Split View und Stage Manager und für ein frei skalierbares Fenster auf dem Mac.
-- **Schutz-Test.** `tests/ios-devices.test.ts` schlägt fehl, wenn Xcode beim Öffnen das iPad, die Mac-Option oder die Ausrichtungen verliert.
+- **Ein Binary für iPhone und iPad.** `TARGETED_DEVICE_FAMILY = "1,2"` macht die App zu einer echten iPad-App, nicht mehr nur hochskaliert.
+- **Kein Mac.** `SUPPORTS_MACCATALYST` und `SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD` stehen auf `NO` (Entscheidung siehe §1.4).
+- **Ausrichtungen.** Das iPhone bleibt im Hochformat. Auf dem iPad gehen alle vier Ausrichtungen (`UISupportedInterfaceOrientations~ipad`). Das ist Voraussetzung für Split View und Stage Manager.
+- **Schutz-Test.** `tests/ios-devices.test.ts` schlägt fehl, wenn Xcode beim Öffnen das iPad oder die Ausrichtungen verliert oder ein Mac-Ziel dazukommt.
 - **Kein neuer Web-Code nötig.**
   - Die Oberfläche hat ab 768 px schon die Seitenleiste mit zentriertem Inhalt (E23), darunter das Telefon-Layout.
-  - Das Tastenfeld folgt `pointer: coarse`: Auf dem iPad gibt es das Bildschirm-Tastenfeld, auf dem Mac die Eingabe per Tastatur.
-  - Geprüft per Screenshot bei 375 × 1032 (Split View ⅓), 744 × 1133 (iPad mini), 1180 × 820 (iPad 11″ quer), 1376 × 1032 (iPad 13″ quer) und 1280 × 800 (Mac-Fenster). Bei keiner Größe scrollt die Seite waagrecht.
+  - Das Tastenfeld folgt `pointer: coarse`: Auf dem iPad gibt es das Bildschirm-Tastenfeld.
+  - Geprüft per Screenshot bei 375 × 1032 (Split View ⅓), 744 × 1133 (iPad mini), 1180 × 820 (iPad 11″ quer) und 1376 × 1032 (iPad 13″ quer). Bei keiner Größe scrollt die Seite waagrecht.
 - **Native Teile sind iPad-tauglich.**
   - Der Bewertungsdialog nutzt die aktive `UIWindowScene`.
   - Passkeys verankern sich am Fenster der WebView.
@@ -40,38 +41,34 @@ Leitplanken aus [PLAN-v5.md](PLAN-v5.md), [PLAN-v8.md](PLAN-v8.md) und [DESIGN-M
 ### 1.2 Checkliste vor dem ersten Release mit iPad (1.16)
 
 - [ ] **Store-Screenshots iPad 13″** (2064 × 2752 hoch oder 2752 × 2064 quer). Sie sind Pflicht, sobald das Binary das iPad unterstützt. Simulator „iPad Pro 13-inch (M4)“: Heute, Training, Fortschritt, Lernen.
-- [ ] **App Store Connect → Preise und Verfügbarkeit → „iPhone- und iPad-Apps auf Apple-Silicon-Macs“** prüfen. Die Option muss aktiv sein, damit die App im Mac App Store erscheint.
-- [ ] **Gerätetests.** Am iPad: Simulator und, wenn möglich, ein echtes Gerät. Am Mac: in Xcode das Ziel „My Mac (Designed for iPad)“.
-  - [ ] Passkey anlegen und anmelden, auf dem iPad und auf dem Mac (Associated Domain `webcredentials:`)
-  - [ ] Lokale Erinnerungen auf dem Mac (Berechtigungsdialog, Zustellung bei geschlossener App)
-  - [ ] Teilen-Menü auf dem iPad: Ergebniskarte und Export. Das Popover muss verankert sein, sonst stürzt iPadOS ab.
-  - [ ] In-App-Browser (Hilfe, Datenschutz) auf dem Mac
-  - [ ] Ein externes Keyboard am iPad: Tippen, Enter und Esc im Training, solange das Bildschirm-Tastenfeld sichtbar ist
+- [ ] **App Store Connect → Preise und Verfügbarkeit → „iPhone- und iPad-Apps auf Apple-Silicon-Macs“ abwählen.** Sonst bietet der Mac App Store die iPad-App trotzdem an; die Build-Einstellung allein verhindert das nicht.
+- [ ] **Gerätetests am iPad** (Simulator und, wenn möglich, ein echtes Gerät):
+  - [ ] Passkey anlegen und anmelden (Associated Domain `webcredentials:`)
+  - [ ] Lokale Erinnerungen (Berechtigungsdialog, Zustellung bei geschlossener App)
+  - [ ] Teilen-Menü: Ergebniskarte und Export. Das Popover muss verankert sein, sonst stürzt iPadOS ab.
+  - [ ] In-App-Browser (Hilfe, Datenschutz)
+  - [ ] Externes Keyboard: Tippen, Enter und Esc im Training, solange das Bildschirm-Tastenfeld sichtbar ist
   - [ ] Stage Manager und Split View ⅓ bis ½ beim Drehen während einer Runde (Fokus-Modus, Sheets)
   - [ ] Apple Pencil (Scribble) im Antwortfeld, wenn das Tastenfeld aus ist
 - [ ] **Release Notes** in `src/releases.ts` (de/en), Version 1.16.0 in `package.json`. Der Upload startet dann automatisch (`ios.yml`).
-- [ ] **App-Beschreibung** um iPad und Mac ergänzen; die Seite `/hilfe` ebenso.
+- [ ] **App-Beschreibung** ums iPad ergänzen; die Seite `/hilfe` ebenso.
 
 ### 1.3 Verbesserungen für große Bildschirme und Tastatur
 
 | # | Idee | Nutzen | Aufwand |
 |---|---|---|---|
-| G1 | **Zweispaltig ab ~1024 px**: Fortschritt (Diagramme nebeneinander), Lernen (Liste links, Methode rechts), Profil (Reiter links, Inhalt rechts) | Auf iPad quer und auf dem Mac bleibt heute viel Fläche leer | M |
-| G2 | **Tastatur zuerst**: sichtbare Kurzbefehle (Enter prüfen, Esc beenden, H = „Wie geht das?“, S = „Weiß nicht“), Übersicht mit `?` | Mac und iPad mit Keyboard deutlich schneller | S |
+| G1 | **Zweispaltig ab ~1024 px**: Fortschritt (Diagramme nebeneinander), Lernen (Liste links, Methode rechts), Profil (Reiter links, Inhalt rechts) | Auf dem iPad quer bleibt heute viel Fläche leer | M |
+| G2 | **Tastatur zuerst**: sichtbare Kurzbefehle (Enter prüfen, Esc beenden, H = „Wie geht das?“, S = „Weiß nicht“), Übersicht mit `?` | iPad mit Keyboard deutlich schneller | S |
 | G3 | **Hardware-Tastatur erkennen**: Nach dem ersten physischen Tastendruck blendet sich das Bildschirm-Tastenfeld für die Runde aus. Tippen bleibt möglich. | iPad mit Magic Keyboard | S |
-| G4 | **Geräteart in der Plattform-Schicht**: `deviceKind(): 'phone' \| 'tablet' \| 'mac' \| 'web'` (nativ über `userInterfaceIdiom` und `isiOSAppOnMac`). Damit lässt sich z. B. die Haptik-Einstellung auf iPad und Mac ausblenden. | Keine wirkungslosen Schalter | S |
+| G4 | **Geräteart in der Plattform-Schicht**: `deviceKind(): 'phone' \| 'tablet' \| 'web'` (nativ über `userInterfaceIdiom`). Damit lässt sich z. B. die Haptik-Einstellung auf dem iPad ausblenden (keine Taptic Engine). | Keine wirkungslosen Schalter | S |
 | G5 | **Größere Typo im Fokus-Modus** auf dem iPad (Aufgabe, Tastenfeld bis 480 px breit) | Ablesbarkeit auf Armlänge | S |
 | G6 | **Mehrere Fenster** (`UIApplicationSupportsMultipleScenes`) | Gering. Riskant, weil zwei WebViews dieselbe IndexedDB schreiben. Vorerst nicht. | L |
 
-### 1.4 Mac: Optionen
+### 1.4 Mac: bewusst nicht (Entscheidung 2026-11-02)
 
-| Weg | Heute | Plus | Minus |
-|---|---|---|---|
-| **iPad-App auf Apple Silicon** („Designed for iPad“) | ✅ aktiv | Kein Zusatzaufwand, gleiches Binary, gleiche Store-Seite, Passkeys und Erinnerungen wie auf dem iPad | Nur Apple Silicon. Menüleiste und Fenster verhalten sich nur wie auf dem Mac üblich, soweit iPadOS das bietet. |
-| **Web-App im Dock** (Safari 17+, „Zum Dock hinzufügen“) | ✅ funktioniert schon (PWA, Web Push) | Auch auf Intel-Macs, ohne Store | Keine Store-Präsenz; Passkeys laufen über das Web statt nativ |
-| **Mac Catalyst** (`SUPPORTS_MACCATALYST = YES`) | – | Intel-Macs, echte Menüleiste, Fenstergrößen, Mac-Look | Capacitor unterstützt Catalyst nicht offiziell. Jedes Plugin (Browser, Haptics, StatusBar …) muss dafür bauen. Zusätzlich ein eigenes Testziel. |
-
-**Empfehlung:** Bei „Designed for iPad“ bleiben, bis Nutzer Intel-Macs oder Mac-Menüs vermissen. Danach einen Spike machen: Catalyst in einem Branch einschalten, in CI bauen und die Bau- und Plugin-Fehler sammeln. Erst danach entscheiden.
+Es gibt keine Mac-App. Auf dem Mac bleibt die Website, die sich in Safari 17+ per „Zum Dock hinzufügen“ wie eine App nutzen lässt (PWA, offline, Web Push). Falls das Thema wiederkommt, ist der Stand der Prüfung:
+- **Mac Catalyst geht mit Capacitor 8.6 nicht ohne Umbau.** Die veröffentlichten Binärpakete (`Capacitor.xcframework`, `Cordova.xcframework` aus `capacitor-swift-pm`) enthalten nur `ios-arm64` und `ios-arm64_x86_64-simulator`, keine Mac-Catalyst-Variante. Catalyst hieße Capacitor und alle Plugins selbst zu bauen und die von `cap sync` verwaltete `Package.swift` zu ändern.
+- **Eine eigene macOS-App wäre machbar.** Gemeint ist eine AppKit-Hülle mit WKWebView, die dasselbe `dist/` lädt und Capacitors Bridge-Protokoll nur für die genutzten Plugins nachbildet: Benachrichtigungen, Teilen, Datei sichern, Passkeys samt Keychain, Browser, App Store und HTTP. Die App nutzt nur rund 15 Plugin-Methoden, daher bliebe der Web-Code unverändert. Der Preis wäre ein zweites Xcode-Projekt und ein CI-Build auf macOS.
 
 ---
 
@@ -130,7 +127,7 @@ Jeder Schritt läuft gleich ab.
 | F4 | **Case-Ketten**: mehrstufige Aufgaben wie im Interview (Marktgröße → Anteil → Umsatz → Wachstum), Zwischenergebnisse laut mitdenken | Näher an der echten Situation als Einzelaufgaben | M | – |
 | F5 | **Mehr Exhibits**: gestapelte Balken, Wasserfall, Tabellen mit Ablenkern, „Was ist die wichtigste Aussage?“ | Exhibits sind im Interview häufig und hier noch schmal | M | – |
 | F6 | **Home-Screen-Widget** (Serie, Tagesziel, fällige Wiederholungen) | Sichtbarkeit → Regelmäßigkeit | L (WidgetKit-Extension, App Group als geteilter Speicher) | – |
-| F7 | **Kurzbefehle/Siri** („Starte die Daily Challenge“), Deep Links `mentalmath://train/daily` | Schneller Einstieg auf iPhone, iPad und Mac | S–M | – |
+| F7 | **Kurzbefehle/Siri** („Starte die Daily Challenge“), Deep Links `mentalmath://train/daily` | Schneller Einstieg auf iPhone und iPad | S–M | – |
 | F8 | **Barrierefreiheit**: VoiceOver-Durchgang (Fokus-Modus, Feedback-Sheet), Dynamic Type auf iPad prüfen | Qualität, Store-Bewertung | S | – |
 | F9 | **Weitere Sprachen** (z. B. Französisch, Spanisch) – i18n ist vorbereitet | Größere Zielgruppe (Consulting ist international) | M je Sprache | – |
 | F10 | **Lerngruppen/Rangliste** (Daily Challenge im Vergleich) | Motivation | L, berührt Datenschutz | Konto |
@@ -152,7 +149,6 @@ Jeder Schritt läuft gleich ab.
 
 ## 5. Offene Entscheidungen
 
-1. **Mac:** Reicht „Designed for iPad“, oder sollen Intel-Macs und eine echte Menüleiste her (Catalyst-Spike, §1.4)?
-2. **Trainingsdaten:** Bleibt es beim lokalen Replay eigener Exporte, oder soll es eine Opt-in-Freigabe anonymer Antworten geben (E9)? Das zweite bedeutet Datenschutzerklärung, App-Store-Angaben und Speicher auf dem Server.
-3. **Release-Schnitt:** 1.16 nur „iPad & Mac“ (empfohlen, klein und gut testbar), Modell-Änderungen erst ab 1.17.
-4. **Interview-Termin (F2):** gewünscht? Davon hängt ab, wie weit E4/E5 vorgezogen werden.
+1. **Trainingsdaten:** Bleibt es beim lokalen Replay eigener Exporte, oder soll es eine Opt-in-Freigabe anonymer Antworten geben (E9)? Das zweite bedeutet Datenschutzerklärung, App-Store-Angaben und Speicher auf dem Server.
+2. **Release-Schnitt:** 1.16 nur „iPad“ (empfohlen, klein und gut testbar), Modell-Änderungen erst ab 1.17.
+3. **Interview-Termin (F2):** gewünscht? Davon hängt ab, wie weit E4/E5 vorgezogen werden.
