@@ -63,7 +63,7 @@ npm run lab        # Lernstand-Modell im Labor: Simulation, Tuning, Replay eines
 | Push auf `develop` | Vorschau der nächsten Version | `https://preview.mental-math.elias-steffen.de` (= `develop.mental-math.pages.dev`) |
 | Push auf `main` | Produktion, **nur mit iOS-Build desselben Codes** | `https://mental-math.elias-steffen.de` |
 
-Vorschauen bauen mit `DEPLOY_CHANNEL=preview`: Suchmaschinen bleiben draußen (`X-Robots-Tag: noindex`), unter *Profil → Über* steht „Vorschau“ und auf dem Home-Bildschirm „MM Preview“. Supabase nutzen sie nur über die eigenen Variablen `PREVIEW_SUPABASE_URL`/`PREVIEW_SUPABASE_ANON_KEY`, nie die der Produktion; ohne sie laufen Vorschauen ohne Konto und Sync. Pull Requests aus Forks bekommen keine Secrets und damit nur Tests. Ablauf von Release und Hotfix: [Branches, Vorschau & Release](#branches-vorschau--release).
+Vorschauen bauen mit `DEPLOY_CHANNEL=preview`: Suchmaschinen bleiben draußen (`X-Robots-Tag: noindex`), unter *Profil → Über* steht „Vorschau“ und auf dem Home-Bildschirm „MM Preview“. Die `develop`-Vorschau nutzt **dasselbe Supabase und dieselben Passkeys wie die Produktion**: Die RP-ID `mental-math.elias-steffen.de` gilt auch für die Subdomain `preview.…`, man meldet sich dort also mit demselben Passkey an und sieht dieselben Daten. PR-Vorschauen (`*.pages.dev`) laufen ohne Konto und Sync, weil Passkeys dort nicht möglich sind. Pull Requests aus Forks bekommen keine Secrets und damit nur Tests. Ablauf von Release und Hotfix: [Branches, Vorschau & Release](#branches-vorschau--release).
 
 ### Einmalige Einrichtung
 
@@ -134,19 +134,12 @@ Kommt nach dem iOS-Build noch ein Commit dazu, lädt `ios.yml` einen neuen Build
    - die Zone liegt bei Cloudflare-DNS; mit externem DNS landet die Adresse auf der Produktion
 4. **Functions der Vorschau:** Cloudflare → `mental-math` → *Settings → Variables and Secrets*, Umgebung **Preview**:
    - **KI:** `GOOGLE_API_KEY`, optional; es reicht derselbe Gratis-Schlüssel.
-   - **Konto:** ein eigenes Supabase-Projekt mit denselben SQL-Skripten wie unter [Daten](#daten), nie die Produktionsdaten. Dafür `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` und ein eigener `AUTH_JWT_KEY` für dieses Projekt. Dazu `AUTH_RP_ID=preview.mental-math.elias-steffen.de` und `AUTH_ORIGINS=https://preview.mental-math.elias-steffen.de`.
-   - **Rate-Limit:** unter *Bindings → Preview* optional `RATE_LIMITER` wie in der Produktion.
-   - PR-Vorschauen (`*.pages.dev`) haben bewusst keine Passkeys (docs/PLAN-auth.md, D12).
-5. **GitHub-Variablen** für den Build der Vorschau: `PREVIEW_SUPABASE_URL` und `PREVIEW_SUPABASE_ANON_KEY` des Vorschau-Projekts.
-
-   ```bash
-   gh variable set PREVIEW_SUPABASE_URL
-   ```
-
-   ```bash
-   gh variable set PREVIEW_SUPABASE_ANON_KEY
-   ```
-
+   - **Konto (dasselbe wie in der Produktion):** `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` und `AUTH_JWT_KEY` mit denselben Werten wie in **Production**. Dazu `AUTH_RP_ID=mental-math.elias-steffen.de`, also dieselbe RP-ID wie in der Produktion, nicht die Vorschau-Domain. Und `AUTH_ORIGINS=https://mental-math.elias-steffen.de,https://preview.mental-math.elias-steffen.de` – die Produktion zuerst, denn der erste Eintrag ist der Aussteller (`iss`) der Tokens.
+   - **Rate-Limit:** unter *Bindings → Preview* `RATE_LIMITER` wie in der Produktion; Vorschau und Produktion teilen sich dann die Grenzen.
+   - **Erinnerungen:** Mit diesen Werten gehen auch die Push-Erinnerungen in der Vorschau, über denselben Takt wie die Produktion.
+   - Ein neues Deploy (Push auf `develop`) übernimmt geänderte Werte.
+   - PR-Vorschauen (`*.pages.dev`) haben bewusst keine Passkeys (docs/PLAN-auth.md, D12). Der Build lässt dort das Konto weg.
+5. **Achtung, gleiche Daten:** Die Vorschau schreibt in die echten Konten. Änderungen am Datenformat (Sync, Speicher, SQL) müssen deshalb abwärtskompatibel sein, bevor sie auf `develop` landen. Die Produktion liest sonst, was die Vorschau geschrieben hat.
 6. **Optional:** die Vorschau mit Cloudflare Access (Zero Trust) auf dich beschränken. So verbraucht niemand sonst das KI-Kontingent.
 
 Alte PR-Vorschauen bleiben bei Cloudflare liegen. Löschen geht im Dashboard unter *Deployments* oder mit `npx wrangler pages deployment delete`.
