@@ -1,7 +1,7 @@
 # Website: Typprüfung, Tests, Build und Deploy auf Cloudflare Pages. Das Ziel hängt vom Anlass ab:
-#   Pull Request      → Vorschau   https://pr-<nr>.mental-math.pages.dev  (nur PRs aus diesem Repo; Forks: nur Tests)
-#   Push auf develop  → Vorschau   https://develop.mental-math.pages.dev  = https://preview.mental-math.elias-steffen.de
-#   Push auf main     → Produktion https://mental-math.elias-steffen.de  – nur mit iOS-Build desselben Codes (Release-Gate)
+#   Pull Request      → Vorschau   https://pr-<nr>.mental-math-8ez.pages.dev  (nur PRs aus diesem Repo; Forks: nur Tests)
+#   Push auf develop  → Vorschau   https://develop.mental-math-8ez.pages.dev = https://preview.mental-math.elias-steffen.de
+#   Push auf release  → Produktion https://mental-math.elias-steffen.de  – nur mit iOS-Build desselben Codes (Release-Gate)
 # Vorschauen bauen mit DEPLOY_CHANNEL=preview (noindex, „Vorschau“ unter Profil → Über, eigener Name auf dem
 # Home-Bildschirm). Die develop-Vorschau nutzt dasselbe Supabase und dieselben Passkeys wie die Produktion
 # (RP-ID mental-math.elias-steffen.de gilt auch für preview.…); PR-Vorschauen (*.pages.dev) laufen ohne Konto,
@@ -11,12 +11,12 @@ name: Deploy
 
 on:
   push:
-    branches: [main, develop]
+    branches: [release, develop]
   pull_request:
   workflow_dispatch:
     inputs:
       skip_ios_gate:
-        description: 'Nur main: ohne iOS-Build desselben Codes deployen (Notfall)'
+        description: 'Nur release: ohne iOS-Build desselben Codes deployen (Notfall)'
         type: boolean
         default: false
 
@@ -45,7 +45,7 @@ jobs:
   # Produktion nur, wenn genau dieser Code schon als iOS-Build in TestFlight liegt (scripts/release-gate.ts)
   release-gate:
     name: Release-Gate
-    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && !inputs.skip_ios_gate
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/release' && !inputs.skip_ios_gate
     uses: ./.github/workflows/release-gate.yml
 
   deploy:
@@ -57,7 +57,7 @@ jobs:
       && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
     runs-on: ubuntu-latest
     environment:
-      name: ${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && 'production' || 'preview' }}
+      name: ${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/release' && 'production' || 'preview' }}
       url: ${{ steps.target.outputs.url || steps.deploy.outputs.pages-deployment-alias-url || steps.deploy.outputs.deployment-url }}
     steps:
       - uses: actions/checkout@v4
@@ -78,7 +78,8 @@ jobs:
           # account: Konto (Supabase + Passkeys) nur in Produktion und auf preview.mental-math.elias-steffen.de
           if [ "$EVENT" = pull_request ]; then
             branch="pr-$PR"; channel=preview; account=false
-          elif [ "$REF_NAME" = main ]; then
+          elif [ "$REF_NAME" = release ]; then
+            # Cloudflare-Seite: „main“ ist dort der Produktions-Branch des Pages-Projekts (nicht der Git-Branch)
             branch=main; channel=production; account=true
             echo "url=https://mental-math.elias-steffen.de" >> "$GITHUB_OUTPUT"
           elif [ "$REF_NAME" = develop ]; then

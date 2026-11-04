@@ -1,8 +1,8 @@
 # iOS-App (iPhone und iPad): baut die Web-App, kopiert sie mit Capacitor ins Xcode-Projekt (ios/) und
 # - prüft bei jedem Push und Pull Request, dass die App für den Simulator baut,
 # - lädt einen Release-Kandidaten zu App Store Connect (TestFlight) hoch: bei jedem Push auf develop oder hotfix/*,
-#   solange die Version in package.json neuer ist als auf main (also noch nicht veröffentlicht), oder per Hand
-#   (Actions → iOS → Run workflow). main selbst lädt nicht hoch – das Release-Gate (release-gate.yml) lässt die
+#   solange die Version in package.json neuer ist als auf release (also noch nicht veröffentlicht), oder per Hand
+#   (Actions → iOS → Run workflow). release selbst lädt nicht hoch – das Release-Gate (release-gate.yml) lässt die
 #   Website erst live gehen, wenn genau dieser Code schon in TestFlight liegt. Der Upload-Schritt muss
 #   „Zu App Store Connect hochladen (TestFlight)“ heißen (scripts/release-gate.ts sucht ihn).
 # Einmalige Einrichtung (Apple-Konto, App Store Connect, Secrets): siehe README.md → iOS-App.
@@ -10,7 +10,7 @@ name: iOS
 
 on:
   push:
-    branches: [main, develop, 'hotfix/**']
+    branches: [release, develop, 'hotfix/**']
   pull_request:
   workflow_dispatch:
     inputs:
@@ -62,12 +62,12 @@ jobs:
           echo "version=$version" >> "$GITHUB_OUTPUT"
           upload=false
           if [ "$EVENT" = workflow_dispatch ] && [ "$UPLOAD" = true ]; then upload=true; fi
-          # Push auf develop/hotfix/*: Release-Kandidat, solange die Version neuer ist als auf main. Jeder weitere Push
+          # Push auf develop/hotfix/*: Release-Kandidat, solange die Version neuer ist als auf release. Jeder weitere Push
           # lädt einen neuen Build derselben Version hoch – das Release-Gate verlangt einen Build genau dieses Codes.
-          if [ "$EVENT" = push ] && [ "$REF" != refs/heads/main ]; then
-            released=$(git show origin/main:package.json | node -p "JSON.parse(require('fs').readFileSync(0, 'utf8')).version")
+          if [ "$EVENT" = push ] && [ "$REF" != refs/heads/release ]; then
+            released=$(git show origin/release:package.json | node -p "JSON.parse(require('fs').readFileSync(0, 'utf8')).version")
             newer=$(node -e "import('./src/releases.ts').then((m) => console.log(m.compareVersions(process.argv[1], process.argv[2]) > 0))" "$version" "$released")
-            echo "Version $version, auf main $released, neuer: $newer"
+            echo "Version $version, auf release $released, neuer: $newer"
             if [ "$newer" = true ]; then upload=true; fi
           fi
           if [ "$upload" = true ] && [ "$HAS_KEY" != true ]; then

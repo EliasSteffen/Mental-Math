@@ -98,7 +98,7 @@ test('Workflows passen zusammen: ios.yml hat den Upload-Schritt, Deploy und PRs 
   const read = (p: string): string => readFileSync(new URL(`../.github/workflows/${p}`, import.meta.url), 'utf8');
   const ios = read(IOS_WORKFLOW);
   assert.match(ios, new RegExp(`- name: ${UPLOAD_STEP.replace(/[()]/g, '\\$&')}\\n`));
-  assert.match(ios, /branches: \[main, develop, 'hotfix\/\*\*'\]/);
+  assert.match(ios, /branches: \[release, develop, 'hotfix\/\*\*'\]/);
   const deploy = read('deploy.yml');
   assert.match(deploy, /uses: \.\/\.github\/workflows\/release-gate\.yml/);
   const step = (name: string): string => {
@@ -118,5 +118,5 @@ test('Workflows passen zusammen: ios.yml hat den Upload-Schritt, Deploy und PRs 
   assert.doesNotMatch(pr, /SUPABASE/);
   assert.match(deploy, /if \[ "\$EVENT" = pull_request \]; then\n\s+branch="pr-\$PR"; channel=preview; account=false/);
   assert.doesNotMatch(step('Bauen (Produktion)'), /DEPLOY_CHANNEL/);
-  assert.match(read('release-gate.yml'), /pull_request:\n {4}branches: \[main\]/);
+  assert.match(read('release-gate.yml'), /pull_request:\n {4}branches: \[release\]/);
 });

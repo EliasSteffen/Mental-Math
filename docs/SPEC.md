@@ -8,7 +8,7 @@ Minimalistische Web-App zum Training von Case-Interview-Mathe. **Statisch** (HTM
 kopfrechner/
 ├─ README.md
 ├─ package.json        # {"type":"module"} + scripts: test = "node --test tests/*.test.js", dev = "python3 -m http.server 8080 -d public"
-├─ .github/workflows/deploy.yml   # Push auf main → Tests → Cloudflare Pages (Projekt "mental-math")
+├─ .github/workflows/deploy.yml   # Push auf release → Tests → Cloudflare Pages (develop → Vorschau) (Projekt "mental-math")
 ├─ .gitignore
 ├─ docs/SPEC.md
 ├─ public/             # ← wird ausgeliefert

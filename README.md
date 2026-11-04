@@ -51,16 +51,16 @@ npm test           # Tests (node --test, TypeScript direkt per Type-Stripping)
 ## Deployment (GitHub Actions → Cloudflare Pages)
 
 - **Repo:** `mental-math`
-- **Cloudflare-Pages-Projekt:** `mental-math` (→ `mental-math.pages.dev`)
+- **Cloudflare-Pages-Projekt:** `mental-math` (→ `mental-math-8ez.pages.dev`; `mental-math.pages.dev` gehört **nicht** zu diesem Projekt)
 - **Domain:** `mental-math.elias-steffen.de`
 
 [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) führt erst Typprüfung und Tests aus und deployt dann `dist/` (Build-Ausgabe aus `public/` + `src/`) auf Cloudflare Pages. Schlagen die Tests fehl, wird nichts deployt. Das Ziel hängt vom Anlass ab:
 
 | Anlass | Ziel | Adresse |
 |---|---|---|
-| Pull Request (aus diesem Repo) | Vorschau | `https://pr-<nr>.mental-math.pages.dev` – im PR unter „View deployment“ |
-| Push auf `develop` | Vorschau der nächsten Version | `https://preview.mental-math.elias-steffen.de` (= `develop.mental-math.pages.dev`) |
-| Push auf `main` | Produktion, **nur mit iOS-Build desselben Codes** | `https://mental-math.elias-steffen.de` |
+| Pull Request (aus diesem Repo) | Vorschau | `https://pr-<nr>.mental-math-8ez.pages.dev` – im PR unter „View deployment“ |
+| Push auf `develop` | Vorschau der nächsten Version | `https://preview.mental-math.elias-steffen.de` (= `develop.mental-math-8ez.pages.dev`) |
+| Push auf `release` | Produktion, **nur mit iOS-Build desselben Codes** | `https://mental-math.elias-steffen.de` |
 
 Vorschauen bauen mit `DEPLOY_CHANNEL=preview`: Suchmaschinen bleiben draußen (`X-Robots-Tag: noindex`), unter *Profil → Über* steht „Vorschau“ und auf dem Home-Bildschirm „MM Preview“. Die `develop`-Vorschau nutzt **dasselbe Supabase und dieselben Passkeys wie die Produktion**: Die RP-ID `mental-math.elias-steffen.de` gilt auch für die Subdomain `preview.…`, man meldet sich dort also mit demselben Passkey an und sieht dieselben Daten. PR-Vorschauen (`*.pages.dev`) laufen ohne Konto und Sync, weil Passkeys dort nicht möglich sind. Pull Requests aus Forks bekommen keine Secrets und damit nur Tests. Ablauf von Release und Hotfix: [Branches, Vorschau & Release](#branches-vorschau--release).
 
@@ -80,6 +80,8 @@ Vorschauen bauen mit `DEPLOY_CHANNEL=preview`: Suchmaschinen bleiben draußen (`
    npx wrangler pages project create mental-math --production-branch=main
    ```
 
+   `main` ist hier nur der Name des Produktions-Branches **bei Cloudflare**. `deploy.yml` deployt den Git-Branch `release` unter diesem Namen.
+
 4. **GitHub-Secrets** im Repo setzen, entweder unter *Settings → Secrets and variables → Actions* oder per CLI:
 
    ```bash
@@ -90,7 +92,7 @@ Vorschauen bauen mit `DEPLOY_CHANNEL=preview`: Suchmaschinen bleiben draußen (`
    gh secret set CLOUDFLARE_ACCOUNT_ID
    ```
 
-5. **Auf `main` pushen.** Danach ist die Seite unter `https://mental-math.pages.dev` erreichbar.
+5. **Auf `release` pushen** (per Release-PR, siehe unten). Danach ist die Seite unter `https://<projekt>.pages.dev` erreichbar, hier `https://mental-math-8ez.pages.dev`.
 6. **Eigene Domain:** Pages-Projekt `mental-math` → *Custom domains → Set up a custom domain* → `mental-math.elias-steffen.de`. Liegt die Zone `elias-steffen.de` bei Cloudflare, wird der DNS-Eintrag automatisch angelegt.
 
 > ⚠️ Das Pages-Projekt **nicht zusätzlich** per „Connect to Git“ mit GitHub verbinden, sonst wird doppelt deployt.
@@ -106,29 +108,32 @@ npx wrangler pages deploy dist --project-name=mental-math
 
 ### Branches, Vorschau & Release
 
-- **`main`** ist, was live ist (Website und App Store).
-- **`develop`** ist die nächste Version, immer unter der Vorschau-Adresse erreichbar.
-- Neue Arbeit kommt per Pull Request nach `develop`. Jeder PR bekommt seine eigene Vorschau.
+- **`release`** ist, was live ist (Website und App Store). Jeder Merge dorthin ist eine neue Version. Direkt pushen geht nicht, nur per Pull Request.
+  Weil es `release` als Branch gibt, sind Branches `release/…` nicht möglich. Releases laufen direkt per PR `develop` → `release`.
+- **`develop`** ist die nächste Version und der Standard-Branch, immer unter der Vorschau-Adresse erreichbar.
+- Neue Arbeit kommt per Pull Request nach `develop`. Jeder PR bekommt seine eigene Vorschau. Gemergte Branches löscht GitHub automatisch.
 
 **Release** – die Website geht erst live, wenn genau dieser Code als iOS-Build in TestFlight liegt:
 
 1. Auf `develop` die Version in `package.json` erhöhen, Release Notes in `src/releases.ts` ergänzen, `npm run changelog`.
-2. Push auf `develop`. [`ios.yml`](.github/workflows/ios.yml) lädt einen Build zu TestFlight hoch. Das passiert bei jedem Push auf `develop`, solange die Version neuer ist als auf `main`; TestFlight hat also immer den aktuellen Stand. Testen auf iPhone und iPad.
-3. Release-PR `develop` → `main` öffnen. Die Prüfung **Release-Gate** ([`release-gate.yml`](.github/workflows/release-gate.yml), [`scripts/release-gate.ts`](scripts/release-gate.ts)) sucht einen erfolgreichen TestFlight-Upload mit demselben Git-Tree. Läuft der iOS-Build noch, wartet sie bis zu 45 Minuten darauf.
+2. Push auf `develop`. [`ios.yml`](.github/workflows/ios.yml) lädt einen Build zu TestFlight hoch. Das passiert bei jedem Push auf `develop`, solange die Version neuer ist als auf `release`; TestFlight hat also immer den aktuellen Stand. Testen auf iPhone und iPad.
+3. Release-PR `develop` → `release` öffnen. Die Prüfung **Release-Gate** ([`release-gate.yml`](.github/workflows/release-gate.yml), [`scripts/release-gate.ts`](scripts/release-gate.ts)) sucht einen erfolgreichen TestFlight-Upload mit demselben Git-Tree. Läuft der iOS-Build noch, wartet sie bis zu 45 Minuten darauf.
 4. Mergen. `deploy.yml` prüft das Gate noch einmal und deployt die Produktion.
 5. In App Store Connect den Build der Version zuordnen und zur Prüfung einreichen.
 
-Kommt nach dem iOS-Build noch ein Commit dazu, lädt `ios.yml` einen neuen Build hoch, und das Gate wartet auf ihn. Ein Commit direkt auf `main` ohne iOS-Build hält das Deploy an.
+Kommt nach dem iOS-Build noch ein Commit dazu, lädt `ios.yml` einen neuen Build hoch, und das Gate wartet auf ihn. Ein Commit auf `release` ohne iOS-Build hält das Deploy an.
 
-**Hotfix:** Branch `hotfix/<name>` von `main`, Patch-Version erhöhen, pushen (lädt zu TestFlight hoch), PR nach `main`, mergen und danach `main` in `develop` mergen. **Notfall** ohne iOS-Build: *Actions → Deploy → Run workflow* auf `main` mit „ohne iOS-Build desselben Codes deployen“.
+**Hotfix:** Branch `hotfix/<name>` von `release`, Patch-Version erhöhen, pushen (lädt zu TestFlight hoch), PR nach `release`, mergen und danach `release` in `develop` mergen. **Notfall** ohne iOS-Build: *Actions → Deploy → Run workflow* auf `release` mit „ohne iOS-Build desselben Codes deployen“.
 
 #### Einmalige Einrichtung der Vorschau
 
-1. **Standard-Branch** (empfohlen): *Settings → General → Default branch* → `develop`, damit neue PRs dorthin zeigen.
-2. **Regeln für `main`:** *Settings → Rules → Rulesets* (oder *Branches*) mit diesen Vorgaben:
-   - Pull Request erforderlich
-   - erforderliche Prüfungen `Release-Gate / iOS-Build desselben Codes`, `Deploy / test` und `iOS / ios`
-3. **Domain:** Cloudflare → Pages-Projekt `mental-math` → *Custom domains → Set up a custom domain* → `preview.mental-math.elias-steffen.de` → *Activate*. Danach im DNS der Zone `elias-steffen.de` das Ziel des CNAME `preview` von `mental-math.pages.dev` auf **`develop.mental-math.pages.dev`** ändern. Voraussetzungen:
+1. **Standard-Branch:** *Settings → General → Default branch* → `develop`, damit neue PRs dorthin zeigen (eingerichtet).
+2. **Regeln** (*Settings → Rules → Rulesets*, eingerichtet):
+   - `release`: Pull Request erforderlich (nur Merge-Commits), kein Löschen, kein Force-Push, erforderliche Prüfungen `iOS-Build desselben Codes` (Release-Gate), `test` (Deploy) und `ios` (iOS)
+   - `develop`: kein Löschen, kein Force-Push
+   - Umgebung `production` (*Settings → Environments*): Deploy nur vom Branch `release`
+   - *Settings → General → Automatically delete head branches* an
+3. **Domain:** Cloudflare → Pages-Projekt `mental-math` → *Custom domains → Set up a custom domain* → `preview.mental-math.elias-steffen.de` → *Activate*. Danach im DNS der Zone `elias-steffen.de` das Ziel des CNAME `preview` von `mental-math-8ez.pages.dev` auf **`develop.mental-math-8ez.pages.dev`** ändern. Zeigt `preview` auf die Produktion, sieht man dort deren Code, und die Anmeldung scheitert mit 403, solange `AUTH_ORIGINS` der Produktion die Vorschau nicht enthält. Voraussetzungen:
    - ein erfolgreiches Deploy von `develop`
    - die Zone liegt bei Cloudflare-DNS; mit externem DNS landet die Adresse auf der Produktion
 4. **Functions der Vorschau:** Cloudflare → `mental-math` → *Settings → Variables and Secrets*, Umgebung **Preview**:
@@ -203,7 +208,7 @@ Zusätzlich gilt: keine Erinnerung, wenn die App in den letzten 20 Minuten offen
 
 Mehr ist nicht nötig: Die VAPID-Schlüssel erzeugt der Server beim ersten Aufruf selbst und legt sie in `push_config` ab; das Token, mit dem der Cron `/api/push/tick` aufruft, erzeugt das SQL-Skript. Bis die Skripte gelaufen sind, blendet die App die Erinnerungen aus.
 
-- **Adresse des Takts:** Standard ist `https://mental-math.pages.dev/api/push/tick` (gleiche Production-Deployment wie die eigene Domain, aber ohne deren Bot-Schutz, der Aufrufe von Supabase sonst blockieren könnte). Anderes Pages-Projekt: `update public.push_config set tick_url = 'https://<projekt>.pages.dev/api/push/tick' where id = 1;`
+- **Adresse des Takts:** Standard ist `https://mental-math-8ez.pages.dev/api/push/tick` (gleiche Production-Deployment wie die eigene Domain, aber ohne deren Bot-Schutz, der Aufrufe von Supabase sonst blockieren könnte). Anderes Pages-Projekt: `update public.push_config set tick_url = 'https://<projekt>.pages.dev/api/push/tick' where id = 1;`
 - **iPhone/iPad** (ab iOS 16.4): Web Push gibt es nur in der installierten App – erst *Teilen → Zum Home-Bildschirm*, dann in der App einschalten.
 - **iOS-App:** braucht nichts davon. Dort plant das Gerät die Erinnerungen selbst als lokale Benachrichtigungen (`src/core/reminder-plan.ts` spielt dieselben Regeln aus `src/core/reminders.ts` durch, zwei Wochen im Voraus).
 - **Optional:** Pages-Variable `PUSH_SUBJECT` (`mailto:…` oder `https://…`) als Kontakt für die Push-Dienste; Standard ist die eigene Origin.
@@ -237,7 +242,7 @@ npm run ios:sync
 npm run ios:open
 ```
 
-**Pipeline** (`.github/workflows/ios.yml`, macOS-Runner – für öffentliche Repos kostenlos): Bei jedem Push und Pull Request laufen Typprüfung, Tests und ein Simulator-Build. Bei jedem Push auf `develop` oder `hotfix/*` mit einer Version in `package.json`, die neuer ist als auf `main`, wird die App signiert, archiviert und zu App Store Connect hochgeladen (Release-Kandidat; Version = `package.json`, Build-Nummer = Lauf-Nummer). `main` selbst lädt nicht hoch, das [Release-Gate](#branches-vorschau--release) verlangt den Build vorher. Vorher prüft `scripts/asc-check.ts` Schlüssel und App. Xcode signiert und exportiert nur die `.ipa`; hochgeladen wird mit `scripts/asc-upload.ts` über die App Store Connect API, denn Xcodes eigener Upload lehnt den Team-Schlüssel mit „Cannot verify client's JWT headers“ ab. Das Skript wartet, bis Apple den Build verarbeitet hat, und meldet Ablehnungsgründe im Log. Vor dem Upload gibt die Pipeline die Entitlements der signierten App aus und bricht ab, wenn die Associated Domain `webcredentials:` fehlt (ohne sie scheitern die Passkeys der App). Per Hand: *Actions → iOS → Run workflow*. Danach in App Store Connect den Build der Version zuordnen und zur Prüfung einreichen.
+**Pipeline** (`.github/workflows/ios.yml`, macOS-Runner – für öffentliche Repos kostenlos): Bei jedem Push und Pull Request laufen Typprüfung, Tests und ein Simulator-Build. Bei jedem Push auf `develop` oder `hotfix/*` mit einer Version in `package.json`, die neuer ist als auf `release`, wird die App signiert, archiviert und zu App Store Connect hochgeladen (Release-Kandidat; Version = `package.json`, Build-Nummer = Lauf-Nummer). `release` selbst lädt nicht hoch, das [Release-Gate](#branches-vorschau--release) verlangt den Build vorher. Vorher prüft `scripts/asc-check.ts` Schlüssel und App. Xcode signiert und exportiert nur die `.ipa`; hochgeladen wird mit `scripts/asc-upload.ts` über die App Store Connect API, denn Xcodes eigener Upload lehnt den Team-Schlüssel mit „Cannot verify client's JWT headers“ ab. Das Skript wartet, bis Apple den Build verarbeitet hat, und meldet Ablehnungsgründe im Log. Vor dem Upload gibt die Pipeline die Entitlements der signierten App aus und bricht ab, wenn die Associated Domain `webcredentials:` fehlt (ohne sie scheitern die Passkeys der App). Per Hand: *Actions → iOS → Run workflow*. Danach in App Store Connect den Build der Version zuordnen und zur Prüfung einreichen.
 
 ### Einmalige Einrichtung
 

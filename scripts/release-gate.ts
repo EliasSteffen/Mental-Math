@@ -1,8 +1,8 @@
 // Release-Gate: Die Website geht nur live, wenn genau dieser Code schon als iOS-Build zu TestFlight hochgeladen ist.
 // „Genau dieser Code“ heißt: derselbe Git-Tree wie ein Commit, für den .github/workflows/ios.yml (push oder Run workflow)
 // den Upload-Schritt erfolgreich beendet hat. Der Tree-Vergleich übersteht Merge-, Squash- und Rebase-Merges, schlägt
-// aber fehl, sobald sich der Code unterscheidet (z. B. ein Commit direkt auf main ohne iOS-Build).
-// Läuft in CI: release-gate.yml (Pull Requests auf main) und deploy.yml (vor dem Produktions-Deploy).
+// aber fehl, sobald sich der Code unterscheidet (z. B. ein Commit direkt auf release ohne iOS-Build).
+// Läuft in CI: release-gate.yml (Pull Requests auf release) und deploy.yml (vor dem Produktions-Deploy).
 // Läuft gerade ein passender iOS-Lauf, wartet das Gate auf ihn (GATE_TIMEOUT_MIN, Standard 45).
 import { appendFileSync } from 'node:fs';
 
