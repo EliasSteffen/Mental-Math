@@ -9,6 +9,7 @@ Alle nennenswerten Änderungen an Mental Math. Format nach [Keep a Changelog](ht
 ### Kleine Verbesserungen
 
 - Die erste Verbesserung, die ohne Update aus dem App Store auf dein iPhone kommt.
+- Die Vorschau der nächsten Version läuft jetzt zuverlässig mit deinem Konto und deinen Daten.
 
 ## [1.16.0] - 2026-11-04
 

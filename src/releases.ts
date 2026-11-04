@@ -9,6 +9,7 @@ export const RELEASES: Release[] = [
     title: { de: 'Kleine Verbesserungen', en: 'Small improvements' },
     highlights: [
       { de: 'Die erste Verbesserung, die ohne Update aus dem App Store auf dein iPhone kommt.', en: 'The first improvement that reaches your iPhone without an App Store update.' },
+      { de: 'Die Vorschau der nächsten Version läuft jetzt zuverlässig mit deinem Konto und deinen Daten.', en: 'The preview of the next version now works reliably with your account and your data.' },
     ],
   },
   {
