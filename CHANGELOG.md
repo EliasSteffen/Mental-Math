@@ -4,6 +4,12 @@ Alle nennenswerten Änderungen an Mental Math. Format nach [Keep a Changelog](ht
 
 <!-- Automatisch erzeugt mit `npm run changelog` aus src/releases.ts – nicht von Hand bearbeiten. -->
 
+## [1.16.1] - 2026-11-04
+
+### Kleine Verbesserungen
+
+- Die erste Verbesserung, die ohne Update aus dem App Store auf dein iPhone kommt.
+
 ## [1.16.0] - 2026-11-04
 
 ### Schnellere Verbesserungen

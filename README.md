@@ -59,7 +59,7 @@ npm test           # Tests (node --test, TypeScript direkt per Type-Stripping)
 | Anlass | Ziel | Adresse |
 |---|---|---|
 | Pull Request (aus diesem Repo) | Vorschau | `https://pr-<nr>.mental-math-8ez.pages.dev` – im PR unter „View deployment“ |
-| Push auf `develop` | Vorschau der nächsten Version | `https://preview.mental-math.elias-steffen.de` (= `develop.mental-math-8ez.pages.dev`) |
+| Push auf `develop` | Vorschau der nächsten Version | `https://preview.mental-math.elias-steffen.de` (eigenes Pages-Projekt `mental-math-preview` = `mental-math-preview.pages.dev`) |
 | Push auf `release` | Produktion, **nur mit iOS-Build desselben Codes** | `https://mental-math.elias-steffen.de` |
 
 Vorschauen bauen mit `DEPLOY_CHANNEL=preview`: Suchmaschinen bleiben draußen (`X-Robots-Tag: noindex`), unter *Profil → Über* steht „Vorschau“ und auf dem Home-Bildschirm „MM Preview“. Die `develop`-Vorschau nutzt **dasselbe Supabase und dieselben Passkeys wie die Produktion**: Die RP-ID `mental-math.elias-steffen.de` gilt auch für die Subdomain `preview.…`, man meldet sich dort also mit demselben Passkey an und sieht dieselben Daten. PR-Vorschauen (`*.pages.dev`) laufen ohne Konto und Sync, weil Passkeys dort nicht möglich sind. Pull Requests aus Forks bekommen keine Secrets und damit nur Tests. Ablauf von Release und Hotfix: [Branches, Vorschau & Release](#branches-vorschau--release).
@@ -133,10 +133,8 @@ Kommt nach dem iOS-Build noch ein Commit dazu, lädt `ios.yml` einen neuen Build
    - `develop`: kein Löschen, kein Force-Push
    - Umgebung `production` (*Settings → Environments*): Deploy nur vom Branch `release`
    - *Settings → General → Automatically delete head branches* an
-3. **Domain:** Cloudflare → Pages-Projekt `mental-math` → *Custom domains → Set up a custom domain* → `preview.mental-math.elias-steffen.de` → *Activate*. Danach im DNS der Zone `elias-steffen.de` das Ziel des CNAME `preview` von `mental-math-8ez.pages.dev` auf **`develop.mental-math-8ez.pages.dev`** ändern. Zeigt `preview` auf die Produktion, sieht man dort deren Code, und die Anmeldung scheitert mit 403, solange `AUTH_ORIGINS` der Produktion die Vorschau nicht enthält. Voraussetzungen:
-   - ein erfolgreiches Deploy von `develop`
-   - die Zone liegt bei Cloudflare-DNS; mit externem DNS landet die Adresse auf der Produktion
-4. **Functions der Vorschau:** Cloudflare → `mental-math` → *Settings → Variables and Secrets*, Umgebung **Preview**:
+3. **Domain** (eingerichtet): Die Vorschau ist ein eigenes Pages-Projekt `mental-math-preview` mit `develop` als Produktions-Branch, die Domain `preview.mental-math.elias-steffen.de` hängt dort. Grund: `elias-steffen.de` liegt bei Strato. Mit DNS außerhalb von Cloudflare liefert eine eigene Domain immer die Produktion ihres Projekts aus, ein CNAME auf `develop.<projekt>.pages.dev` wirkt nicht. Bei Strato: CNAME `preview.mental-math` → `mental-math-preview.pages.dev`.
+4. **Functions der Vorschau:** Cloudflare → `mental-math-preview` → *Settings → Variables and Secrets*, Umgebung **Production** (und für PR-Vorschauen `mental-math` → **Preview**):
    - **KI:** `GOOGLE_API_KEY`, optional; es reicht derselbe Gratis-Schlüssel.
    - **Konto (dasselbe wie in der Produktion):** `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` und `AUTH_JWT_KEY` mit denselben Werten wie in **Production**. Dazu `AUTH_RP_ID=mental-math.elias-steffen.de`, also dieselbe RP-ID wie in der Produktion, nicht die Vorschau-Domain. Und `AUTH_ORIGINS=https://mental-math.elias-steffen.de,https://preview.mental-math.elias-steffen.de` – die Produktion zuerst, denn der erste Eintrag ist der Aussteller (`iss`) der Tokens.
    - **Rate-Limit:** unter *Bindings → Preview* `RATE_LIMITER` wie in der Produktion; Vorschau und Produktion teilen sich dann die Grenzen.

@@ -5,6 +5,13 @@ const DATE = '2026-10-30';
 
 export const RELEASES: Release[] = [
   {
+    version: '1.16.1', date: '2026-11-04',
+    title: { de: 'Kleine Verbesserungen', en: 'Small improvements' },
+    highlights: [
+      { de: 'Die erste Verbesserung, die ohne Update aus dem App Store auf dein iPhone kommt.', en: 'The first improvement that reaches your iPhone without an App Store update.' },
+    ],
+  },
+  {
     version: '1.16.0', date: '2026-11-04',
     title: { de: 'Schnellere Verbesserungen', en: 'Faster improvements' },
     highlights: [
