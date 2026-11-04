@@ -1,6 +1,7 @@
 # Website: Typprüfung, Tests, Build und Deploy auf Cloudflare Pages. Das Ziel hängt vom Anlass ab:
 #   Pull Request      → Vorschau   https://pr-<nr>.mental-math-8ez.pages.dev  (nur PRs aus diesem Repo; Forks: nur Tests)
-#   Push auf develop  → Vorschau   https://develop.mental-math-8ez.pages.dev = https://preview.mental-math.elias-steffen.de
+#   Push auf develop  → Vorschau   https://preview.mental-math.elias-steffen.de (eigenes Pages-Projekt mental-math-preview,
+#                                  dessen Produktions-Branch develop ist – die Domain liegt bei Strato, nicht bei Cloudflare-DNS)
 #   Push auf release  → Produktion https://mental-math.elias-steffen.de  – nur mit iOS-Build desselben Codes (Release-Gate)
 # release und develop veröffentlichen zusätzlich ein Live-Update der iOS-App (/ota/manifest.json, Kanal production bzw.
 # beta; docs/PLAN-live-updates.md).
@@ -85,21 +86,24 @@ jobs:
         run: |
           # account: Konto (Supabase + Passkeys) nur in Produktion und auf preview.mental-math.elias-steffen.de
           if [ "$EVENT" = pull_request ]; then
-            branch="pr-$PR"; channel=preview; account=false
+            branch="pr-$PR"; channel=preview; account=false; project=mental-math
           elif [ "$REF_NAME" = release ]; then
             # Cloudflare-Seite: „main“ ist dort der Produktions-Branch des Pages-Projekts (nicht der Git-Branch)
-            branch=main; channel=production; account=true
+            branch=main; channel=production; account=true; project=mental-math
             echo "url=https://mental-math.elias-steffen.de" >> "$GITHUB_OUTPUT"
           elif [ "$REF_NAME" = develop ]; then
-            branch=develop; channel=preview; account=true
+            # Eigenes Projekt: Mit DNS außerhalb von Cloudflare zeigt eine eigene Domain immer auf die Produktion ihres
+            # Projekts, nie auf einen Branch-Alias. In mental-math-preview ist develop der Produktions-Branch.
+            branch=develop; channel=preview; account=true; project=mental-math-preview
             echo "url=https://preview.mental-math.elias-steffen.de" >> "$GITHUB_OUTPUT"
           else
             # Branch-Alias wie bei Cloudflare: klein, nur a–z, 0–9 und Bindestrich, höchstens 28 Zeichen
-            branch=$(printf '%s' "$REF_NAME" | tr 'A-Z' 'a-z' | tr -c 'a-z0-9-' '-' | cut -c1-28); channel=preview; account=false
+            branch=$(printf '%s' "$REF_NAME" | tr 'A-Z' 'a-z' | tr -c 'a-z0-9-' '-' | cut -c1-28); channel=preview; account=false; project=mental-math
           fi
           echo "branch=$branch" >> "$GITHUB_OUTPUT"
           echo "channel=$channel" >> "$GITHUB_OUTPUT"
           echo "account=$account" >> "$GITHUB_OUTPUT"
+          echo "project=$project" >> "$GITHUB_OUTPUT"
           echo "Ziel: $channel (Branch-Alias $branch, Konto: $account)"
 
       - name: Bauen (Produktion)
@@ -142,7 +146,7 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy dist --project-name=mental-math --branch=${{ steps.target.outputs.branch }}
+          command: pages deploy dist --project-name=${{ steps.target.outputs.project }} --branch=${{ steps.target.outputs.branch }}
           gitHubToken: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Adresse
