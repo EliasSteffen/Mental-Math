@@ -34,7 +34,7 @@ export const multGen: Record<string, Gen> = {
   },
   'mult.square': (rng: Rng, L: Level): Task => {
     for (;;) {
-      const a = randInt(lv(L, 11, 13, 61), lv(L, 25, 99, 99), rng);
+      const a = randInt(lv(L, 11, 13, 61), lv(L, 29, 99, 99), rng);
       if (a % 10 === 0) continue;
       if (L === 3 && a % 5 === 0) continue;
       return task('mult.square', { params: { a }, prompt: `${fmt(a)} × ${fmt(a)}`, expected: a * a });

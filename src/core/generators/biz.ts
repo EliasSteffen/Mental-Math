@@ -6,6 +6,22 @@ import type { Rng } from '../numbers.ts';
 import { task, lv, decHint, placesHint, pctHint, UNIT_VALUE, bigStr } from './helpers.ts';
 import type { Gen } from './helpers.ts';
 
+/** Stunden je SLA-Zeitraum (Monat = 30 Tage) */
+export const SLA_HOURS = { year: 8760, month: 720, week: 168, day: 24 } as const;
+export type SlaPeriod = keyof typeof SLA_HOURS;
+export const slaPeriod = (x: unknown): SlaPeriod => (typeof x === 'string' && Object.hasOwn(SLA_HOURS, x) ? (x as SlaPeriod) : 'year');
+/** Erlaubte Ausfallzeit in Stunden */
+export const slaHours = (a: number, per: SlaPeriod): number => ((100 - a) / 100) * SLA_HOURS[per];
+
+// Verfügbarkeit × Zeitraum; unter 1 h wird in Minuten gefragt, unter 1 min gar nicht
+const slaPool = (as: number[], pers: SlaPeriod[]): Array<[number, SlaPeriod]> =>
+  pers.flatMap((per) => as.map((a): [number, SlaPeriod] => [a, per])).filter(([a, per]) => slaHours(a, per) * 60 >= 1);
+const SLA_POOL: Record<Level, Array<[number, SlaPeriod]>> = {
+  1: slaPool([95, 98, 99, 99.9], ['year', 'month', 'day']),
+  2: slaPool([99, 99.5, 99.9, 99.95, 99.99], ['year', 'month', 'week', 'day']),
+  3: slaPool([99.5, 99.95, 99.99, 99.8, 99.7], ['year', 'month', 'week', 'day']),
+};
+
 export const bizGen: Record<string, Gen> = {
   'biz.payback': (rng: Rng, L: Level): Task => {
     for (;;) {
@@ -49,8 +65,8 @@ export const bizGen: Record<string, Gen> = {
     }
   },
   'biz.roi': (rng: Rng, L: Level): Task => {
-    const C = pick(lv(L, [2, 4, 5, 10], [2, 4, 5, 8, 10, 20], [3, 6, 7, 9, 12, 15, 25, 40]), rng);
-    const roi = pick(lv(L, [10, 20, 50, 100], [10, 20, 25, 40, 50, 75, 100, 150, 200], [15, 30, 35, 45, 60, 80, 120, 175, 250]), rng);
+    const C = pick(lv(L, [1, 2, 4, 5, 10, 20], [2, 4, 5, 8, 10, 20], [3, 6, 7, 9, 12, 15, 25, 40]), rng);
+    const roi = pick(lv(L, [10, 20, 25, 50, 100], [10, 20, 25, 40, 50, 75, 100, 150, 200], [15, 30, 35, 45, 60, 80, 120, 175, 250]), rng);
     const B = round(C * (1 + roi / 100), 4);
     return task('biz.roi', { params: { C, B },
       prompt: tr('core.p.roi', { c: fmt(C), b: fmt(B) }),
@@ -82,11 +98,11 @@ export const bizGen: Record<string, Gen> = {
     });
   },
   'biz.sla': (rng: Rng, L: Level): Task => {
-    const a = pick(lv(L, [99, 99.9], [99, 99.5, 99.9, 99.95, 99.99], [99.5, 99.95, 99.99, 99.8, 99.7]), rng);
-    const minutes = a === 99.99;
-    const hours = ((100 - a) / 100) * 8760;
-    return task('biz.sla', { params: { a },
-      prompt: tr(minutes ? 'core.p.sla.min' : 'core.p.sla.h', { a: fmt(a) }),
+    const [a, per] = pick(SLA_POOL[L], rng);
+    const hours = slaHours(a, per);
+    const minutes = hours < 1;
+    return task('biz.sla', { params: { a, per },
+      prompt: tr(minutes ? 'core.p.sla.min' : 'core.p.sla.h', { a: fmt(a), per: tr(`core.sla.${per}`) }),
       unit: minutes ? 'min' : 'h',
       hint: tr('core.hint.tol5'),
       expected: minutes ? hours * 60 : hours,

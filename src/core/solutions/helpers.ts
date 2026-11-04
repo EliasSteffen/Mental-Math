@@ -10,7 +10,7 @@ export interface SP {
   nach: number; discount: number; m1: number; m2: number; r1: number; r2: number; T: number; base: number;
   I: number; s: number; F: number; v: number | string; R: number; G: number; C: number; B: number; O: number;
   A: number; t: number; V: number; H: number; S: number; E: number; fam: number; x: number; e: number;
-  disp: string; fact: string;
+  disp: string; fact: string; per?: string;
   ex: string; ttl: string; lab: string; s1: string; s2: string; sn: string; hd: string; k2: number; a1: number; a2: number; p1: number; p2: number; d1: string; d2: string;
 }
 export type StepFn = (p: SP, task: Task) => string[];
