@@ -345,4 +345,6 @@ export interface Release {
   title: ReleaseNote;
   highlights: ReleaseNote[];
 }
-export interface BuildInfo { version: string; build: string; date: string }
+/** Produktion (mental-math.elias-steffen.de, App Store) oder Vorschau (Pull Requests, develop) */
+export type BuildChannel = 'production' | 'preview';
+export interface BuildInfo { version: string; build: string; date: string; channel: BuildChannel }

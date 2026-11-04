@@ -34,7 +34,7 @@ create table if not exists public.push_config (            -- nur service_role (
   id          smallint primary key default 1 check (id = 1),
   vapid       jsonb check (vapid is null or jsonb_typeof(vapid) = 'object'),
   cron_token  text not null default replace(gen_random_uuid()::text || gen_random_uuid()::text, '-', ''),
-  tick_url    text not null default 'https://mental-math.pages.dev/api/push/tick' check (tick_url like 'https://%'),
+  tick_url    text not null default 'https://mental-math-8ez.pages.dev/api/push/tick' check (tick_url like 'https://%'),
   created_at  timestamptz not null default now()
 );
 

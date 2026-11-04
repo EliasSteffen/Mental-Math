@@ -98,6 +98,7 @@ export const settings: Record<keyof typeof De, string> = {
   rateApp: 'Rate the app',
   iosApp: 'iOS app',
   build: 'Build',
+  channelPreview: 'Preview',
   deviceId: 'Device ID',
   profileId: 'Profile ID',
   // Erweitert
