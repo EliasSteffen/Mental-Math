@@ -5,6 +5,14 @@ const DATE = '2026-10-30';
 
 export const RELEASES: Release[] = [
   {
+    version: '1.16.0', date: '2026-11-04',
+    title: { de: 'Schnellere Verbesserungen', en: 'Faster improvements' },
+    highlights: [
+      { de: 'Kleine Verbesserungen und Fehlerbehebungen erreichen die iPhone-App jetzt direkt – ohne Update aus dem App Store. Die App prüft beim Start, lädt im Hintergrund und wechselt erst beim nächsten Öffnen.', en: 'Small improvements and fixes now reach the iPhone app directly – without an App Store update. The app checks on launch, downloads in the background and switches over the next time you open it.' },
+      { de: 'Jedes Update ist signiert und wird vor dem Einsatz geprüft. Startet eine neue Version nicht sauber, kehrt die App automatisch zur vorherigen zurück.', en: 'Every update is signed and verified before it is used. If a new version does not start cleanly, the app automatically returns to the previous one.' },
+    ],
+  },
+  {
     version: '1.15.0', date: '2026-11-01',
     title: { de: 'iPhone-App, Einführung & Teilen', en: 'iPhone app, intro & sharing' },
     highlights: [
