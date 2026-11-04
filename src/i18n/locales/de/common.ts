@@ -60,6 +60,12 @@ export const common = {
   // App-Update (platform/web.ts)
   updateReady: 'Neue Version verfügbar',
   updateReload: 'Neu laden',
+  // Live-Update der iOS-App (platform/live-update.ts, features/whats-new.ts)
+  liveUpdateLoading: 'Update {version} wird geladen',
+  liveUpdateReady: 'Update {version} bereit',
+  liveUpdateApply: 'Jetzt aktualisieren',
+  liveUpdateDone: 'Aktualisiert auf {version}',
+  liveUpdateWhatsNew: 'Was ist neu?',
   // App-Update aus dem App Store (features/app-store.ts)
   storeUpdate: 'Update verfügbar',
   storeUpdateAction: 'Aktualisieren',

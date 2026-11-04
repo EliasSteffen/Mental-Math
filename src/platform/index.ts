@@ -111,10 +111,19 @@ export async function bootPlatform(): Promise<'ok' | 'reload'> {
   if (!isNative()) return 'ok';
   try {
     const m = await import('./live-update.ts');
-    return await m.bootLiveUpdate();
+    const r = await m.bootLiveUpdate();
+    liveUpdated = r.updatedTo;
+    return r.action;
   } catch {
     return 'ok';
   }
+}
+
+let liveUpdated: string | null = null;
+
+/** Erster Start nach einem Live-Update: die neue Version (nach bootPlatform), sonst null. Auf der Website immer null. */
+export function liveUpdatedTo(): string | null {
+  return liveUpdated;
 }
 
 /** Nach dem ersten Bild: Die Oberfläche läuft. In der App bestätigt das ein Live-Update und sucht nach neuen. */

@@ -4,6 +4,14 @@ Alle nennenswerten Änderungen an Mental Math. Format nach [Keep a Changelog](ht
 
 <!-- Automatisch erzeugt mit `npm run changelog` aus src/releases.ts – nicht von Hand bearbeiten. -->
 
+## [1.16.2] - 2026-11-04
+
+### Updates, die man sieht
+
+- Lädt die iPhone-App eine neue Version, zeigt sie das unten mit einem kleinen Fortschrittsbalken an – ohne dich beim Üben zu stören.
+- Ist das Update bereit, kannst du es mit „Jetzt aktualisieren“ sofort laden oder einfach beim nächsten Öffnen. Mitten in einer Runde passiert nie etwas.
+- Nach dem Wechsel bestätigt die App kurz die neue Version und zeigt auf Wunsch, was neu ist.
+
 ## [1.16.1] - 2026-11-04
 
 ### Kleine Verbesserungen

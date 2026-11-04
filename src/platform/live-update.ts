@@ -12,6 +12,10 @@ import {
   readManifest, readyStep, sha256Hex, toBase64,
   type LiveBundle, type LiveChannel, type LiveFile, type LiveState, type Running,
 } from '../core/live-update.ts';
+import { createNotice, updatedTo, type Notice } from '../core/live-update-notice.ts';
+import { isRoundRunning } from '../features/pwa-update.ts';
+import { t } from '../i18n/index.ts';
+import { progressToast, toast, type ProgressToast } from '../ui/toast.ts';
 import { liveUpdatePlugin, loadNative, onNativeResume, type LiveUpdateInfo } from './native.ts';
 
 const KEY = 'mm-live-update';
@@ -42,35 +46,75 @@ function channelConfig(channel: LiveChannel): { url: string; keys: readonly stri
     : { url: PUBLIC_CONFIG.liveUpdateUrl, keys: PUBLIC_CONFIG.liveUpdateKeys };
 }
 
-/**
- * Beim Start, bevor die Oberfläche zeichnet: offenen Probelauf auswerten, Reset oder vorgemerktes Bundle anwenden.
- * 'reload': Die WebView lädt gleich ein anderes Bundle – nichts zeichnen. Ohne Zustand (nie ein Update) sofort 'ok'.
- */
-export async function bootLiveUpdate(): Promise<'ok' | 'reload'> {
-  const state = load();
-  if (!state.pending && !state.trial && !state.reset) return 'ok';
+export interface BootResult {
+  /** 'reload': Die WebView lädt gleich ein anderes Bundle – nichts zeichnen. */
+  action: 'ok' | 'reload';
+  /** Erster Start nach einem Wechsel: neue Version (für „Aktualisiert auf …“), sonst null */
+  updatedTo: string | null;
+}
+
+/** Offenen Probelauf auswerten, Reset oder vorgemerktes Bundle anwenden (beim Start und per „Jetzt aktualisieren“). */
+async function applyStaged(state: LiveState): Promise<BootResult> {
   const lu = await liveUpdatePlugin();
   const info = await lu.info();
-  const r = bootStep(state, { running: runningOf(info), nativeVersion: info.nativeVersion, failed: info.failed });
+  const running = runningOf(info);
+  const r = bootStep(state, { running, nativeVersion: info.nativeVersion, failed: info.failed });
   save(r.state);
   if (r.action.kind === 'trial') {
     log('Probelauf', r.action.id);
     try {
       await lu.trial({ id: r.action.id, timeoutMs: READY_TIMEOUT_MS });
-      return 'reload';
+      return { action: 'reload', updatedTo: null };
     } catch (e) {
       // Bundle fehlt oder ist unvollständig: gleich als fehlgeschlagen merken, weiter mit dem laufenden
       log('Probelauf nicht möglich', e);
-      save(bootStep(r.state, { running: runningOf(info), nativeVersion: info.nativeVersion, failed: [r.action.id] }).state);
-      return 'ok';
+      save(bootStep(r.state, { running, nativeVersion: info.nativeVersion, failed: [r.action.id] }).state);
+      return { action: 'ok', updatedTo: null };
     }
   }
   if (r.action.kind === 'reset') {
     log('zurück zum eingebauten Bundle');
     await lu.reset();
-    return 'reload';
+    return { action: 'reload', updatedTo: null };
   }
-  return 'ok';
+  return { action: 'ok', updatedTo: updatedTo(r.state, running) };
+}
+
+/**
+ * Beim Start, bevor die Oberfläche zeichnet: offenen Probelauf auswerten, Reset oder vorgemerktes Bundle anwenden.
+ * Ohne Zustand (nie ein Update) sofort fertig.
+ */
+export async function bootLiveUpdate(): Promise<BootResult> {
+  const state = load();
+  if (!state.pending && !state.trial && !state.reset) return { action: 'ok', updatedTo: null };
+  return applyStaged(state);
+}
+
+/* ---------- Hinweise: lädt (Fortschritt), bereit („Jetzt aktualisieren“) – nie während einer Runde ---------- */
+
+let notice: Notice | null = null;
+
+function getNotice(): Notice {
+  if (notice) return notice;
+  let pill: ProgressToast | null = null;
+  let closeReady: (() => void) | null = null;
+  notice = createNotice({
+    roundRunning: () => isRoundRunning(location.hash),
+    showProgress: (v) => {
+      pill ??= progressToast(t('common.liveUpdateLoading', { version: v.version }));
+      pill.set(v.total > 0 ? v.done / v.total : 0, `${v.done}/${v.total}`);
+    },
+    hideProgress: () => { pill?.close(); pill = null; },
+    showReady: (version, onApply) => {
+      closeReady = toast(t('common.liveUpdateReady', { version }), {
+        durationMs: 0, action: { label: t('common.liveUpdateApply'), onClick: onApply },
+      });
+    },
+    hideReady: () => { closeReady?.(); closeReady = null; },
+    apply: () => { void applyStaged(load()).catch((e: unknown) => log('Anwenden fehlgeschlagen', e)); },
+  });
+  window.addEventListener('hashchange', () => notice?.routeChanged());
+  return notice;
 }
 
 let checking = false;
@@ -107,8 +151,16 @@ async function check(force: boolean): Promise<void> {
 
     const bundle = r.action.bundle;
     log('lade', bundle.version, bundle.id);
-    await download(bundle, url);
+    const n = getNotice();
+    n.loading(bundle.version, bundle.files.length);
+    try {
+      await download(bundle, url, (done, total) => n.progress(done, total));
+    } catch (e) {
+      n.failed();
+      throw e;
+    }
     save(downloadedStep(load(), bundle, channel, read.value.createdAt));
+    n.ready(bundle.version);
     log('bereit für den nächsten Start', bundle.version, bundle.id);
   } catch (e) {
     log('Prüfung fehlgeschlagen', e);
@@ -146,7 +198,7 @@ async function remoteCopy(f: LiveFile, origin: string): Promise<string> {
  * und vorgemerkt wird erst nach dem letzten geprüften Schreiben – ein abgebrochener Download wird nie gestartet und beim
  * nächsten Aufräumen gelöscht.
  */
-async function download(bundle: LiveBundle, manifestUrl: string): Promise<void> {
+async function download(bundle: LiveBundle, manifestUrl: string, onProgress: (done: number, total: number) => void): Promise<void> {
   const m = await loadNative();
   const dir = `${SNAPSHOTS}/${bundle.id}`;
   const origin = new URL(manifestUrl).origin;
@@ -154,10 +206,13 @@ async function download(bundle: LiveBundle, manifestUrl: string): Promise<void> 
   const files = [...bundle.files].sort((a, b) => Number(a.path === '/index.html') - Number(b.path === '/index.html'));
   const last = files.pop();
   let fetched = 0;
+  let done = 0;
+  const total = bundle.files.length;
   const write = async (f: LiveFile): Promise<void> => {
     let data = await localCopy(f);
     if (data === null) { data = await remoteCopy(f, origin); fetched++; }
     await m.Filesystem.writeFile({ path: `${dir}${f.path}`, data, directory: m.Directory.Library, recursive: true });
+    onProgress(++done, total);
   };
   for (let i = 0; i < files.length; i += PARALLEL) await Promise.all(files.slice(i, i + PARALLEL).map(write));
   if (last) await write(last);
