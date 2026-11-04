@@ -20,7 +20,7 @@ import type { PasskeyInfo, RecoveryStatus } from '../vendor/auth.ts';
 import * as acct from '../features/account.ts';
 import { getSyncStatus, logoutAndForgetDevice, onSyncStatus, syncNow, syncStatusEntries, wipeCloudData } from '../features/sync.ts';
 import { remindersGroup } from './settings-reminders.ts';
-import { APP_STORE_URL, isNative, openStorePage, publicUrl, saveFile } from '../platform/index.ts';
+import { APP_STORE_URL, isNative, liveUpdateBeta, openStorePage, publicUrl, saveFile, setLiveUpdateBeta } from '../platform/index.ts';
 import { showOnboarding } from '../ui/onboarding.ts';
 import { TAB_HREF } from '../ui/shell.ts';
 
@@ -287,10 +287,21 @@ function aboutGroup(): HTMLElement {
   const store = isNative()
     ? row({ icon: 'sparkles', label: t('settings.rateApp'), chevron: true, onClick: () => { void openStorePage(true); } })
     : row({ icon: 'download', label: t('settings.iosApp'), value: 'App Store', href: APP_STORE_URL, target: '_blank' });
+  // Beta-Updates (docs/PLAN-live-updates.md): nur in TestFlight-Installationen, erst sichtbar, wenn die App es bestätigt
+  const beta = switchRow({
+    label: t('settings.betaUpdates'), help: t('settings.betaUpdatesHelp'), checked: false,
+    onChange: (on) => { setLiveUpdateBeta(on); toast(t('settings.betaUpdatesNext')); },
+  });
+  beta.el.hidden = true;
+  void liveUpdateBeta().then((on) => {
+    if (on === null) return;
+    beta.set(on);
+    beta.el.hidden = false;
+  });
   const meta = (label: string, value: string, title?: string): HTMLElement =>
     h('div', null, h('dt', null, label), h('dd', { class: 'num', title }, value));
   return profGroup(t('settings.about'),
-    list([news, intro, help, privacy, store, source]),
+    list([news, intro, help, privacy, store, source, beta.el]),
     h('dl', { class: 'prof-meta' },
       meta(t('settings.build'), [BUILD_INFO.build, fmtIsoDate(BUILD_INFO.date), BUILD_INFO.channel === 'preview' ? t('settings.channelPreview') : '']
         .filter(Boolean).join(' · ')),

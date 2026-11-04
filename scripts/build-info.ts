@@ -1,5 +1,5 @@
 // Schreibt src/generated/build-info.ts (Version aus package.json, Git-Kurz-Hash, Datum, Kanal)
-// und src/generated/public-config.ts (öffentliche Supabase-Werte aus PUBLIC_* in process.env).
+// und src/generated/public-config.ts (öffentliche Werte aus PUBLIC_* in process.env: Supabase, API, Live-Updates).
 // Kanal: DEPLOY_CHANNEL=preview für Vorschau-Builds (Pull Requests, develop), sonst Produktion.
 import { execSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -8,10 +8,42 @@ import type { BuildChannel } from '../src/types.ts';
 
 const ROOT: string = fileURLToPath(new URL('..', import.meta.url));
 
-export interface PublicConfig { supabaseUrl: string; supabaseKey: string; apiOrigin: string }
+export interface PublicConfig {
+  supabaseUrl: string;
+  supabaseKey: string;
+  apiOrigin: string;
+  /** Live-Updates der iOS-App (docs/PLAN-live-updates.md): Manifest-Adressen und vertraute Schlüssel (Base64-SPKI) */
+  liveUpdateUrl: string;
+  liveUpdateBetaUrl: string;
+  liveUpdateKeys: string[];
+  liveUpdateBetaKeys: string[];
+}
 
 /** API der iOS-App (die Website nutzt relative Pfade); überschreibbar mit PUBLIC_API_ORIGIN */
 export const DEFAULT_API_ORIGIN = 'https://mental-math.elias-steffen.de';
+
+/** Beta-Manifest (develop → Vorschau); überschreibbar mit PUBLIC_LIVE_UPDATE_BETA_URL */
+export const DEFAULT_LIVE_UPDATE_BETA_URL = 'https://preview.mental-math.elias-steffen.de/ota/manifest.json';
+
+/** Manifest-Adresse: https, oder http nur auf localhost/127.0.0.1 (Test im Simulator) */
+export function validManifestUrl(url: string): boolean {
+  try {
+    const u = new URL(url);
+    if (u.username || u.password || u.search || u.hash) return false;
+    return u.protocol === 'https:' || (u.protocol === 'http:' && (u.hostname === 'localhost' || u.hostname === '127.0.0.1'));
+  } catch {
+    return false;
+  }
+}
+
+/** Base64-SPKI eines P-256-Schlüssels: fester Kopf (Algorithmus + Kurve), 65 Byte Punkt, zusammen 91 Byte */
+const P256_SPKI_RE = /^MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE[A-Za-z0-9+/]{86}==$/;
+
+/** Öffentliche Schlüssel (Komma-getrennt, Base64-SPKI P-256); ungültige fallen weg. */
+export function parseLiveUpdateKeys(raw: string | undefined): string[] {
+  return (raw ?? '').split(',').map((k) => k.trim())
+    .filter((k) => P256_SPKI_RE.test(k));
+}
 
 /** https-Origin ohne Pfad, z. B. https://mental-math.example */
 export function validApiOrigin(origin: string): boolean {
@@ -70,10 +102,17 @@ export function readPublicConfig(): PublicConfig {
   const url: string = (process.env.PUBLIC_SUPABASE_URL ?? '').trim();
   const key: string = (process.env.PUBLIC_SUPABASE_ANON_KEY ?? '').trim();
   const api: string = (process.env.PUBLIC_API_ORIGIN ?? '').trim();
+  const apiOrigin: string = validApiOrigin(api) ? api : DEFAULT_API_ORIGIN;
+  const lu: string = (process.env.PUBLIC_LIVE_UPDATE_URL ?? '').trim();
+  const luBeta: string = (process.env.PUBLIC_LIVE_UPDATE_BETA_URL ?? '').trim();
   return {
     supabaseUrl: validPublicUrl(url) ? url : '',
     supabaseKey: validPublicKey(key) ? key : '',
-    apiOrigin: validApiOrigin(api) ? api : DEFAULT_API_ORIGIN,
+    apiOrigin,
+    liveUpdateUrl: validManifestUrl(lu) ? lu : `${apiOrigin}/ota/manifest.json`,
+    liveUpdateBetaUrl: validManifestUrl(luBeta) ? luBeta : DEFAULT_LIVE_UPDATE_BETA_URL,
+    liveUpdateKeys: parseLiveUpdateKeys(process.env.PUBLIC_LIVE_UPDATE_KEYS),
+    liveUpdateBetaKeys: parseLiveUpdateKeys(process.env.PUBLIC_LIVE_UPDATE_BETA_KEYS),
   };
 }
 
@@ -89,7 +128,10 @@ export const BUILD_INFO: BuildInfo = ${JSON.stringify(info)};
 
   const cfg: PublicConfig = readPublicConfig();
   const publicOut = `// AUTOMATISCH ERZEUGT von scripts/build-info.ts – nicht bearbeiten. Nur öffentliche Werte.
-export const PUBLIC_CONFIG: { supabaseUrl: string; supabaseKey: string; apiOrigin: string } = ${JSON.stringify(cfg)};
+export const PUBLIC_CONFIG: {
+  supabaseUrl: string; supabaseKey: string; apiOrigin: string;
+  liveUpdateUrl: string; liveUpdateBetaUrl: string; liveUpdateKeys: string[]; liveUpdateBetaKeys: string[];
+} = ${JSON.stringify(cfg)};
 `;
 
   mkdirSync(`${ROOT}src/generated`, { recursive: true });
@@ -97,6 +139,7 @@ export const PUBLIC_CONFIG: { supabaseUrl: string; supabaseKey: string; apiOrigi
   writeFileSync(`${ROOT}src/generated/public-config.ts`, publicOut);
   console.log(`build-info: ${info.version} (${info.build}, ${info.date}, ${info.channel})`);
   console.log(`public-config: Supabase-URL ${cfg.supabaseUrl ? 'gesetzt' : 'leer'}, Schlüssel ${cfg.supabaseKey ? 'gesetzt' : 'leer'}`);
+  console.log(`public-config: Live-Updates ${cfg.liveUpdateKeys.length} Schlüssel (${cfg.liveUpdateUrl}), Beta ${cfg.liveUpdateBetaKeys.length}`);
 }
 
 if (import.meta.main) main();

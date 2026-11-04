@@ -99,6 +99,9 @@ export const settings: Record<keyof typeof De, string> = {
   iosApp: 'iOS app',
   build: 'Build',
   channelPreview: 'Preview',
+  betaUpdates: 'Beta updates',
+  betaUpdatesHelp: 'TestFlight only: new versions of the interface from development, before they reach the App Store.',
+  betaUpdatesNext: 'Takes effect the next time you open the app.',
   deviceId: 'Device ID',
   profileId: 'Profile ID',
   // Erweitert
