@@ -16,7 +16,9 @@
     "dev": "npm run build && python3 -m http.server 8080 -d dist",
     "dev:ai": "npm run build && npx wrangler pages dev dist --port 8788",
     "ios:sync": "npm run build && cap sync ios",
-    "ios:open": "cap open ios"
+    "ios:open": "cap open ios",
+    "native:stamp": "node scripts/native-fingerprint.ts --write",
+    "live-update:keygen": "node scripts/live-update.ts keygen"
   },
   "devDependencies": {
     "@capacitor/cli": "8.6.0",

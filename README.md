@@ -277,6 +277,10 @@ npm run ios:open
 - **EU:** Händlerstatus nach dem Digital Services Act angeben
 - Exportkonformität ist im `Info.plist` erledigt (`ITSAppUsesNonExemptEncryption = NO`)
 
+### Live-Updates (ohne Store-Release)
+
+Fehlerbehebungen und neue Trainingsmodi erreichen die App, ohne dass eine neue Version durch das App Review muss. Der Deploy von `release` (nach dem Release-Gate) veröffentlicht neben der Website ein signiertes `/ota/manifest.json`. Die App prüft es bei jedem Start, lädt geänderte Dateien im Hintergrund und wechselt beim nächsten Start. Meldet sich die neue Oberfläche nicht binnen 10 s, schaltet ein nativer Wächter (`LiveUpdatePlugin.swift`) auf die vorherige zurück. Native Änderungen (Swift, `Info.plist`, Capacitor-Plugins) brauchen weiter einen Store-Release: `npm test` meldet sie, dann Version auf die nächste Store-Version setzen und `npm run native:stamp`. Einrichtung (Schlüssel, Environments), Not-Aus (`LIVE_UPDATE=off|reset`), Beta-Kanal für TestFlight und Apples Regeln: [docs/PLAN-live-updates.md](docs/PLAN-live-updates.md).
+
 ## Daten
 
 Fortschritt und Statistiken liegen lokal in IndexedDB. Ohne Konto bleibt alles auf dem Gerät, es gibt kein Tracking. Mit Konto (Passkey) werden die Trainingsdaten über Supabase zwischen deinen Geräten synchronisiert. In den Einstellungen lassen sich die Daten als JSON exportieren, importieren oder löschen.
@@ -313,13 +317,13 @@ server/rate-limit.ts        ← Rate-Limit-Logik (In-Memory-Fallback + Durable-O
 functions/api/push/[[path]].ts ← Push-Erinnerungen (Abo, Einstellungen, Test, Cron-Takt)
 server/push*.ts             ← Push-Handler, Web-Push-Verschlüsselung + VAPID, Supabase-Speicher (Texte: src/core/reminder-messages.ts)
 server/app-origin.ts        ← CORS für die iOS-App (capacitor://localhost), functions/api/_middleware.ts
-ios/                        ← Xcode-Projekt der iOS-App (Capacitor), eigenes Plugin NativeAuthPlugin.swift
+ios/                        ← Xcode-Projekt der iOS-App (Capacitor), eigene Plugins NativeAuth, AppStore, LiveUpdate; native-version.json (minNative)
 capacitor.config.json       ← App-ID, Name, WebView-Optionen
 sql/                        ← Supabase-SQL der App (Trainingsdaten, Push + Cron)
 workers/rate-limiter/       ← Worker mit dem Durable Object RateLimiter (eigener Deploy-Workflow)
 tests/                      ← node --test (*.test.ts)
 docs/                       ← SPEC, ARCHITECTURE, PLAN-*
-.github/workflows/deploy.yml  ← CI/CD: Tests + Build + Deploy auf Cloudflare Pages (PR- und develop-Vorschau, Produktion mit Release-Gate)
+.github/workflows/deploy.yml  ← CI/CD: Tests + Build + Deploy auf Cloudflare Pages (PR- und develop-Vorschau, Produktion mit Release-Gate, Live-Update-Manifest)
 .github/workflows/release-gate.yml ← Produktion nur mit iOS-Build desselben Codes (scripts/release-gate.ts)
 .github/workflows/ios.yml     ← iOS: Simulator-Build bei jedem Push, TestFlight-Upload für Release-Kandidaten auf develop/hotfix/*
 ```

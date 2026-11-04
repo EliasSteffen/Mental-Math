@@ -2,6 +2,8 @@
 #   Pull Request      → Vorschau   https://pr-<nr>.mental-math-8ez.pages.dev  (nur PRs aus diesem Repo; Forks: nur Tests)
 #   Push auf develop  → Vorschau   https://develop.mental-math-8ez.pages.dev = https://preview.mental-math.elias-steffen.de
 #   Push auf release  → Produktion https://mental-math.elias-steffen.de  – nur mit iOS-Build desselben Codes (Release-Gate)
+# release und develop veröffentlichen zusätzlich ein Live-Update der iOS-App (/ota/manifest.json, Kanal production bzw.
+# beta; docs/PLAN-live-updates.md).
 # Vorschauen bauen mit DEPLOY_CHANNEL=preview (noindex, „Vorschau“ unter Profil → Über, eigener Name auf dem
 # Home-Bildschirm). Die develop-Vorschau nutzt dasselbe Supabase und dieselben Passkeys wie die Produktion
 # (RP-ID mental-math.elias-steffen.de gilt auch für preview.…); PR-Vorschauen (*.pages.dev) laufen ohne Konto,
@@ -59,6 +61,12 @@ jobs:
     environment:
       name: ${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/release' && 'production' || 'preview' }}
       url: ${{ steps.target.outputs.url || steps.deploy.outputs.pages-deployment-alias-url || steps.deploy.outputs.deployment-url }}
+    env:
+      # Wie im iOS-Build (ios.yml): Ein Live-Update ist dieses dist/, es muss dieselbe API und dieselben Schlüssel kennen.
+      # Fehlen die Schlüssel, nimmt die App nach diesem Update keine weiteren an (scripts/live-update.ts prüft das).
+      PUBLIC_API_ORIGIN: ${{ vars.PUBLIC_API_ORIGIN }}
+      PUBLIC_LIVE_UPDATE_KEYS: ${{ vars.LIVE_UPDATE_PUBLIC_KEYS }}
+      PUBLIC_LIVE_UPDATE_BETA_KEYS: ${{ vars.LIVE_UPDATE_BETA_PUBLIC_KEYS }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -117,6 +125,17 @@ jobs:
         run: npm run build
         env:
           DEPLOY_CHANNEL: preview
+
+      # Live-Update der iOS-App (docs/PLAN-live-updates.md): signiertes dist/ota/manifest.json – production von release
+      # (nach dem Release-Gate), beta von develop. Ohne Secret LIVE_UPDATE_SIGNING_KEY im Environment entsteht keins.
+      # Not-Aus: Variable LIVE_UPDATE=off (nichts Neues laden) bzw. reset (zurück zum eingebauten Bundle), dann neu deployen.
+      - name: Live-Update veröffentlichen
+        if: steps.target.outputs.channel == 'production' || steps.target.outputs.branch == 'develop'
+        env:
+          LIVE_UPDATE_SIGNING_KEY: ${{ secrets.LIVE_UPDATE_SIGNING_KEY }}
+          LIVE_UPDATE: ${{ vars.LIVE_UPDATE }}
+          CHANNEL: ${{ steps.target.outputs.channel == 'production' && 'production' || 'beta' }}
+        run: node scripts/live-update.ts publish --channel "$CHANNEL"
 
       - uses: cloudflare/wrangler-action@v3
         id: deploy

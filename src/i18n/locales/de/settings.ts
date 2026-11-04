@@ -97,6 +97,9 @@ export const settings = {
   iosApp: 'iOS-App',
   build: 'Build',
   channelPreview: 'Vorschau',
+  betaUpdates: 'Beta-Updates',
+  betaUpdatesHelp: 'Nur TestFlight: neue Versionen der Oberfläche aus der Entwicklung, bevor sie im App Store erscheinen.',
+  betaUpdatesNext: 'Gilt ab dem nächsten Start der App.',
   deviceId: 'Geräte-ID',
   profileId: 'Profil-ID',
   // Erweitert
