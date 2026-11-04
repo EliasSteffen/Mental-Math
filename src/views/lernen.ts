@@ -1,4 +1,5 @@
-// Lernen-Tab: Methodenliste mit Suche (#/lernen) und Detailseite je Aufgabentyp (#/lernen/:id).
+// Lernen-Tab: Methodenliste mit Suche (#/lernen), Detailseite je Aufgabentyp (#/lernen/:id) und geführter
+// Lernmodus „Schritt für Schritt“ (#/lernen/:id/schritte, views/lernen-guide.ts).
 // Die Suche filtert lokal (ohne rerender); die Scroll-Position von Liste und Detail merkt sich der Router.
 import type { Level, Subtype, Task } from '../types.ts';
 import { fmt, fmtSeconds } from '../core/numbers.ts';
@@ -18,9 +19,8 @@ import { setPrimaryAction } from '../ui/shell.ts';
 import { t } from '../i18n/index.ts';
 import { pitfallList, safeSteps, stepsList } from '../ui/widgets.ts';
 import { matchesSearch, normalizeSearch, pickNext } from './lernen-search.ts';
-
-/** Aufgaben je Übungsrunde aus dem Lernbereich (mit Methoden-Intro). */
-const PRACTICE_N = 5;
+import { hasGuided } from '../core/solutions/guided.ts';
+import { PRACTICE_N, guideHref, practiceHref, renderGuide, resetGuide } from './lernen-guide.ts';
 
 const MASTERY_RANK: Readonly<Record<Mastery, number>> = { empty: 0, half: 1, full: 2 };
 
@@ -28,8 +28,6 @@ const MASTERY_RANK: Readonly<Record<Mastery, number>> = { empty: 0, half: 1, ful
 let lastQuery = '';
 
 const subtypesOf = (categoryId: string): Subtype[] => Object.values(SUBTYPES).filter((s) => s.category === categoryId);
-
-const practiceHref = (id: string): string => `#/train/${id}?n=${PRACTICE_N}&intro=1`;
 
 /* ---------- Liste ---------- */
 
@@ -114,6 +112,14 @@ function statusLine(sub: Subtype, score: number | null | undefined, count: numbe
   return h('p', { class: 'learn-status' }, masteryMark(m), h('span', null, parts.join(' · ')));
 }
 
+/** Einstieg in den geführten Lernmodus (nur für Typen mit strukturierten Schritten); startet immer frisch. */
+function guideEntry(id: string): HTMLElement {
+  const entry = row({
+    icon: 'play', label: t('guide.entry'), sub: t('guide.entrySub'), href: guideHref(id), onClick: resetGuide, class: 'guide-entry',
+  });
+  return group(null, list([entry]));
+}
+
 /** Beispielaufgabe mit aufklappbarem Lösungsweg; „Neues Beispiel“ würfelt neu (Fokus bleibt auf dem Button). */
 function exampleGroup(sub: Subtype, lvl: Level): HTMLElement | null {
   const exhibit = h('div', { class: 'learn-exhibit' });
@@ -166,6 +172,7 @@ function renderDetail(sub: Subtype): void {
   appendChildren(app, [
     backLink({ label: t('lernen.title'), href: '#/lernen', ariaLabel: t('lernen.back') }),
     h('div', { class: 'learn-head' }, largeTitle(sub.name, cat?.name), statusLine(sub, score, count, lvl)),
+    hasGuided(sub.id) ? guideEntry(sub.id) : null,
     m?.idea ? group(t('lernen.idea'), card([h('p', { class: 'method-text' }, m.idea)])) : null,
     m?.steps?.length ? group(t('lernen.approach'), card([stepsList(m.steps)])) : null,
     exampleGroup(sub, lvl),
@@ -179,8 +186,10 @@ function renderDetail(sub: Subtype): void {
 
 /* ---------- Einstieg ---------- */
 
-export function renderLernen(openId: string | null): void {
+/** Liste, Detailseite oder – mit `guide` und für Typen mit strukturierten Schritten – der geführte Lernmodus. */
+export function renderLernen(openId: string | null, guide = false): void {
   const sub = openId && Object.hasOwn(SUBTYPES, openId) ? SUBTYPES[openId] : undefined;
+  if (sub && guide && hasGuided(sub.id) && renderGuide(sub)) return;
   if (sub) renderDetail(sub);
   else renderList();
 }
