@@ -4,12 +4,13 @@ Alle nennenswerten Änderungen an Mental Math. Format nach [Keep a Changelog](ht
 
 <!-- Automatisch erzeugt mit `npm run changelog` aus src/releases.ts – nicht von Hand bearbeiten. -->
 
-## [1.16.1] - 2026-11-04
+## [1.16.1] - 2026-11-05
 
-### Kleine Verbesserungen
+### Schritt für Schritt lernen
 
-- Die erste Verbesserung, die ohne Update aus dem App Store auf dein iPhone kommt.
-- Die Vorschau der nächsten Version läuft jetzt zuverlässig mit deinem Konto und deinen Daten.
+- Neu im Lernen-Tab: „Schritt für Schritt lernen“. Ein Rechentrick wird erst an einem Beispiel gezeigt, dann rechnest du jeden Zwischenschritt selbst – mit einem Tipp genau für den Schritt, an dem es hakt.
+- Kleine Grafiken machen die Tricks sichtbar: Flächenmodell, Zahlenstrahl, Anteilsbalken und Stellenwerte.
+- Mehr Abwechslung im Training: Dieselbe Aufgabe kommt nicht mehr kurz hintereinander, und viele Aufgabentypen haben deutlich mehr Varianten.
 
 ## [1.16.0] - 2026-11-04
 

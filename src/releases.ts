@@ -5,11 +5,12 @@ const DATE = '2026-10-30';
 
 export const RELEASES: Release[] = [
   {
-    version: '1.16.1', date: '2026-11-04',
-    title: { de: 'Kleine Verbesserungen', en: 'Small improvements' },
+    version: '1.16.1', date: '2026-11-05',
+    title: { de: 'Schritt für Schritt lernen', en: 'Learn step by step' },
     highlights: [
-      { de: 'Die erste Verbesserung, die ohne Update aus dem App Store auf dein iPhone kommt.', en: 'The first improvement that reaches your iPhone without an App Store update.' },
-      { de: 'Die Vorschau der nächsten Version läuft jetzt zuverlässig mit deinem Konto und deinen Daten.', en: 'The preview of the next version now works reliably with your account and your data.' },
+      { de: 'Neu im Lernen-Tab: „Schritt für Schritt lernen“. Ein Rechentrick wird erst an einem Beispiel gezeigt, dann rechnest du jeden Zwischenschritt selbst – mit einem Tipp genau für den Schritt, an dem es hakt.', en: 'New in the Learn tab: "Learn step by step". A math trick is first shown with an example, then you work out each intermediate step yourself – with a hint for exactly the step you are stuck on.' },
+      { de: 'Kleine Grafiken machen die Tricks sichtbar: Flächenmodell, Zahlenstrahl, Anteilsbalken und Stellenwerte.', en: 'Small graphics make the tricks visible: area model, number line, fraction bars and place values.' },
+      { de: 'Mehr Abwechslung im Training: Dieselbe Aufgabe kommt nicht mehr kurz hintereinander, und viele Aufgabentypen haben deutlich mehr Varianten.', en: 'More variety in training: the same task no longer comes up again right away, and many task types have far more variants.' },
     ],
   },
   {
