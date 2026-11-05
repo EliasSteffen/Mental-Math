@@ -1,4 +1,4 @@
-// Toasts (nur Export/Import, Sync-Fehler, Konto, App-Update – E21): gestapelt unten, im Top-Layer (popover="manual"), damit sie
+// Toasts (nur Export/Import, Sync-Fehler, Konto, App-Update, Live-Update – E21): gestapelt unten, im Top-Layer (popover="manual"), damit sie
 // auch über einem offenen Sheet oder Dialog sichtbar sind. Ohne Popover-API: fester Stapel mit hohem z-index.
 // Die Höhe über dem unteren Rand folgt dem, was dort gerade schwebt (Tab-Leiste, CTA, Dock, Feedback-Sheet).
 // Ansage: nur eine Ebene – jeder Toast ist selbst status bzw. alert, der Stapel ist keine Live-Region (sonst doppelt).
@@ -91,4 +91,35 @@ export function toast(text: string, opts: ToastOptions = {}): () => void {
   for (let i = 0; i < live.length - MAX_VISIBLE; i += 1) dismiss(live[i] as HTMLElement);
   if (!sticky) setTimeout(() => dismiss(el), durationMs);
   return () => dismiss(el);
+}
+
+/** Stehende Meldung mit Fortschritt (z. B. Live-Update lädt): set() ändert Anteil (0–1) und Zähler, close() schließt. */
+export interface ProgressToast { set(fraction: number, count: string): void; close(): void }
+
+/**
+ * Fortschritts-Pille im selben Stapel: Text bleibt stehen (nur er wird angesagt, role="status" = polite), Balken und
+ * Zähler ändern sich still. Animation: Pille steigt ein, ein leiser Glanz läuft über den Balken (nicht bei Reduced Motion).
+ */
+export function progressToast(text: string): ProgressToast {
+  const parent = getStack();
+  const fill = h('span', { class: 'toast-progress-fill' });
+  const bar = h('span', {
+    class: 'toast-progress', role: 'progressbar', 'aria-label': text,
+    'aria-valuemin': '0', 'aria-valuemax': '100', 'aria-valuenow': '0',
+  }, fill);
+  const count = h('span', { class: 'toast-count num', 'aria-hidden': 'true' });
+  const el = h('div', { class: 'toast is-info is-sticky has-progress', role: 'status' },
+    h('span', { class: 'toast-row' }, h('span', { class: 'toast-dot', 'aria-hidden': 'true' }), h('span', { class: 'toast-text' }, text), count),
+    bar);
+  raise(parent);
+  parent.append(el);
+  return {
+    set(fraction, label) {
+      const f = Math.max(0, Math.min(1, Number.isFinite(fraction) ? fraction : 0));
+      fill.style.setProperty('--progress', String(f));
+      bar.setAttribute('aria-valuenow', String(Math.round(f * 100)));
+      count.textContent = label;
+    },
+    close() { dismiss(el); },
+  };
 }

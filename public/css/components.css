@@ -572,6 +572,34 @@
   }
   .toast.has-action > .toast-text { flex:1 1 auto; min-width:0; }
   .toast.has-action > .btn { flex:none; }
+  /* Fortschritt (progressToast, Live-Update der iOS-App): Text, Zähler, Balken mit leisem Glanz */
+  .toast.has-progress { display:grid; gap:var(--space-2); min-width:min(100%, 280px); text-align:start; }
+  .toast-row { display:flex; align-items:center; gap:var(--space-2); }
+  .toast-row > .toast-text { flex:1 1 auto; min-width:0; }
+  .toast-count { flex:none; color:var(--muted); font-size:var(--text-xs); }
+  .toast-dot {
+    flex:none; width:8px; height:8px; border-radius:50%; background:var(--accent);
+    animation:toast-pulse 1.4s ease-in-out infinite;
+  }
+  .toast-progress {
+    position:relative; display:block; height:4px; border-radius:999px; overflow:hidden;
+    background:color-mix(in srgb, var(--accent) 16%, transparent);
+  }
+  .toast-progress-fill {
+    position:absolute; inset:0; border-radius:inherit; background:var(--accent);
+    transform-origin:left center; transform:scaleX(var(--progress, 0));
+    transition:transform var(--dur-state, 200ms) var(--ease-out);
+  }
+  .toast-progress-fill::after {
+    content:''; position:absolute; inset:0 auto 0 -60%; width:60%;
+    background:linear-gradient(90deg, transparent, color-mix(in srgb, var(--on-accent) 45%, transparent), transparent);
+    animation:sheen 1.6s ease-in-out infinite;
+  }
+  @keyframes toast-pulse { 50% { opacity:.35; transform:scale(.8); } }
+  @media (prefers-reduced-motion: reduce) {
+    .toast-dot, .toast-progress-fill::after { animation:none; }
+    .toast-progress-fill::after { display:none; }
+  }
 
   /* ---------- Feiern (charts.confetti, nur mit Einstellung „Feiern“): einmalig, kein Loop ---------- */
   .confetti { position:fixed; inset:0; z-index:70; pointer-events:none; overflow:hidden; }

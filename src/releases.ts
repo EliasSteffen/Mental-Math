@@ -5,6 +5,15 @@ const DATE = '2026-10-30';
 
 export const RELEASES: Release[] = [
   {
+    version: '1.16.2', date: '2026-11-05',
+    title: { de: 'Updates, die man sieht', en: 'Updates you can see' },
+    highlights: [
+      { de: 'Lädt die iPhone-App eine neue Version, zeigt sie das unten mit einem kleinen Fortschrittsbalken an – ohne dich beim Üben zu stören.', en: 'When the iPhone app downloads a new version, a small progress bar at the bottom shows it – without interrupting your practice.' },
+      { de: 'Ist das Update bereit, kannst du es mit „Jetzt aktualisieren“ sofort laden oder einfach beim nächsten Öffnen. Mitten in einer Runde passiert nie etwas.', en: 'Once the update is ready, tap “Update now” to load it right away or simply get it the next time you open the app. Nothing ever happens in the middle of a round.' },
+      { de: 'Nach dem Wechsel bestätigt die App kurz die neue Version und zeigt auf Wunsch, was neu ist.', en: 'After switching, the app briefly confirms the new version and shows you what’s new if you like.' },
+    ],
+  },
+  {
     version: '1.16.1', date: '2026-11-05',
     title: { de: 'Schritt für Schritt lernen', en: 'Learn step by step' },
     highlights: [
