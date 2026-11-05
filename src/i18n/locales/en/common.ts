@@ -62,6 +62,12 @@ export const common: Record<keyof typeof De, string> = {
   // App update (platform/web.ts)
   updateReady: 'New version available',
   updateReload: 'Reload',
+  // Live-Update der iOS-App (platform/live-update.ts, features/whats-new.ts)
+  liveUpdateLoading: 'Downloading update {version}',
+  liveUpdateReady: 'Update {version} ready',
+  liveUpdateApply: 'Update now',
+  liveUpdateDone: 'Updated to {version}',
+  liveUpdateWhatsNew: 'What’s new?',
   // App update from the App Store (features/app-store.ts)
   storeUpdate: 'Update available',
   storeUpdateAction: 'Update',

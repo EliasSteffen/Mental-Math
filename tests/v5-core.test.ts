@@ -77,7 +77,7 @@ test('Tricks: Aufgaben erfüllen die Voraussetzung des Tricks', () => {
       const q = generate('tricks.square5', Math.random, { level });
       const s = Number(q.params.n);
       assert.equal(s % 10, 5);
-      assert.ok(level === 3 ? s >= 105 && s <= 195 : s >= 15 && s <= 95);
+      assert.ok(level === 3 ? s >= 105 && s <= 295 : s >= 15 && s <= (level === 1 ? 105 : 155));
 
       const p = generate('tricks.pctswap', Math.random, { level });
       assert.ok([10, 20, 25, 50].includes(Number(p.params.y)));

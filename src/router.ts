@@ -49,7 +49,7 @@ type Route =
   | { name: 'today' }
   | { name: 'progress' }
   | { name: 'profile' }
-  | { name: 'learn'; id: string | null }
+  | { name: 'learn'; id: string | null; guide: boolean }
   | { name: 'chain' }
   | { name: 'parallel' }
   | { name: 'custom' }
@@ -105,7 +105,10 @@ function parseRoute(): Route {
   const p1 = parts[1];
   if (p0 === 'fortschritt') return { name: 'progress' };
   if (p0 === 'profil') return { name: 'profile' };
-  if (p0 === 'lernen') return { name: 'learn', id: p1 && Object.hasOwn(SUBTYPES, p1) ? p1 : null };
+  if (p0 === 'lernen') {
+    const id = p1 && Object.hasOwn(SUBTYPES, p1) ? p1 : null;
+    return { name: 'learn', id, guide: id !== null && parts[2] === 'schritte' };
+  }
   if (p0 === 'chain') return { name: 'chain' };
   if (p0 === 'parallel') return { name: 'parallel' };
   if (p0 === 'custom') return { name: 'custom' };
@@ -132,9 +135,9 @@ function tabOf(route: Route): TabId | null {
   }
 }
 
-/** Schlüssel für die gemerkte Scroll-Position (nur Tab-Seiten; Lernen-Liste und -Detail getrennt). */
+/** Schlüssel für die gemerkte Scroll-Position (nur Tab-Seiten; Lernen-Liste, -Detail und -Schritte getrennt). */
 function scrollKey(route: Route): string | null {
-  if (route.name === 'learn') return route.id ? `learn/${route.id}` : 'learn';
+  if (route.name === 'learn') return route.id ? `learn/${route.id}${route.guide ? '/guide' : ''}` : 'learn';
   return tabOf(route) ? route.name : null;
 }
 
@@ -153,7 +156,7 @@ function routeTitle(route: Route): string | null {
 
 function draw(route: Route): void {
   if (route.name === 'progress') renderAnalyse();
-  else if (route.name === 'learn') renderLernen(route.id);
+  else if (route.name === 'learn') renderLernen(route.id, route.guide);
   else if (route.name === 'profile') renderSettings();
   else if (route.name === 'chain') renderChain();
   else if (route.name === 'parallel') renderParallel();

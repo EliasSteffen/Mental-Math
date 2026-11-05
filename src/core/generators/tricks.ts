@@ -38,9 +38,9 @@ export const tricksGen: Record<string, Gen> = {
     return task('tricks.near100', { params: { a, b }, prompt: `${a} × ${b}`, expected: a * b });
   },
 
-  // Quadrat einer Zahl auf 5
+  // Quadrat einer Zahl auf 5: L1 15 … 105, L2 15 … 155, L3 105 … 295
   'tricks.square5': (rng: Rng, L: Level): Task => {
-    const n = L === 3 ? randInt(10, 19, rng) * 10 + 5 : randInt(1, L === 1 ? 5 : 9, rng) * 10 + 5;
+    const n = L === 3 ? randInt(10, 29, rng) * 10 + 5 : randInt(1, L === 1 ? 10 : 15, rng) * 10 + 5;
     return task('tricks.square5', { params: { n }, prompt: `${n}²`, expected: n * n });
   },
 

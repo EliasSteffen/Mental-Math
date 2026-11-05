@@ -5,6 +5,32 @@ const DATE = '2026-10-30';
 
 export const RELEASES: Release[] = [
   {
+    version: '1.16.2', date: '2026-11-05',
+    title: { de: 'Updates, die man sieht', en: 'Updates you can see' },
+    highlights: [
+      { de: 'Lädt die iPhone-App eine neue Version, zeigt sie das unten mit einem kleinen Fortschrittsbalken an – ohne dich beim Üben zu stören.', en: 'When the iPhone app downloads a new version, a small progress bar at the bottom shows it – without interrupting your practice.' },
+      { de: 'Ist das Update bereit, kannst du es mit „Jetzt aktualisieren“ sofort laden oder einfach beim nächsten Öffnen. Mitten in einer Runde passiert nie etwas.', en: 'Once the update is ready, tap “Update now” to load it right away or simply get it the next time you open the app. Nothing ever happens in the middle of a round.' },
+      { de: 'Nach dem Wechsel bestätigt die App kurz die neue Version und zeigt auf Wunsch, was neu ist.', en: 'After switching, the app briefly confirms the new version and shows you what’s new if you like.' },
+    ],
+  },
+  {
+    version: '1.16.1', date: '2026-11-05',
+    title: { de: 'Schritt für Schritt lernen', en: 'Learn step by step' },
+    highlights: [
+      { de: 'Neu im Lernen-Tab: „Schritt für Schritt lernen“. Ein Rechentrick wird erst an einem Beispiel gezeigt, dann rechnest du jeden Zwischenschritt selbst – mit einem Tipp genau für den Schritt, an dem es hakt.', en: 'New in the Learn tab: "Learn step by step". A math trick is first shown with an example, then you work out each intermediate step yourself – with a hint for exactly the step you are stuck on.' },
+      { de: 'Kleine Grafiken machen die Tricks sichtbar: Flächenmodell, Zahlenstrahl, Anteilsbalken und Stellenwerte.', en: 'Small graphics make the tricks visible: area model, number line, fraction bars and place values.' },
+      { de: 'Mehr Abwechslung im Training: Dieselbe Aufgabe kommt nicht mehr kurz hintereinander, und viele Aufgabentypen haben deutlich mehr Varianten.', en: 'More variety in training: the same task no longer comes up again right away, and many task types have far more variants.' },
+    ],
+  },
+  {
+    version: '1.16.0', date: '2026-11-04',
+    title: { de: 'Schnellere Verbesserungen', en: 'Faster improvements' },
+    highlights: [
+      { de: 'Kleine Verbesserungen und Fehlerbehebungen erreichen die iPhone-App jetzt direkt – ohne Update aus dem App Store. Die App prüft beim Start, lädt im Hintergrund und wechselt erst beim nächsten Öffnen.', en: 'Small improvements and fixes now reach the iPhone app directly – without an App Store update. The app checks on launch, downloads in the background and switches over the next time you open it.' },
+      { de: 'Jedes Update ist signiert und wird vor dem Einsatz geprüft. Startet eine neue Version nicht sauber, kehrt die App automatisch zur vorherigen zurück.', en: 'Every update is signed and verified before it is used. If a new version does not start cleanly, the app automatically returns to the previous one.' },
+    ],
+  },
+  {
     version: '1.15.0', date: '2026-11-01',
     title: { de: 'iPhone-App, Einführung & Teilen', en: 'iPhone app, intro & sharing' },
     highlights: [

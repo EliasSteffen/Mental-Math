@@ -4,7 +4,7 @@ name: Deploy Rate Limiter
 
 on:
   push:
-    branches: [main]
+    branches: [release]
     paths:
       - workers/rate-limiter/**
       - server/rate-limit.ts

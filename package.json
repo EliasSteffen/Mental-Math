@@ -1,6 +1,6 @@
 {
   "name": "mental-math",
-  "version": "1.15.0",
+  "version": "1.16.2",
   "private": true,
   "type": "module",
   "workspaces": [
@@ -16,7 +16,13 @@
     "dev": "npm run build && python3 -m http.server 8080 -d dist",
     "dev:ai": "npm run build && npx wrangler pages dev dist --port 8788",
     "ios:sync": "npm run build && cap sync ios",
-    "ios:open": "cap open ios"
+    "ios:open": "cap open ios",
+    "native:stamp": "node scripts/native-fingerprint.ts --write",
+    "live-update:keygen": "node scripts/live-update.ts keygen",
+    "local:keys": "node scripts/local-release.ts keys",
+    "local:preview": "node scripts/local-release.ts preview",
+    "local:testflight": "node scripts/local-release.ts testflight",
+    "local:production": "node scripts/local-release.ts production"
   },
   "devDependencies": {
     "@capacitor/cli": "8.6.0",

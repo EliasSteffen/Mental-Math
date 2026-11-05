@@ -21,6 +21,8 @@ import { customTask } from './custom.ts';
 
 export { parseU, uMul, uDiv, uInv, uMap, uStr, uRaw, p10 } from '../units.ts';
 export { CATEGORIES, SUBTYPES, LEVEL_NAMES, LEVEL_WEIGHT, activeCategories, mixCategories } from '../catalog.ts';
+export { RECENT_WINDOW, FRESH_TRIES, taskKey, pushRecent, pickFresh, noRepeat } from './recent.ts';
+export type { FreshOptions, NoRepeat } from './recent.ts';
 
 const GEN: Record<string, Gen> = {
   ...tableGen, ...multGen, ...divGen, ...bigGen, ...pctGen, ...fracGen, ...growthGen, ...bizGen, ...estGen, ...unitsGen, ...magGen, ...tricksGen, ...exhibitGen,

@@ -68,6 +68,46 @@ export async function appStorePlugin(): Promise<AppStorePlugin> {
   return storePlugin;
 }
 
+/** Antwort von LiveUpdate.info(); running/null: eingebautes Bundle, sonst Ordnername (Bundle-ID). */
+export interface LiveUpdateInfo {
+  /** CFBundleShortVersionString des Binarys */
+  nativeVersion: string;
+  nativeBuild: string;
+  /** TestFlight-Installation (Sandbox-Beleg) */
+  testFlight: boolean;
+  running: string | null;
+  /** vom Wächter bzw. Startschutz verworfene Bundles */
+  failed: string[];
+}
+
+/** Eigenes Plugin der App (ios/App/App/LiveUpdatePlugin.swift): Bundle umschalten, Wächter, Startschutz. */
+export interface LiveUpdatePlugin {
+  info(): Promise<LiveUpdateInfo>;
+  /** Bundle probeweise laden (nicht gespeichert); ohne ready() binnen timeoutMs zurück zum vorherigen. */
+  trial(o: { id: string; timeoutMs: number }): Promise<void>;
+  /** Oberfläche läuft: Wächter aus; ein geladenes Bundle wird zum Startbundle. */
+  ready(): Promise<{ running: string | null }>;
+  /** zurück zum eingebauten Bundle (lädt neu) */
+  reset(): Promise<void>;
+}
+
+let livePlugin: LiveUpdatePlugin | null = null;
+
+/** LiveUpdate als schlichtes Objekt (Proxy-`then`, siehe nativeAuthPlugin). */
+export async function liveUpdatePlugin(): Promise<LiveUpdatePlugin> {
+  const m = await loadNative();
+  if (!livePlugin) {
+    const p = m.registerPlugin<LiveUpdatePlugin>('LiveUpdate');
+    livePlugin = {
+      info: () => p.info(),
+      trial: (o) => p.trial(o),
+      ready: () => p.ready(),
+      reset: () => p.reset(),
+    };
+  }
+  return livePlugin;
+}
+
 /** App kommt zurück in den Vordergrund (Capacitor App „resume“). */
 export function onNativeResume(fn: () => void): void {
   void loadNative().then((m) => m.App.addListener('resume', fn)).catch(() => undefined);

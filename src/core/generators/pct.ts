@@ -39,7 +39,7 @@ export const pctGen: Record<string, Gen> = {
     });
   },
   'pct.points': (rng: Rng, L: Level): Task => {
-    const m1 = pick(lv(L, [5, 10, 20, 25], [4, 5, 8, 10, 12, 15, 20, 25], [6, 7, 9, 12, 15, 18, 24]), rng);
+    const m1 = pick(lv(L, [2, 4, 5, 10, 20, 25, 50], [4, 5, 8, 10, 12, 15, 20, 25], [6, 7, 9, 12, 15, 18, 24]), rng);
     const d = L === 1 ? pick([1, 2, 5], rng) : randInt(1, L === 3 ? 6 : 5, rng), m2 = m1 + d;
     const e = round((d / m1) * 100, 4);
     return task('pct.points', { params: { m1, m2 },
