@@ -40,4 +40,128 @@
   .learn-note { margin:0; font-size:var(--text-xs); line-height:1.45; color:var(--muted); }
   .learn-answer { margin:0; font-size:var(--text-sm); }
   .learn-again { align-self:flex-start; margin-left:calc(-1 * var(--space-1)); }
+
+  /* ---------- Geführter Lernmodus „Schritt für Schritt“ (views/lernen-guide.ts) ---------- */
+  .guide-entry .row-icon { color:var(--accent-text); }
+
+  /* Stufen-Leiste: drei gleich breite Schaltflächen, aktive Stufe mit Akzent */
+  .guide-stages > ol {
+    display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:var(--space-1);
+    margin:0; padding:var(--space-1); list-style:none;
+    border-radius:var(--radius-md); background:var(--surface-2);
+  }
+  .guide-stage-btn {
+    display:flex; align-items:center; justify-content:center; gap:6px;
+    width:100%; min-height:var(--hit-min); margin:0; padding:0 var(--space-2);
+    border:0; border-radius:var(--radius-sm); background:transparent; color:var(--muted);
+    font:inherit; font-size:var(--text-xs); font-weight:var(--weight-semibold); line-height:1.2; cursor:pointer;
+    transition:var(--press-transition), background-color var(--dur-state) var(--ease-out), color var(--dur-state) var(--ease-out);
+  }
+  .guide-stage-btn[aria-current="step"] { background:var(--surface); color:var(--text); box-shadow:var(--shadow-1); }
+  .guide-stage-num {
+    display:flex; flex:none; align-items:center; justify-content:center; width:20px; height:20px;
+    border-radius:var(--radius-pill); background:color-mix(in srgb, var(--text) 8%, transparent);
+    font-family:var(--font-num); font-size:12px; line-height:1;
+  }
+  .guide-stage-btn[aria-current="step"] .guide-stage-num { background:var(--accent); color:var(--on-accent); }
+  .guide-stage-btn.is-done .guide-stage-num { background:var(--good-soft); color:var(--good); }
+  .guide-stage-label { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  /* Schmale Geräte: Nummer über dem Namen, damit „Gemeinsam“ ganz lesbar bleibt */
+  @media (max-width: 440px) {
+    .guide-stage-btn { flex-direction:column; gap:2px; min-height:52px; padding:var(--space-1) 2px; }
+  }
+
+  .guide-card { gap:var(--space-4); }
+  .guide-intro { margin:0; font-size:var(--text-sm); line-height:1.45; color:var(--muted); }
+  .guide-prompt { font-family:var(--font-num); font-size:var(--text-xl); }
+  .guide-prompt.is-long { font-family:var(--font); font-size:var(--text-lg); }
+
+  /* Grafik: natürliche Größe, auf schmalen Geräten verkleinert */
+  .guide-visual { display:flex; justify-content:center; min-width:0; padding:var(--space-2) 0; }
+  .guide-visual > svg { display:block; max-width:100%; height:auto; overflow:visible; }
+
+  /* Schritte: ältere ruhig, der aktuelle betont */
+  .guide-steps { gap:var(--space-3); }
+  .guide-steps > li { color:var(--muted); }
+  .guide-steps > li.is-current, .guide-steps > li:last-child { color:var(--text); }
+  .guide-steps > li.is-current::before { background:var(--accent); color:var(--on-accent); }
+  .guide-step { animation:rise-in var(--dur-enter) var(--ease-out) both; }
+  .guide-text { margin:0; font-size:var(--text-sm); line-height:1.45; }
+  /* Rechnung als Fließtext (Ziffern derselben Zahl bleiben zusammen); das Eingabefeld steht inline in der Zeile */
+  .guide-expr {
+    margin:var(--space-1) 0 0; font-family:var(--font-num); font-size:var(--text-md); line-height:1.9;
+    font-variant-numeric:tabular-nums; color:var(--text); overflow-wrap:anywhere;
+  }
+  .guide-mark {
+    padding:1px 2px; border-radius:5px; background:var(--accent-soft); color:var(--accent-text);
+    font-weight:var(--weight-semibold); -webkit-box-decoration-break:clone; box-decoration-break:clone;
+  }
+  .guide-result { font-weight:var(--weight-bold); }
+  .guide-expr.is-solved .guide-result { color:var(--good); }
+  .guide-count { margin:0; font-size:var(--text-xs); color:var(--muted); font-variant-numeric:tabular-nums; }
+  .guide-actions { display:flex; flex-wrap:wrap; justify-content:space-between; gap:var(--space-2); margin-top:calc(-1 * var(--space-2)); }
+
+  /* Eingabe in „Gemeinsam“ und „Allein“ */
+  .guide-ask { display:flex; flex-direction:column; gap:var(--space-2); min-width:0; }
+  .guide-field { display:inline-flex; align-items:center; gap:var(--space-2); min-width:0; vertical-align:middle; }
+  .guide-answer { display:flex; align-items:center; gap:var(--space-2); min-width:0; }
+  .guide-input {
+    width:7.5em; min-width:0; height:var(--hit-min); margin:0; padding:0 var(--space-3);
+    border:2px solid var(--accent); border-radius:var(--radius-sm); background:var(--surface); color:var(--text);
+    font-family:var(--font-num); font-size:var(--text-md); font-variant-numeric:tabular-nums; text-align:end;
+    -webkit-appearance:none; appearance:none;
+  }
+  .guide-input::placeholder { color:var(--muted); opacity:1; }
+  .guide-input[aria-invalid="true"] { border-color:var(--bad); background:var(--bad-soft); }
+  .guide-input:read-only { border-color:var(--good); background:var(--good-soft); }
+  .guide-answer .guide-input { width:min(100%, 220px); height:56px; font-size:var(--text-lg); }
+  .guide-unit { color:var(--muted); font-family:var(--font-num); }
+  .guide-ask-actions { display:flex; flex-wrap:wrap; align-items:center; gap:var(--space-2); }
+  .guide-feedback, .guide-status { margin:0; font-size:var(--text-sm); line-height:1.45; color:var(--muted); }
+  .guide-feedback:empty, .guide-status:empty { display:none; }
+  .guide-feedback.is-bad { color:var(--bad); }
+  .guide-status { color:var(--good); font-weight:var(--weight-semibold); }
+  .guide-done, .guide-success { display:flex; flex-direction:column; gap:var(--space-3); }
+  .guide-done-text { margin:0; font-size:var(--text-md); font-weight:var(--weight-semibold); }
+
+  /* ---------- SVG-Grafiken (ui/guide-visuals.ts) ---------- */
+  .gv text { fill:var(--text); font-family:var(--font-num); font-size:14px; font-variant-numeric:tabular-nums; }
+  .gv .gv-label { fill:var(--muted); font-size:13px; }
+  .gv .gv-value { font-weight:var(--weight-bold); }
+  .gv .gv-muted { fill:var(--muted); }
+  .gv .gv-note { fill:var(--muted); font-size:12px; }
+  .gv .gv-digit { font-size:22px; font-weight:var(--weight-bold); }
+  .gv .gv-t-a { fill:var(--accent-text); }
+  .gv .gv-t-b { fill:var(--good); }
+  .gv .gv-t-c { fill:var(--warn); }
+  .gv .gv-zero-t { fill:var(--muted); font-size:12px; }
+
+  .gv-cell { fill:var(--surface-2); stroke:var(--border); stroke-width:1; }
+  .gv-cell.is-shown { fill:var(--accent-soft); stroke:var(--accent); }
+  .gv-neg { fill:transparent; stroke:var(--warn); stroke-width:1.5; stroke-dasharray:4 3; }
+  .gv-neg.is-shown { fill:var(--warn-soft); }
+  .gv-box { fill:var(--surface-2); stroke:var(--border); stroke-width:1; }
+  .gv-box.is-empty { fill:transparent; stroke-dasharray:4 3; }
+  .gv-chip { fill:var(--surface-2); stroke:var(--border); stroke-width:1; }
+  .gv-a { fill:var(--accent-soft); stroke:var(--accent); }
+  .gv-b { fill:var(--good-soft); stroke:var(--good); }
+  .gv-c { fill:var(--warn-soft); stroke:var(--warn); }
+  .gv-zero { fill:transparent; stroke:var(--border); stroke-width:1; }
+  .gv-brace { fill:none; stroke:var(--good); stroke-width:1.5; }
+
+  .gv-axis { stroke:var(--muted); stroke-width:1.5; }
+  .gv-tick { stroke:var(--border); stroke-width:1; }
+  .gv-arc { fill:none; stroke:var(--muted); stroke-width:2; stroke-linecap:round; }
+  .gv-arc-a { stroke:var(--accent); }
+  .gv-arc-b { stroke:var(--good); }
+  .gv-arc-c { stroke:var(--warn); }
+  .gv-dot { fill:var(--surface); stroke:var(--muted); stroke-width:2; }
+  .gv-dot-a { fill:var(--accent); stroke:var(--accent); }
+  .gv-dot-b { fill:var(--good); stroke:var(--good); }
+
+  .gv-bar { fill:var(--surface-2); stroke:var(--border); stroke-width:1; }
+  .gv-part { fill:var(--accent-soft); stroke:var(--accent); stroke-width:1; }
+  .gv-div { stroke:var(--border); stroke-width:1; }
+  .gv-cut { fill:var(--warn-soft); stroke:var(--warn); stroke-width:1.5; stroke-dasharray:4 3; }
+  .gv-extra { fill:var(--good-soft); stroke:var(--good); stroke-width:1.5; }
 }
