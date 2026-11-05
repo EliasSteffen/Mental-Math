@@ -127,6 +127,16 @@ jobs:
           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
         run: node scripts/asc-check.ts
 
+      # Jeder Lauf legt über den API-Schlüssel ein neues Entwicklungszertifikat an (der Runner hat keins); sein privater
+      # Schlüssel verschwindet mit dem Runner. Alte davon widerrufen, sonst „maximum number of certificates“.
+      # Nur „Created via API“, nur Entwicklung, nur älter als 3 Stunden (scripts/asc-certs.ts).
+      - name: Alte CI-Zertifikate widerrufen
+        if: steps.release.outputs.upload == 'true'
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+        run: node scripts/asc-certs.ts
+
       - name: Archivieren (Release)
         if: steps.release.outputs.upload == 'true'
         env:
