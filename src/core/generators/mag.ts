@@ -37,6 +37,13 @@ export const FACTS: Fact[] = [
   ['BIP Deutschland in €', '4.300 Mrd.', 4.3, 12, 3], ['Sekunden pro Jahr', '31,5 Mio.', 3.15, 7, 3],
   ['Einwohner China', '1,4 Mrd.', 1.4, 9, 3], ['Einwohner Indien', '1,4 Mrd.', 1.4, 9, 3],
   ['Sekunden pro Monat', '2,6 Mio.', 2.6, 6, 3],
+  ['Sekunden pro Stunde', '3.600', 3.6, 3, 1], ['Stunden pro Woche', '168', 1.68, 2, 1],
+  ['Erdumfang in km', '40.000', 4, 4, 1], ['Einwohner Frankreich', '68 Mio.', 6.8, 7, 1],
+  ['Einwohner Japan', '124 Mio.', 1.24, 8, 2], ['Einwohner Österreich', '9,2 Mio.', 9.2, 6, 2],
+  ['Einwohner Hamburg', '1,9 Mio.', 1.9, 6, 2], ['Entfernung Erde–Mond in km', '384.000', 3.84, 5, 2],
+  ['Minuten pro Woche', '10.080', 1.008, 4, 2],
+  ['Sekunden pro Woche', '604.800', 6.048, 5, 3], ['Lichtgeschwindigkeit in km/s', '300.000', 3, 5, 3],
+  ['Fläche Deutschland in km²', '357.000', 3.57, 5, 3], ['Einwohner Afrika', '1,5 Mrd.', 1.5, 9, 3],
 ];
 
 // Zwei Faktoren a × 10^p für Produkt/Quotient

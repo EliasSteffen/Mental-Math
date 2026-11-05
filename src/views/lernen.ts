@@ -3,7 +3,7 @@
 import type { Level, Subtype, Task } from '../types.ts';
 import { fmt, fmtSeconds } from '../core/numbers.ts';
 import { CATEGORIES, LEVEL_NAMES, SUBTYPES, activeCategories } from '../core/catalog.ts';
-import { generate } from '../core/generators/index.ts';
+import { generate, noRepeat } from '../core/generators/index.ts';
 import { categoryStats, levelFor, subtypeStats } from '../core/scoring.ts';
 import { getMethod } from '../core/methods.ts';
 import { renderExhibit } from '../ui/exhibit.ts';
@@ -119,11 +119,13 @@ function exampleGroup(sub: Subtype, lvl: Level): HTMLElement | null {
   const exhibit = h('div', { class: 'learn-exhibit' });
   const prompt = h('p', { class: 'learn-prompt', 'aria-live': 'polite' });
   const rest = h('div', { class: 'learn-example-rest' });
+  // „Neues Beispiel“ zeigt nicht gleich wieder eins der letzten
+  const fresh = noRepeat();
 
   function draw(): boolean {
     let task: Task;
     try {
-      task = generate(sub.id, Math.random, { level: lvl });
+      task = fresh.next(() => generate(sub.id, Math.random, { level: lvl }));
     } catch {
       return false;
     }

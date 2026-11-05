@@ -416,12 +416,13 @@ export const methods: Record<keyof typeof De, Method> = {
       'Take that percentage of 8,760 h (0.1% = 1/1,000 → 8.76 h).',
       'For 99.99%: work in minutes (1 year = 525,600 min), 0.01% ≈ 52.6 min.',
       'Downtime scales with the share: half the share, half the time.',
+      'Other periods work the same way: month (30 days) = 720 h, week = 168 h, day = 24 h = 1,440 min.',
     ],
     trick: '99.9%: 0.1% of 8,760 h = 8.76 h ≈ 8.8 h. 99.5%: 0.5% of 8,760 = 43.8 h. 99.99%: 0.01% of 525,600 min ≈ 52.6 min.',
     pitfalls: [
       'Using the availability instead of the downtime share.',
       'Confusing percent and per mille – 0.1% is 1/1,000, not 1/100.',
-      'Giving 99.99% in hours instead of minutes.',
+      'Answering in hours when the question asks for minutes (under 1 h).',
     ],
   },
 

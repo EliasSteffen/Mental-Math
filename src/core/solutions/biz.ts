@@ -3,6 +3,7 @@ import { t } from '../../i18n/index.ts';
 import { fmt, round } from '../numbers.ts';
 import { R, roundSig } from './helpers.ts';
 import type { SP, StepFn } from './helpers.ts';
+import { SLA_HOURS, slaHours, slaPeriod } from '../generators/biz.ts';
 
 export const bizSteps: Record<string, StepFn> = {
   'biz.payback': ({ I, s }: SP, task: Task) => {
@@ -80,14 +81,21 @@ export const bizSteps: Record<string, StepFn> = {
     ];
   },
 
-  'biz.sla': ({ a }: SP, task: Task) => {
-    const u = R(100 - a), h = R(u * 88), min = a === 99.99;
-    const steps = [
-      t('sol.biz.slaShare', { a: fmt(a), u: fmt(u) }),
-      t('sol.biz.slaYear', { h1: fmt(8760), h2: fmt(8800) }),
-      t('sol.biz.slaCalc', { u: fmt(u), h: fmt(h) }),
-    ];
-    if (min) steps.push(t('sol.biz.slaMin', { h: fmt(h), m: fmt(round(h * 60, 0)) }));
+  'biz.sla': ({ a, per: perRaw }: SP, task: Task) => {
+    // ältere Versuche ohne Zeitraum: pro Jahr
+    const per = slaPeriod(perRaw), u = R(100 - a), min = slaHours(a, per) < 1;
+    const steps = [t('sol.biz.slaShare', { a: fmt(a), u: fmt(u) })];
+    if (per === 'year') {
+      // Jahr: mit 1 % ≈ 88 h überschlagen
+      const h = R(u * 88);
+      steps.push(t('sol.biz.slaYear', { h1: fmt(8760), h2: fmt(8800) }), t('sol.biz.slaCalc', { u: fmt(u), h: fmt(h) }));
+      if (min) steps.push(t('sol.biz.slaMin', { h: fmt(h), m: fmt(round(h * 60, 0)) }));
+    } else {
+      const H = SLA_HOURS[per], p1 = R(H / 100), h = R((u * H) / 100);
+      const key = per === 'month' ? 'sol.biz.slaMonth' : per === 'week' ? 'sol.biz.slaWeek' : 'sol.biz.slaDay';
+      steps.push(t(key, { h: fmt(H), p1: fmt(p1, 4) }), t('sol.biz.slaCalcP', { u: fmt(u), p1: fmt(p1, 4), h: fmt(h, 4) }));
+      if (min) steps.push(t('sol.biz.slaMin', { h: fmt(h, 4), m: fmt(round(h * 60, 2)) }));
+    }
     steps.push(t('sol.exact', { e: `${fmt(task.expected)} ${min ? 'min' : 'h'}` }));
     return steps;
   },

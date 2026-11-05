@@ -4,7 +4,7 @@
 import type { Attempt, CustomRange, Evaluation, Level, Mode, Task, TimerDisplay } from '../../types.ts';
 import { fmt, parseAnswer, unitFactor } from '../../core/numbers.ts';
 import { CATEGORIES, SUBTYPES, LEVEL_NAMES } from '../../core/catalog.ts';
-import { generate, generateForMode } from '../../core/generators/index.ts';
+import { generate, generateForMode, noRepeat } from '../../core/generators/index.ts';
 import { evaluate, weaknesses, levelFor } from '../../core/scoring.ts';
 import { getMethod } from '../../core/methods.ts';
 import { renderExhibit } from '../../ui/exhibit.ts';
@@ -126,6 +126,9 @@ export function renderTrain(modeIn: Mode, { n: nOverride = null, intro = false, 
     }
   }
 
+  // Wiederholungssperre der Sitzung: keine Aufgabe, die einer der letzten 8 gleicht (Daily/Retry bleiben feste Listen)
+  const fresh = noRepeat();
+
   let timer: TaskTimer | null = null;
   let onKey: ((e: KeyboardEvent) => void) | null = null;
   let autoFailTimer: ReturnType<typeof setInterval> | null = null;
@@ -189,12 +192,12 @@ export function renderTrain(modeIn: Mode, { n: nOverride = null, intro = false, 
     const task: Task = fixedTasks
       ? fixedTasks[ctx.index]!
       : mode === 'custom' && custom
-      ? generate(custom.kind === 'mul' ? 'custom.mul' : 'custom.square', Math.random, { level: 2, custom })
-      : generateForMode(genMode, {
+      ? fresh.next(() => generate(custom.kind === 'mul' ? 'custom.mul' : 'custom.square', Math.random, { level: 2, custom }))
+      : fresh.next(() => generateForMode(genMode, {
         enabledCategories: settings.enabledCategories,
         weakSubtypes, reviewSubtypes,
         levelFor: (id: string): Level => levelFor(id, getAttempts(), settings.difficulty),
-      });
+      }));
     const taskEst = est && task.kind !== 'choice';
     const sub = SUBTYPES[task.subtype];
     const cat = CATEGORIES.find((c) => c.id === task.category);
@@ -344,6 +347,8 @@ export function renderTrain(modeIn: Mode, { n: nOverride = null, intro = false, 
     const sub = SUBTYPES[subId];
     const cat = sub ? CATEGORIES.find((c) => c.id === sub.category) : undefined;
     const ex = generate(subId, Math.random, { level: levelFor(subId, getAttempts(), settings.difficulty) });
+    // Das Beispiel nicht gleich als erste Aufgabe wiederholen
+    fresh.remember(ex);
     const exSteps = safeSteps(ex);
     const start = button({ label: t('common.letsGo'), kind: 'primary', full: true, onClick: () => showTask() });
     setKeyHandler((e) => {

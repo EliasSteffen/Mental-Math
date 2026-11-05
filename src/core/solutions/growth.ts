@@ -22,8 +22,8 @@ export const growthSteps: Record<string, StepFn> = {
 
   'growth.rule72': ({ r }: SP, task: Task) => [
     t('sol.gr.r72'),
-    `72 ÷ ${r}: ${r} × ${fmt(72 / r)} = 72`,
-    t('sol.gr.r72check', { x: fmt(72 / r), r }),
+    `72 ÷ ${fmt(r)}: ${fmt(r)} × ${fmt(72 / r)} = 72`,
+    t('sol.gr.r72check', { x: fmt(72 / r), r: fmt(r) }),
     t('sol.gr.exactYears', { e: fmt(task.expected) }),
   ],
 
