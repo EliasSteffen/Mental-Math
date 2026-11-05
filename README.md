@@ -125,6 +125,24 @@ Kommt nach dem iOS-Build noch ein Commit dazu, lädt `ios.yml` einen neuen Build
 
 **Hotfix:** Branch `hotfix/<name>` von `release`, Patch-Version erhöhen, pushen (lädt zu TestFlight hoch), PR nach `release`, mergen und danach `release` in `develop` mergen. **Notfall** ohne iOS-Build: *Actions → Deploy → Run workflow* auf `release` mit „ohne iOS-Build desselben Codes deployen“.
 
+#### Ohne GitHub Actions (lokal)
+
+Ist das Actions-Kontingent aufgebraucht, laufen dieselben Schritte auf dem eigenen Mac ([`scripts/local-release.ts`](scripts/local-release.ts)). Jeder Befehl prüft vorher, wie CI: richtiger Branch, keine ungespeicherten Änderungen, Stand gepusht, `typecheck` und `test` grün.
+
+| Befehl | Branch | Was |
+|---|---|---|
+| `npm run local:preview` | `develop` | Vorschau-Build → Pages-Projekt `mental-math-preview`, dazu das Beta-Live-Update |
+| `npm run local:testflight` | `develop`, `release`, `hotfix/*` | `ios:sync`, Xcode-Archiv, Prüfung der Associated Domain, Upload zu TestFlight. Build-Nummer `yyMMddHHmm` |
+| `npm run local:production` | `release` | Produktions-Build → Pages-Projekt `mental-math`, dazu das Live-Update für alle |
+
+Einmalig:
+
+- **Cloudflare:** `npx wrangler login`
+- **Xcode:** *Settings → Accounts* mit der Apple-ID des Teams. Damit signiert und lädt Xcode hoch, ohne API-Schlüssel.
+- **Live-Update-Schlüssel:** `npm run local:keys` legt sie an. Die privaten liegen in `~/.config/mental-math/` (chmod 600) und gehören zusätzlich in den Passwort-Manager. Die öffentlichen stehen in [`config/live-update-keys.json`](config/live-update-keys.json) und gehen in jeden Build. Dieselben Schlüssel stehen in GitHub (Environment-Secrets `LIVE_UPDATE_SIGNING_KEY`, Variablen `LIVE_UPDATE_*PUBLIC_KEYS`), damit CI und lokale Builds zusammenpassen.
+
+Release lokal: Release-PR `develop` → `release` mergen, `git switch release && git pull`, `npm run local:testflight`, `npm run local:production`. Danach in App Store Connect den Build zuordnen und einreichen. Das Release-Gate (gleicher Code in TestFlight) prüft hier niemand automatisch: erst TestFlight, dann Produktion.
+
 #### Einmalige Einrichtung der Vorschau
 
 1. **Standard-Branch:** *Settings → General → Default branch* → `develop`, damit neue PRs dorthin zeigen (eingerichtet).
