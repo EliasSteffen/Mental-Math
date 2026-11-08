@@ -1,6 +1,21 @@
 # Plan: Rangliste und Wettbewerbe (Daily Challenge mit einem Versuch)
 
-Stand: 2026-11-08 · Basis: `develop` @ `e8a8f43` (1.16.2)
+Stand: 2026-11-08 · Basis: `develop` @ `e8a8f43` (1.16.2) · **umgesetzt in 1.17.0** (Branch `claude/peaceful-pasteur-7jbvvi`)
+
+**Umsetzung:** P1–P3 sind gebaut, mit den Vorschlägen aus §12 (Berlin-Tag, Abbruch zählt, Wertung nur mit Konto, Opt-in).
+- Server: `sql/006_challenges.sql`, `server/challenge.ts`, `server/challenge-store.ts`, `functions/api/challenge/[[path]].ts`
+- Regeln: `src/core/challenge.ts`
+- Client: `src/features/challenge.ts`, `src/views/{challenge,compete,compete-ui,leaderboard}.ts`, gewerteter Modus in `src/views/train/`
+- Tests: `tests/challenge*.test.ts` (Regeln, Handler + echtes SQL in PGlite, Client-Outbox). Zusätzlich im Browser geprüft mit drei Konten: Einladung, Abbruch per Neuladen und per ✕, Gruppen-Rangliste, Gruppen-Wettbewerb.
+
+Abweichungen vom Plan:
+- Ein Name ist vor dem ersten gewerteten Versuch Pflicht.
+- Ohne Opt-in steht man als „Anonym“ in der Rangliste statt gar nicht. So entstehen keine Lücken in den Plätzen.
+- Wettbewerbe für alle legt man per SQL an (siehe README). Gruppen-Wettbewerbe startet die Person, die die Gruppe angelegt hat, in der App.
+
+**Noch offen:**
+- Push „Neue Daily“ und „Du wurdest überholt“. Die Push-Abos sind heute nicht mit Konten verknüpft.
+- Einrichtung: `sql/006_challenges.sql` in Supabase einspielen, dann Deploy (lokale Pipeline, solange das Actions-Kontingent fehlt).
 
 Inhalt:
 0. Befund „Webapp lädt nicht“

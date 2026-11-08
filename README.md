@@ -297,13 +297,32 @@ npm run ios:open
 
 Fehlerbehebungen und neue Trainingsmodi erreichen die App, ohne dass eine neue Version durch das App Review muss. Der Deploy von `release` (nach dem Release-Gate) veröffentlicht neben der Website ein signiertes `/ota/manifest.json`. Die App prüft es bei jedem Start, lädt geänderte Dateien im Hintergrund und wechselt beim nächsten Start. Meldet sich die neue Oberfläche nicht binnen 10 s, schaltet ein nativer Wächter (`LiveUpdatePlugin.swift`) auf die vorherige zurück. Native Änderungen (Swift, `Info.plist`, Capacitor-Plugins) brauchen weiter einen Store-Release: `npm test` meldet sie, dann Version auf die nächste Store-Version setzen und `npm run native:stamp`. Einrichtung (Schlüssel, Environments), Not-Aus (`LIVE_UPDATE=off|reset`), Beta-Kanal für TestFlight und Apples Regeln: [docs/PLAN-live-updates.md](docs/PLAN-live-updates.md).
 
+## Ranglisten & Wettbewerbe
+
+Mit Konto wird die Daily Challenge gewertet: Alle bekommen am selben Tag (00:00 Europe/Berlin) dieselben 15 Aufgaben, jede Person hat **genau einen Versuch**, das Ergebnis landet in der Rangliste. Dazu kommen Wochen-Ranglisten, Gruppen (Beitritt per Code oder Link `#/wettbewerbe?join=CODE`) und Wettbewerbe – für alle per SQL, in Gruppen von der Person, die sie angelegt hat. Ohne Konto bleibt die Daily lokal und ungewertet. Plan und Regeln: [docs/PLAN-wettbewerb.md](docs/PLAN-wettbewerb.md).
+
+**So funktioniert es:** `/api/challenge/*` (`functions/api/challenge/[[path]].ts` → `server/challenge.ts`) prüft das Access-Token von `/api/auth`. Der Server erzeugt die Aufgaben (de + en aus demselben Seed, `src/core/challenge.ts`), speichert sie und gibt sie erst beim Start heraus. Der Primärschlüssel `(challenge_id, user_id)` lässt nur einen Versuch zu. Die Abgabe bewertet der Server mit `evaluate()` neu. Was nach 30 Minuten kommt, gilt als `expired`; unplausibel schnelle richtige Antworten (≥ 3 unter 350 ms) als `flagged` – beides erscheint nicht öffentlich. Der Client hält jede Antwort in einer Outbox (`src/features/challenge.ts`): Ein Abbruch, ein Neuladen oder ein Funkloch führt zur Abgabe beim nächsten Start. Namen erscheinen in globalen Ranglisten nur mit Opt-in, sonst „Anonym“.
+
+**Einrichten (einmalig):** `sql/006_challenges.sql` im Supabase-SQL-Editor ausführen (idempotent, nur `service_role`). Weitere Variablen braucht es nicht: Die Function nutzt dieselben wie `/api/auth` (`SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `AUTH_JWT_KEY`, `AUTH_RP_ID`, `AUTH_ORIGINS`, optional `RATE_LIMITER`), in der Produktion und in `mental-math-preview`. Die Daily eines Tages legt der erste Aufruf an; Challenges werden rund 400 Tage nach ihrem Ende gelöscht.
+
+**Wettbewerb für alle anlegen** (Aufgaben entstehen beim ersten Aufruf):
+
+```sql
+insert into public.challenges (id, kind, title, starts_at, ends_at, config, seed)
+values ('comp-prozente-kw47', 'competition', '{"de":"Prozente-Woche","en":"Percentage week"}',
+        '2026-11-16 00:00 Europe/Berlin', '2026-11-23 00:00 Europe/Berlin',
+        '{"count":20,"level":2,"categories":["pct"]}', encode(gen_random_bytes(16), 'hex'));
+```
+
+**Moderation:** Name ausblenden mit `update public.challenge_profiles set listed = false where lower(display_name) = lower('…');`, einen Versuch aus der Wertung nehmen mit `update public.challenge_attempts set status = 'flagged' where …;`.
+
 ## Daten
 
 Fortschritt und Statistiken liegen lokal in IndexedDB. Ohne Konto bleibt alles auf dem Gerät, es gibt kein Tracking. Mit Konto (Passkey) werden die Trainingsdaten über Supabase zwischen deinen Geräten synchronisiert. In den Einstellungen lassen sich die Daten als JSON exportieren, importieren oder löschen.
 
 **Wiederherstellungscode:** Beim Anlegen des Kontos zeigt die App einmalig einen Code (20 Zeichen). Wer alle Passkeys verliert, legt damit unter *Einstellungen → Daten & Account → Passkey verloren?* einen neuen Passkey an; danach gibt es einen neuen Code. Gespeichert wird nur ein SHA-256-Hash.
 
-**Supabase-SQL (einmalig, in dieser Reihenfolge im SQL-Editor):** `packages/passkey-auth/sql/001_passkey_auth.sql`, `packages/offline-sync/sql/offline_sync_guard.sql`, `sql/002_training_data.sql`, `packages/passkey-auth/sql/003_recovery_codes.sql`, für Erinnerungen außerdem `sql/004_push.sql` und `sql/005_push_cron.sql`. Alle Skripte sind idempotent.
+**Supabase-SQL (einmalig, in dieser Reihenfolge im SQL-Editor):** `packages/passkey-auth/sql/001_passkey_auth.sql`, `packages/offline-sync/sql/offline_sync_guard.sql`, `sql/002_training_data.sql`, `packages/passkey-auth/sql/003_recovery_codes.sql`, für Erinnerungen außerdem `sql/004_push.sql` und `sql/005_push_cron.sql`, für Ranglisten und Wettbewerbe `sql/006_challenges.sql`. Alle Skripte sind idempotent.
 
 **Update auf 1.14.0:** `packages/passkey-auth/sql/001_passkey_auth.sql` (Gnadenfrist und Wiederverwendungserkennung beim Refresh, Sitzungen höchstens 90 Tage) und `sql/002_training_data.sql` (Löschen samt Lösch-Markierung in einem Aufruf) erneut einspielen. Beide sind idempotent; ob zuerst SQL oder Server ausgerollt wird, ist egal.
 
@@ -331,11 +350,13 @@ functions/api/explain.ts    ← Cloudflare Pages Function (KI-Endpoint, bleibt i
 server/explain.ts           ← Validierung, Prompt (de/en), Gemini-Aufruf
 server/rate-limit.ts        ← Rate-Limit-Logik (In-Memory-Fallback + Durable-Object-Client)
 functions/api/push/[[path]].ts ← Push-Erinnerungen (Abo, Einstellungen, Test, Cron-Takt)
+functions/api/challenge/[[path]].ts ← Gewertete Daily, Wettbewerbe, Ranglisten, Gruppen
+server/challenge*.ts        ← Challenge-Handler und Speicher (SQL-Funktionen aus sql/006_challenges.sql)
 server/push*.ts             ← Push-Handler, Web-Push-Verschlüsselung + VAPID, Supabase-Speicher (Texte: src/core/reminder-messages.ts)
 server/app-origin.ts        ← CORS für die iOS-App (capacitor://localhost), functions/api/_middleware.ts
 ios/                        ← Xcode-Projekt der iOS-App (Capacitor), eigene Plugins NativeAuth, AppStore, LiveUpdate; native-version.json (minNative)
 capacitor.config.json       ← App-ID, Name, WebView-Optionen
-sql/                        ← Supabase-SQL der App (Trainingsdaten, Push + Cron)
+sql/                        ← Supabase-SQL der App (Trainingsdaten, Push + Cron, Challenges)
 workers/rate-limiter/       ← Worker mit dem Durable Object RateLimiter (eigener Deploy-Workflow)
 tests/                      ← node --test (*.test.ts)
 docs/                       ← SPEC, ARCHITECTURE, PLAN-*

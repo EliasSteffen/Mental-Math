@@ -4,6 +4,15 @@ Alle nennenswerten Änderungen an Mental Math. Format nach [Keep a Changelog](ht
 
 <!-- Automatisch erzeugt mit `npm run changelog` aus src/releases.ts – nicht von Hand bearbeiten. -->
 
+## [1.17.0] - 2026-11-08
+
+### Ranglisten & Wettbewerbe
+
+- Die Daily Challenge wird gewertet: Mit Konto bekommen alle am selben Tag dieselben 15 Aufgaben, und du hast genau einen Versuch. Danach siehst du deinen Platz und wie viele du hinter dir lässt.
+- Ranglisten für den Tag und die Woche. Dein Name erscheint nur, wenn du zustimmst – sonst stehst du dort anonym.
+- Gruppen für Freunde, Team oder Kurs: per Link oder Code beitreten, eigene Rangliste und eigene Wettbewerbe mit Kategorie, Anzahl, Stufe und Dauer.
+- Nach deinem Versuch kannst du dieselben Aufgaben ungewertet nachüben. Fällt das Netz aus, wird dein Ergebnis abgegeben, sobald du wieder online bist.
+
 ## [1.16.2] - 2026-11-05
 
 ### Updates, die man sieht

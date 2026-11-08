@@ -5,6 +5,16 @@ const DATE = '2026-10-30';
 
 export const RELEASES: Release[] = [
   {
+    version: '1.17.0', date: '2026-11-08',
+    title: { de: 'Ranglisten & Wettbewerbe', en: 'Leaderboards & competitions' },
+    highlights: [
+      { de: 'Die Daily Challenge wird gewertet: Mit Konto bekommen alle am selben Tag dieselben 15 Aufgaben, und du hast genau einen Versuch. Danach siehst du deinen Platz und wie viele du hinter dir lässt.', en: 'The daily challenge is now ranked: with an account, everyone gets the same 15 tasks on the same day, and you have exactly one attempt. Afterwards you see your rank and how many you beat.' },
+      { de: 'Ranglisten für den Tag und die Woche. Dein Name erscheint nur, wenn du zustimmst – sonst stehst du dort anonym.', en: 'Leaderboards for the day and the week. Your name only appears if you agree – otherwise you are listed anonymously.' },
+      { de: 'Gruppen für Freunde, Team oder Kurs: per Link oder Code beitreten, eigene Rangliste und eigene Wettbewerbe mit Kategorie, Anzahl, Stufe und Dauer.', en: 'Groups for friends, team or class: join with a link or code, with their own leaderboard and their own competitions by category, number, level and duration.' },
+      { de: 'Nach deinem Versuch kannst du dieselben Aufgaben ungewertet nachüben. Fällt das Netz aus, wird dein Ergebnis abgegeben, sobald du wieder online bist.', en: 'After your attempt you can practice the same tasks unranked. If the connection drops, your result is submitted as soon as you are back online.' },
+    ],
+  },
+  {
     version: '1.16.2', date: '2026-11-05',
     title: { de: 'Updates, die man sieht', en: 'Updates you can see' },
     highlights: [
