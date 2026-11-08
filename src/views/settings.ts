@@ -82,6 +82,7 @@ function trainingGroup(s: Settings): HTMLElement {
     label: t('settings.difficulty'),
     options: [['auto', t('settings.diffAuto')], ['1', t('settings.diffEasy')], ['2', t('settings.diffMedium')], ['3', t('settings.diffHard')]],
     value: s.difficulty === 'auto' ? 'auto' : (String(s.difficulty) as DiffValue),
+    help: t('settings.diffHelp'),
     onChange: (v) => save({ difficulty: v === 'auto' ? 'auto' : (Number(v) as Level) }),
   });
 

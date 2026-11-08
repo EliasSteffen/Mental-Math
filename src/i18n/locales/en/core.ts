@@ -140,6 +140,7 @@ export const core: Record<keyof typeof De, string> = {
   'rec.review.one': '{n} review due',
   'rec.review.many': '{n} reviews due',
   'rec.weak.reason': '{pct}% correct in recent attempts',
+  'rec.basis.reason': 'Foundation first: it makes “{sub}” easier',
   'rec.new.reason': 'Never practised',
   'rec.mixed.title': 'Mixed training',
   'rec.mixed.reason': 'All good – keep up the rhythm',

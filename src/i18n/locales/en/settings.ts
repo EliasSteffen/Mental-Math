@@ -7,6 +7,7 @@ export const settings: Record<keyof typeof De, string> = {
   training: 'Training',
   difficulty: 'Difficulty',
   diffAuto: 'Auto',
+  diffHelp: 'Auto adapts each task type to you: harder after 3 confident answers, easier after 2 mistakes – down to basics like the times tables if needed.',
   diffEasy: 'Easy',
   diffMedium: 'Medium',
   diffHard: 'Hard',

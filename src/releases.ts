@@ -12,6 +12,7 @@ export const RELEASES: Release[] = [
       { de: 'Ranglisten für den Tag und die Woche. Dein Name erscheint nur, wenn du zustimmst – sonst stehst du dort anonym.', en: 'Leaderboards for the day and the week. Your name only appears if you agree – otherwise you are listed anonymously.' },
       { de: 'Gruppen für Freunde, Team oder Kurs: per Link oder Code beitreten, eigene Rangliste und eigene Wettbewerbe mit Kategorie, Anzahl, Stufe und Dauer.', en: 'Groups for friends, team or class: join with a link or code, with their own leaderboard and their own competitions by category, number, level and duration.' },
       { de: 'Nach deinem Versuch kannst du dieselben Aufgaben ungewertet nachüben. Fällt das Netz aus, wird dein Ergebnis abgegeben, sobald du wieder online bist.', en: 'After your attempt you can practice the same tasks unranked. If the connection drops, your result is submitted as soon as you are back online.' },
+      { de: 'Training passt sich schneller an dich an: Nach drei sicheren Treffern wird ein Aufgabentyp schwerer, nach zwei Fehlern leichter. Hakt es auch auf „Leicht“, kommen zwischendurch die Grundlagen – bis hinunter zum kleinen 1×1.', en: 'Training adapts to you faster: after three confident answers a task type gets harder, after two mistakes easier. If even “Easy” is tough, the basics come in between – all the way down to the times tables.' },
     ],
   },
   {

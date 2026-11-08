@@ -5,6 +5,7 @@ export const settings = {
   training: 'Training',
   difficulty: 'Schwierigkeit',
   diffAuto: 'Auto',
+  diffHelp: 'Auto passt jeden Aufgabentyp an dich an: nach 3 sicheren Treffern schwerer, nach 2 Fehlern leichter – wenn nötig bis zu den Grundlagen wie dem kleinen 1×1.',
   diffEasy: 'Leicht',
   diffMedium: 'Mittel',
   diffHard: 'Schwer',

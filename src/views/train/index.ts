@@ -6,6 +6,7 @@ import { fmt, parseAnswer, unitFactor } from '../../core/numbers.ts';
 import { CATEGORIES, SUBTYPES, LEVEL_NAMES } from '../../core/catalog.ts';
 import { generate, generateForMode, noRepeat } from '../../core/generators/index.ts';
 import { evaluate, weaknesses, levelFor } from '../../core/scoring.ts';
+import { planTask } from '../../core/adaptive.ts';
 import { getMethod } from '../../core/methods.ts';
 import { renderExhibit } from '../../ui/exhibit.ts';
 import { modeName } from '../../core/modes.ts';
@@ -148,6 +149,8 @@ export function renderTrain(modeIn: Mode, { n: nOverride = null, intro: introIn 
 
   // Wiederholungssperre der Sitzung: keine Aufgabe, die einer der letzten 8 gleicht (Daily/Retry bleiben feste Listen)
   const fresh = noRepeat();
+  // „Auto“: Stufe je Typ folgt der Treppe; unter „Leicht“ kommen Grundlagen bzw. ein Einstieg (src/core/adaptive.ts)
+  const adaptive = settings.difficulty === undefined || settings.difficulty === 'auto';
 
   let timer: TaskTimer | null = null;
   let onKey: ((e: KeyboardEvent) => void) | null = null;
@@ -227,6 +230,7 @@ export function renderTrain(modeIn: Mode, { n: nOverride = null, intro: introIn 
         enabledCategories: settings.enabledCategories,
         weakSubtypes, reviewSubtypes,
         levelFor: (id: string): Level => levelFor(id, getAttempts(), settings.difficulty),
+        plan: adaptive ? (id: string) => planTask(id, getAttempts()) : undefined,
       }));
     const taskEst = est && task.kind !== 'choice';
     const sub = SUBTYPES[task.subtype];
@@ -289,7 +293,10 @@ export function renderTrain(modeIn: Mode, { n: nOverride = null, intro: introIn 
     const stage = h('div', { class: 'stage train-stage' },
       notice && ctx.index === 0 ? h('p', { class: 'train-notice' }, notice) : null,
       h('p', { class: 'train-cat' }, `${cat ? cat.name : task.category} · ${sub ? sub.name : task.subtype}`),
-      precise ? h('p', { class: 'train-meta num' }, `${LEVEL_NAMES[task.level] ?? LEVEL_NAMES[2]} · ${t('common.pointsValue', { n: ctx.points })}`) : null,
+      precise ? h('p', { class: 'train-meta num' }, `${task.basic ? t('train.levelBasic') : LEVEL_NAMES[task.level] ?? LEVEL_NAMES[2]} · ${t('common.pointsValue', { n: ctx.points })}`) : null,
+      task.foundationFor && SUBTYPES[task.foundationFor]
+        ? h('p', { class: 'train-pill' }, t('train.foundationPill', { sub: SUBTYPES[task.foundationFor]?.name ?? '' }))
+        : null,
       ranked && ctx.index === 0 ? h('p', { class: 'train-pill' }, t('compete.rankedPill')) : null,
       renderExhibit(task.params),
       h('h1', { class: long ? 'train-q is-long' : 'train-q num' }, task.prompt),

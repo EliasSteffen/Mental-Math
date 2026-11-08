@@ -138,6 +138,7 @@ export const core = {
   'rec.review.one': '{n} Wiederholung fällig',
   'rec.review.many': '{n} Wiederholungen fällig',
   'rec.weak.reason': '{pct} % richtig in den letzten Versuchen',
+  'rec.basis.reason': 'Grundlage zuerst: Mit ihr fällt dir „{sub}“ leichter',
   'rec.new.reason': 'Noch nie geübt',
   'rec.mixed.title': 'Gemischtes Training',
   'rec.mixed.reason': 'Alles im grünen Bereich – bleib im Rhythmus',

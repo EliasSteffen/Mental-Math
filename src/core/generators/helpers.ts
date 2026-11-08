@@ -7,7 +7,8 @@ import { t } from '../../i18n/index.ts';
 import { lw } from '../l10n.ts';
 
 /** Generator eines Subtyps: (rng, normalisiertes Level) → Aufgabe */
-export type Gen = (rng: Rng, L: Level) => Task;
+/** Generator je Typ; `o.basic`: Einstieg unter „Leicht“ (nur Typen aus HAS_BASIC werten es aus) */
+export type Gen = (rng: Rng, L: Level, o?: { basic?: boolean }) => Task;
 
 export const lv = <T>(level: Level, a: T, b: T, c: T): T => (level === 1 ? a : level === 3 ? c : b);
 
