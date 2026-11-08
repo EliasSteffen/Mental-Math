@@ -13,5 +13,6 @@ import { account } from './account.ts';
 import { sol } from './sol.ts';
 import { onboarding } from './onboarding.ts';
 import { guide } from './guide.ts';
+import { compete } from './compete.ts';
 
-export const dict = { common, home, train, parallel, chain, custom, analyse, lernen, settings, release, core, account, sol, onboarding, guide } as const;
+export const dict = { common, home, train, parallel, chain, custom, analyse, lernen, settings, release, core, account, sol, onboarding, guide, compete } as const;

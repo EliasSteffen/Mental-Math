@@ -129,6 +129,7 @@ export const core = {
   'mode.daily': 'Daily Challenge',
   'mode.retry': 'Wiederholung',
   'mode.custom': 'Eigenes Training',
+  'mode.challenge': 'Wettbewerb',
   'mode.sub': '{cat} · {sub}',
   'label.nullen': 'Nullen-Fehler',
   'label.ungenau': 'Ungenau',

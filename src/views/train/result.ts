@@ -1,6 +1,6 @@
 // Rundenergebnis (Artboard „Ergebnis“): Kopf, Ergebnis-Segmente, Erkenntnis (E20), Status Line,
 // Aufgabenliste (falsche zuerst, richtige aufklappbar) und Dock mit „Fehler üben“ / „Fertig“ / „Ergebnis teilen“ / „Nochmal“.
-import { fmtSeconds } from '../../core/numbers.ts';
+import { fmt, fmtSeconds } from '../../core/numbers.ts';
 import { SUBTYPES } from '../../core/catalog.ts';
 import { getMethod } from '../../core/methods.ts';
 import { modeName } from '../../core/modes.ts';
@@ -18,7 +18,9 @@ import { safeSteps } from '../../ui/widgets.ts';
 import { answerText, givenAnswerText, roundInsight, type RoundInsight } from './diagnosis.ts';
 import type { TrainCtx, TrainResult } from './index.ts';
 import { t } from '../../i18n/index.ts';
-import { publicUrl } from '../../platform/index.ts';
+import { publicUrl, shareText } from '../../platform/index.ts';
+import { finishAttempt } from '../../features/challenge.ts';
+import type { ChallengeResult } from '../../core/challenge.ts';
 import { maybeAskForReview } from '../../features/app-store.ts';
 import { buildShareCard } from '../../features/share-card.ts';
 import { shareCardButton } from '../../ui/share-card.ts';
@@ -69,6 +71,78 @@ function taskRow(r: TrainResult): HTMLElement {
   return resultRow({ ok, label: r.task.prompt, sub, onClick: () => openTaskSheet(r) });
 }
 
+/** Text der Platz-Karte zu einem (Server-)Ergebnis; null = noch nicht abgegeben (offline). */
+function rankLines(r: ChallengeResult | null): { title: string; text: string; tone: 'good' | 'accent' | 'warn' } {
+  if (!r) return { title: t('compete.pendingTitle'), text: t('compete.pendingText'), tone: 'warn' };
+  if (r.status === 'flagged') return { title: t('compete.flaggedTitle'), text: t('compete.flaggedText'), tone: 'warn' };
+  if (r.status === 'expired') return { title: t('compete.expiredTitle'), text: t('compete.expiredText'), tone: 'warn' };
+  const title = r.rank !== null ? t('compete.rankOf', { rank: r.rank, total: r.total }) : t('compete.ranked');
+  const text = [
+    t('compete.pointsTime', { points: fmt(r.points), time: fmtSeconds(r.timeMs) }),
+    r.percentile ? t('compete.percentile', { p: r.percentile }) : null,
+  ].filter(Boolean).join(' · ');
+  return { title, text, tone: r.rank === 1 ? 'good' : 'accent' };
+}
+
+/** Ergebnis einer gewerteten Runde: Abgabe an den Server, Platz und Perzentil; danach ungewertet nachüben. */
+function showRankedResult(ctx: TrainCtx, o: { n: number; correct: number; totalMs: number; avg: number }): void {
+  const ranked = ctx.ranked;
+  if (!ranked) return;
+  const { results, root } = ctx;
+  const rankBox = h('div', { class: 'compete-rank', 'aria-live': 'polite' },
+    insight({ icon: 'trophy', tone: 'accent', title: t('compete.submitting'), text: t('compete.submittingText') }));
+  let server: ChallengeResult | null = null;
+  const boardBtn = button({ label: t('compete.toBoard'), kind: 'soft', icon: 'trophy', href: `#/rangliste?id=${encodeURIComponent(ranked.id)}` });
+  const share = button({
+    label: t('compete.share'), kind: 'outline', icon: 'link',
+    onClick: () => {
+      const r = server;
+      const line = t('compete.shareText', {
+        title: ranked.title, correct: r?.correct ?? o.correct, n: r?.n ?? o.n, points: fmt(r?.points ?? ctx.points),
+        time: fmtSeconds(r?.timeMs ?? o.totalMs),
+        rank: r?.rank !== null && r?.rank !== undefined ? t('compete.shareRank', { rank: r.rank, total: r.total }) : '',
+      });
+      void shareText(`${line.trim()}\n${publicUrl()}`).then((res) => {
+        if (res === 'copied') toast(t('compete.copied'), { kind: 'success' });
+      });
+    },
+  });
+  const practice = button({
+    label: t('compete.practiceAgain'), kind: 'primary', full: true, icon: 'refresh',
+    onClick: () => {
+      try { sessionStorage.setItem('mm.retry', JSON.stringify(ranked.tasks)); } catch { toast(t('train.notPossible')); return; }
+      go('#/train/retry');
+    },
+  });
+
+  const wrongRows = results.filter((r) => !r.ev.correct).map(taskRow);
+  const rightRows = results.filter((r) => r.ev.correct).map(taskRow);
+  const title = h('h1', { class: 'train-result-title num', tabindex: '-1' }, t('train.resultScore', { good: o.correct, n: o.n }));
+  root.replaceChildren(
+    h('div', { class: 'stage is-start train-result' },
+      h('header', { class: 'train-result-head' },
+        h('p', { class: 'train-result-sub' }, `${ranked.title} · ${t('compete.rankedShort')}`),
+        title,
+        h('p', { class: 'train-result-avg num' }, t('train.avgPerTask', { time: fmtSeconds(o.avg) }))),
+      o.n ? resultSegments(results.map((r) => r.ev.correct)) : null,
+      rankBox,
+      o.n ? group({ title: t('train.tasks'), meta: wrongRows.length ? t('train.wrongFirst') : undefined },
+        list([...wrongRows, ...rightRows])) : null),
+    dock(
+      h('div', { class: 'train-result-actions' }, button({ label: t('train.done'), href: '#/wettbewerbe' }), boardBtn, share),
+      practice));
+  setTitle(t('common.roundDone'));
+  window.scrollTo(0, 0);
+  title.focus({ preventScroll: true });
+
+  const show = (r: ChallengeResult | null): void => {
+    server = r;
+    const l = rankLines(r);
+    rankBox.replaceChildren(insight({ icon: 'trophy', tone: l.tone, title: l.title, text: l.text }));
+  };
+  void finishAttempt(ranked.id).then(show, () => show(null));
+}
+
 export function showResult(ctx: TrainCtx): void {
   ctx.stop();
   const { mode, results, root } = ctx;
@@ -78,6 +152,10 @@ export function showResult(ctx: TrainCtx): void {
   const avg = n ? totalMs / n : 0;
 
   addSession({ id: ctx.sessionId, ts: ctx.startedAt, mode, n, correct, points: ctx.points, avgTimeMs: Math.round(avg) });
+  if (ctx.ranked) {
+    showRankedResult(ctx, { n, correct, totalMs, avg });
+    return;
+  }
 
   const endedAt = Date.now();
   if (ctx.dailyKey) setDailyResult(ctx.dailyKey, { n, correct, points: ctx.points, timeMs: totalMs, ts: endedAt });

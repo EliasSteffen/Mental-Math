@@ -10,7 +10,10 @@ import { app, appendChildren, h } from '../ui/dom.ts';
 import { card, chip, chips, group, largeTitle, list, masteryOf, row, statusLine } from '../ui/kit.ts';
 import { setPrimaryAction } from '../ui/shell.ts';
 import { openSheet, type SheetHandle } from '../ui/sheet.ts';
-import { addCleanup } from '../router.ts';
+import { addCleanup, rerender } from '../router.ts';
+import { challengeDay, dailyId } from '../core/challenge.ts';
+import { accountEnabled, onAccountChange } from '../features/account.ts';
+import { cachedResult, pendingAttempt, rankedAvailable } from '../features/challenge.ts';
 import { locale, t } from '../i18n/index.ts';
 import type { Recommendation } from '../types.ts';
 import { dateLine, daypart, heroPlan, timeGap, type HeroPlan, type TimeGap } from './home-data.ts';
@@ -76,6 +79,25 @@ export function renderHome(): void {
   const gap = timeGap(attempts, rec.subtype);
   const stats = categoryStats(attempts);
   const daily = getDailyResults()[dayKey(now)];
+  // Mit Konto ist die Daily gewertet (ein Versuch, Rangliste); ohne bleibt sie lokal und ungewertet
+  const ranked = rankedAvailable();
+  const rankedId = dailyId(challengeDay(now));
+  const rankedRes = ranked ? cachedResult(rankedId) : null;
+  const dailyRow = ranked
+    ? row({
+      icon: 'calendar', label: t('home.dailyChallenge'), href: `#/challenge/${rankedId}`, sub: t('home.dailyRanked'),
+      value: rankedRes
+        ? (rankedRes.rank !== null ? t('compete.rankShort', { rank: rankedRes.rank, total: rankedRes.total }) : `${rankedRes.correct}/${rankedRes.n}`)
+        : pendingAttempt()?.id === rankedId ? t('compete.stateRunning') : t('home.dailyOpen'),
+      valueTone: rankedRes ? 'muted' : 'accent',
+    })
+    : row({
+      icon: 'calendar', label: t('home.dailyChallenge'), href: '#/train/daily',
+      sub: accountEnabled() ? t('home.dailyUnranked') : undefined,
+      value: daily ? `${daily.correct}/${daily.n}` : t('home.dailyOpen'), valueTone: daily ? 'muted' : 'accent',
+    });
+  // Anmeldung kommt beim Start oft erst nach dem ersten Bild: dann die Daily-Zeile umstellen
+  if (accountEnabled()) addCleanup(onAccountChange(() => rerender({ keepScroll: true })));
 
   // „Weitere Modi“ als Bottom Sheet (E7): Tippen auf eine Zeile schließt das Sheet, der Link navigiert danach
   let sheet: SheetHandle | null = null;
@@ -110,10 +132,8 @@ export function renderHome(): void {
     hero(rec, plan, gap, fresh),
     statusLine({ todayMin: Math.floor(st.todayMs / 60000), goalMin, streak: st.current }),
     group(t('home.otherTitle'), list([
-      row({
-        icon: 'calendar', label: t('home.dailyChallenge'), href: '#/train/daily',
-        value: daily ? `${daily.correct}/${daily.n}` : t('home.dailyOpen'), valueTone: daily ? 'muted' : 'accent',
-      }),
+      dailyRow,
+      accountEnabled() ? row({ icon: 'trophy', label: t('home.competeTitle'), sub: t('home.competeSub'), href: '#/wettbewerbe' }) : null,
       row({ icon: 'grid', label: t('home.allMixed'), href: '#/train/all' }),
       moreRow,
     ])),

@@ -889,7 +889,10 @@ function accountCard(): HTMLElement {
     if (key === lastKey) return;
     lastKey = key;
     sync = syncRow();
-    box.replaceChildren(...[accountHead(st), sync].filter((x): x is HTMLElement => x !== null));
+    const compete = st.status === 'signed-in'
+      ? row({ icon: 'trophy', label: t('compete.title'), sub: t('compete.subtitle'), href: '#/wettbewerbe' })
+      : null;
+    box.replaceChildren(...[accountHead(st), sync, compete].filter((x): x is HTMLElement => x !== null));
   };
   draw();
   addCleanup(acct.onAccountChange(draw));

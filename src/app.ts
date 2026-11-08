@@ -6,6 +6,7 @@ import { getAttempts, getSettings, initStorage } from './data/storage.ts';
 import { detectLang, setLang } from './i18n/index.ts';
 import { restoreAccount, watchAccountRestore } from './features/account.ts';
 import { startSync } from './features/sync.ts';
+import { watchPending } from './features/challenge.ts';
 import { maybeShowWhatsNew } from './features/whats-new.ts';
 import { shouldShowOnboarding } from './features/onboarding.ts';
 import { showOnboarding } from './ui/onboarding.ts';
@@ -31,6 +32,7 @@ setLang(detectLang(getSettings().lang));
 startRouter();
 void restoreAccount();
 watchAccountRestore(); // Offline-Kaltstart: Anmeldung wiederherstellen, sobald das Netz zurück ist
+watchPending(); // Gewertete Challenge: offene Abgabe senden, sobald angemeldet bzw. wieder online
 startSync();
 startPush();
 if (firstRun) showOnboarding(openAccountOnProfile);
