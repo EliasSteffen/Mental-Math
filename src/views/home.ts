@@ -83,6 +83,10 @@ export function renderHome(): void {
   const ranked = rankedAvailable();
   const rankedId = dailyId(challengeDay(now));
   const rankedRes = ranked ? cachedResult(rankedId) : null;
+  // Noch keine Einstufung (neu dabei, „Auto“): kurzer Test, der die Startstufe findet
+  const placementRow = !settings.placement && settings.difficulty === 'auto' && attempts.length < 100
+    ? row({ icon: 'target', label: t('home.placementTitle'), sub: t('home.placementSub'), href: '#/einstufung', value: t('home.placementValue'), valueTone: 'accent' })
+    : null;
   const dailyRow = ranked
     ? row({
       icon: 'calendar', label: t('home.dailyChallenge'), href: `#/challenge/${rankedId}`, sub: t('home.dailyRanked'),
@@ -132,6 +136,7 @@ export function renderHome(): void {
     hero(rec, plan, gap, fresh),
     statusLine({ todayMin: Math.floor(st.todayMs / 60000), goalMin, streak: st.current }),
     group(t('home.otherTitle'), list([
+      placementRow,
       dailyRow,
       accountEnabled() ? row({ icon: 'trophy', label: t('home.competeTitle'), sub: t('home.competeSub'), href: '#/wettbewerbe' }) : null,
       row({ icon: 'grid', label: t('home.allMixed'), href: '#/train/all' }),

@@ -12,6 +12,7 @@ import { renderAnalyse } from './views/analyse.ts';
 import { renderSettings } from './views/settings.ts';
 import { renderCompete } from './views/compete.ts';
 import { renderChallenge } from './views/challenge.ts';
+import { renderPlacement } from './views/placement.ts';
 import { parseBoardQuery, renderLeaderboard, type BoardRoute } from './views/leaderboard.ts';
 import { isChallengeId } from './core/challenge.ts';
 import { onLangChange, t } from './i18n/index.ts';
@@ -60,6 +61,7 @@ type Route =
   | { name: 'compete'; query: URLSearchParams }
   | { name: 'board'; board: BoardRoute }
   | { name: 'challenge'; id: string }
+  | { name: 'placement' }
   | { name: 'train'; mode: string; n: number | null; intro: boolean; estimate: boolean; custom: CustomRange | null };
 
 /** Alte Pfade (Lesezeichen, PWA-Start) → neue; die Query (z. B. ?tab=) bleibt erhalten (E6). */
@@ -120,6 +122,7 @@ function parseRoute(): Route {
   if (p0 === 'parallel') return { name: 'parallel' };
   if (p0 === 'custom') return { name: 'custom' };
   if (p0 === 'wettbewerbe') return { name: 'compete', query };
+  if (p0 === 'einstufung') return { name: 'placement' };
   if (p0 === 'rangliste') return { name: 'board', board: parseBoardQuery(query) };
   if (p0 === 'challenge' && isChallengeId(p1)) return { name: 'challenge', id: p1 };
   if (p0 === 'train' && p1 && isValidMode(p1)) {
@@ -162,6 +165,7 @@ function routeTitle(route: Route): string | null {
     case 'compete': return t('compete.title');
     case 'board': return t('compete.boardTitle');
     case 'challenge': return t('compete.title');
+    case 'placement': return t('placement.title');
     case 'train': return modeName(route.mode);
     default: return t('settings.routeTraining');
   }
@@ -177,6 +181,7 @@ function draw(route: Route): void {
   else if (route.name === 'compete') renderCompete(route.query);
   else if (route.name === 'board') renderLeaderboard(route.board);
   else if (route.name === 'challenge') renderChallenge(route.id);
+  else if (route.name === 'placement') renderPlacement();
   else if (route.name === 'train') renderTrain(route.mode, { n: route.n, intro: route.intro, estimate: route.estimate, custom: route.custom });
   else renderHome();
 }

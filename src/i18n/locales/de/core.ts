@@ -130,6 +130,7 @@ export const core = {
   'mode.retry': 'Wiederholung',
   'mode.custom': 'Eigenes Training',
   'mode.challenge': 'Wettbewerb',
+  'mode.placement': 'Einstufung',
   'mode.sub': '{cat} · {sub}',
   'label.nullen': 'Nullen-Fehler',
   'label.ungenau': 'Ungenau',

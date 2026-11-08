@@ -14,6 +14,7 @@ export const DEFAULT_SETTINGS: Settings = {
   timerDisplay: 'calm', breathe: false, confetti: false,
   lastStoreCheck: 0, updateNotifiedVersion: '', updateNotifiedAt: 0, reviewAskedVersion: '', reviewAskedAt: 0,
   onboardingDone: false,
+  placement: null,
 };
 
 export const DEFAULT_PARALLEL_STATS: ParallelStats = { nextStart: 2, bestChains: 0, bestCorrectStreak: 0, rounds: 0 };
@@ -49,6 +50,13 @@ export function normalizeTheme(v: unknown): ThemeSetting {
   return THEME_SETTINGS.find((x) => x === v) ?? 'system';
 }
 
+/** Ergebnis des Einstufungstests: ganze Zahl 0–6 und Zeitpunkt, sonst null. */
+export function normalizePlacement(v: unknown): Settings['placement'] {
+  if (!isObj(v)) return null;
+  const { theta, ts } = v;
+  return typeof theta === 'number' && Number.isInteger(theta) && theta >= 0 && theta <= 6 && isNum(ts) ? { theta, ts } : null;
+}
+
 /**
  * Beliebige gespeicherte/importierte/synchronisierte Einstellungen → gültige Settings.
  * Fehlende Felder kommen aus den Defaults; Theme wird migriert; fehlende `timerDisplay` folgt dem alten
@@ -65,6 +73,7 @@ export function normalizeSettings(raw: unknown): Settings {
     breathe: typeof s.breathe === 'boolean' ? s.breathe : DEFAULT_SETTINGS.breathe,
     confetti: typeof s.confetti === 'boolean' ? s.confetti : DEFAULT_SETTINGS.confetti,
     onboardingDone: s.onboardingDone === true,
+    placement: normalizePlacement(s.placement),
   };
 }
 

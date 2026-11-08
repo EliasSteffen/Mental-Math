@@ -109,6 +109,47 @@ export function stepFromOutcomes(outcomes: readonly Outcome[], start: Step = 1):
   return step as Step;
 }
 
+/* ---------- Startstufe aus dem Einstufungstest (src/core/placement.ts) ---------- */
+
+/** Höchstes Ergebnis des Einstufungstests (0 = Grundlagen … 6 = Profi). */
+export const THETA_MAX = 6;
+
+/**
+ * Wie anspruchsvoll ein Typ im Vergleich ist (0 = kleines 1×1 … 3 = mehrstufig wie 2×2, Zinseszins, Exhibits).
+ * Bestimmt zusammen mit dem Testergebnis die Startstufe der Treppe; nicht genannte Typen gelten als 3.
+ */
+export const TIER: Readonly<Record<SubtypeId, 0 | 1 | 2>> = {
+  'table.mul': 0, 'table.div': 0,
+  'mult.2x1': 1, 'mult.easy': 1, 'frac.topct': 1, 'est.mult': 1, 'mag.facts': 1, 'mag.exponent': 1,
+  'tricks.x11': 1, 'tricks.square5': 1, 'tricks.subround': 1,
+  'div.exact': 2, 'pct.of': 2, 'frac.of': 2, 'est.div': 2, 'est.pct': 2, 'mult.square': 2, 'units.dimless': 2,
+  'units.result': 2, 'biz.margin': 2, 'biz.roi': 2, 'biz.payback': 2, 'growth.rule72': 2, 'tricks.pctswap': 2,
+  'tricks.near100': 2,
+};
+
+/**
+ * Startstufe eines Typs bei Testergebnis theta: theta − Anspruch, begrenzt auf 0–3. Die Vorstufe „Grundlagen“
+ * gibt es als Start nur bei schwachem Ergebnis (theta ≤ 1); sonst beginnt jeder Typ mindestens auf „Leicht“.
+ */
+export function startStep(subtype: SubtypeId, theta: number): Step {
+  const tier = TIER[subtype] ?? 3;
+  const min = theta <= 1 ? 0 : 1;
+  return Math.max(min, Math.min(3, Math.round(theta) - tier)) as Step;
+}
+
+let placementTheta: number | null = null;
+
+/** Ergebnis des Einstufungstests setzen (null = keiner gemacht: alle Typen starten auf „Leicht“). */
+export function setPlacement(theta: number | null): void {
+  placementTheta = theta === null || !Number.isFinite(theta) ? null : Math.max(0, Math.min(THETA_MAX, Math.round(theta)));
+}
+
+export function getPlacement(): number | null { return placementTheta; }
+
+function startFor(subtype: SubtypeId): Step {
+  return placementTheta === null ? 1 : startStep(subtype, placementTheta);
+}
+
 function outcomesOf(subtype: SubtypeId, attempts: readonly Attempt[] | null | undefined): Outcome[] {
   const list: Outcome[] = [];
   for (const a of attempts ?? []) {
@@ -121,7 +162,7 @@ function outcomesOf(subtype: SubtypeId, attempts: readonly Attempt[] | null | un
 
 /** Aktuelle Stufe eines Typs aus dem Verlauf. */
 export function adaptiveStep(subtype: SubtypeId, attempts: readonly Attempt[] | null | undefined): Step {
-  return stepFromOutcomes(outcomesOf(subtype, attempts));
+  return stepFromOutcomes(outcomesOf(subtype, attempts), startFor(subtype));
 }
 
 /** So viele gewertete Antworten braucht eine Grundlage, bevor die Empfehlung sie als wacklig einstuft. */
@@ -179,7 +220,7 @@ export function shakyFoundation(subtype: SubtypeId, attempts: readonly Attempt[]
   let found: SubtypeId | null = null;
   for (let depth = 0; id && depth < 6; depth++) {
     const list = outcomesOf(id, attempts);
-    const step = stepFromOutcomes(list);
+    const step = stepFromOutcomes(list, startFor(id));
     if (list.length < EVIDENCE_MIN || step > 1) break;
     found = id;
     // Steht auch die Grundlage auf der Vorstufe, ist deren Grundlage womöglich der bessere Anfang

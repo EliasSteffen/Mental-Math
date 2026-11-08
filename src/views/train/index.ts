@@ -53,6 +53,17 @@ export interface TrainCtx {
 }
 
 /**
+ * Einstufungstest: Die nächste Aufgabe hängt an den bisherigen Antworten (src/core/placement.ts); bis zu `max`.
+ * Gleiche strenge Bedingungen wie gewertete Runden (ohne Hilfe, Zeit läuft, kein Auto-Prüfen).
+ */
+export interface PlacementRound {
+  max: number;
+  /** Nächste Aufgabe nach den bisherigen Ergebnissen; null = Test fertig */
+  next(results: readonly TrainResult[]): Task | null;
+  onDone(results: readonly TrainResult[]): void;
+}
+
+/**
  * Gewertete Runde: feste Aufgaben vom Server, gleiche Bedingungen für alle – Zeit läuft immer, kein „Wie geht das?“,
  * keine Atempause, kein Auto-Prüfen (das verriete richtige Eingaben), kein Schätzen. Jede Antwort geht sofort in die Outbox.
  */
@@ -72,6 +83,7 @@ export interface TrainOptions {
   estimate?: boolean;
   custom?: CustomRange | null;
   ranked?: RankedRound | null;
+  placement?: PlacementRound | null;
 }
 
 /** Ab dieser Länge steht die Aufgabe als Text (20 px, max. 30ch) statt als große Zahl. */
@@ -101,13 +113,15 @@ function shortcutBlocked(e: KeyboardEvent): boolean {
   return e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey || isSheetOpen() || isModalOpen();
 }
 
-export function renderTrain(modeIn: Mode, { n: nOverride = null, intro: introIn = false, estimate = false, custom = null, ranked = null }: TrainOptions = {}): void {
+export function renderTrain(modeIn: Mode, { n: nOverride = null, intro: introIn = false, estimate = false, custom = null, ranked = null, placement = null }: TrainOptions = {}): void {
   const settings = getSettings();
-  const timed = ranked ? true : settings.timer !== false;
-  const intro = ranked ? false : introIn;
+  // Strenge Bedingungen (gewertet oder Einstufung): Zeit immer, keine Hilfe, kein Auto-Prüfen, kein Schätzen
+  const strict = ranked !== null || placement !== null;
+  const timed = strict ? true : settings.timer !== false;
+  const intro = strict ? false : introIn;
   const display: TimerDisplay = settings.timerDisplay ?? 'calm';
   const precise = display === 'precise';
-  let mode: Mode = ranked ? ranked.mode : modeIn === 'challenge' ? 'all' : modeIn;
+  let mode: Mode = ranked ? ranked.mode : placement ? 'placement' : modeIn === 'challenge' || modeIn === 'placement' ? 'all' : modeIn;
   let notice: string | null = null;
   const today = dayKey(Date.now());
 
@@ -122,9 +136,11 @@ export function renderTrain(modeIn: Mode, { n: nOverride = null, intro: introIn 
     mode = 'all';
     notice = t('train.noRange');
   }
-  const fixedMode = ranked !== null || mode === 'daily' || mode === 'retry' || mode === 'custom';
-  const sessionLength = fixedTasks ? fixedTasks.length : mode === 'daily' ? 15 : nOverride || settings.sessionLength || 10;
-  const est = !ranked && (estimate || settings.estimateMode === true) && !fixedMode;
+  const fixedMode = strict || mode === 'daily' || mode === 'retry' || mode === 'custom';
+  const sessionLength = placement ? placement.max : fixedTasks ? fixedTasks.length : mode === 'daily' ? 15 : nOverride || settings.sessionLength || 10;
+  const est = !strict && (estimate || settings.estimateMode === true) && !fixedMode;
+  // Einstufung: nächste Aufgabe ergibt sich aus den bisherigen Antworten
+  let queued: Task | null = placement ? placement.next([]) : null;
   // Ghost (Bestzeit) nur bei präziser Zeitanzeige (E13)
   const best = settings.ghost && precise && !fixedMode ? personalBest(getSessions(), mode) : null;
 
@@ -216,13 +232,21 @@ export function renderTrain(modeIn: Mode, { n: nOverride = null, intro: introIn 
 
   function next(): void {
     ctx.index += 1;
+    if (placement) {
+      queued = ctx.index < sessionLength ? placement.next(ctx.results) : null;
+      if (queued) showTask();
+      else { stop(); placement.onDone(ctx.results); }
+      return;
+    }
     if (ctx.index >= sessionLength) showResult(ctx);
     else showTask();
   }
 
   function showTask(): void {
     stop();
-    const task: Task = fixedTasks
+    const task: Task = queued
+      ? queued
+      : fixedTasks
       ? fixedTasks[ctx.index]!
       : mode === 'custom' && custom
       ? fresh.next(() => generate(custom.kind === 'mul' ? 'custom.mul' : 'custom.square', Math.random, { level: 2, custom }))
@@ -248,7 +272,7 @@ export function renderTrain(modeIn: Mode, { n: nOverride = null, intro: introIn 
     const answer = createAnswer(task, {
       keypadSetting: settings.keypad || 'auto',
       numpadLayout: settings.numpadLayout === 'phone' ? 'phone' : 'calculator',
-      autoCheck: !ranked && settings.autoSubmit && task.kind !== 'choice'
+      autoCheck: !strict && settings.autoSubmit && task.kind !== 'choice'
         ? (v: number): boolean => evaluate(task, v, Math.round(performance.now() - t0), { assisted: help.isAssisted(), untimed: !timed, estimate: taskEst }).correct
         : null,
       onFinish: (given) => finish(given),
@@ -265,7 +289,7 @@ export function renderTrain(modeIn: Mode, { n: nOverride = null, intro: introIn 
     // Dock: Zahlenaufgabe = Hilfe/Weiß-nicht über dem Tastenfeld; Auswahl = Raster, darunter Hilfe/Weiß-nicht.
     // Gewertet: ohne Hilfe – nur „Weiß nicht“.
     const skip = button({ label: t('common.dontKnow'), kind: 'quiet', onClick: () => finish(null) });
-    const dockRow = h('div', { class: 'train-dock-row' }, ranked ? null : help.btn, skip);
+    const dockRow = h('div', { class: 'train-dock-row' }, strict ? null : help.btn, skip);
     const dockEl = isChoice ? dock(answer.dockEl, dockRow) : dock(dockRow, answer.dockEl);
     // Zweiter Tipp eines Doppeltipps auf „Weiter“ bzw. „Los geht's“ landet sonst schon im Tastenfeld/Auswahl-Raster
     const armDock = tapGuard(dockEl);
@@ -278,7 +302,7 @@ export function renderTrain(modeIn: Mode, { n: nOverride = null, intro: introIn 
     localTimer.start();
 
     // Auto-Fail: bei Ablauf der Zielzeit die aktuelle Eingabe abgeben (finish ist idempotent)
-    if (!ranked && settings.autoFail === true && timed) {
+    if (!strict && settings.autoFail === true && timed) {
       autoFailTimer = setInterval(() => {
         if (answered) return;
         if (performance.now() - t0 < task.targetMs) return;
@@ -298,6 +322,7 @@ export function renderTrain(modeIn: Mode, { n: nOverride = null, intro: introIn 
         ? h('p', { class: 'train-pill' }, t('train.foundationPill', { sub: SUBTYPES[task.foundationFor]?.name ?? '' }))
         : null,
       ranked && ctx.index === 0 ? h('p', { class: 'train-pill' }, t('compete.rankedPill')) : null,
+      placement && ctx.index === 0 ? h('p', { class: 'train-pill' }, t('placement.pill')) : null,
       renderExhibit(task.params),
       h('h1', { class: long ? 'train-q is-long' : 'train-q num' }, task.prompt),
       taskEst ? h('p', { class: 'train-pill' }, t('train.estimateHint')) : null,
@@ -414,7 +439,7 @@ export function renderTrain(modeIn: Mode, { n: nOverride = null, intro: introIn 
   const begin = (): void => { if (intro) showIntro(); else showTask(); };
 
   // Atempause (E19): nicht bei Daily, Wiederholung der Fehler und kurzen Review-Runden
-  const breathe = !ranked && settings.breathe === true && mode !== 'daily' && mode !== 'retry' && !(mode === 'review' && sessionLength < 3);
+  const breathe = !strict && settings.breathe === true && mode !== 'daily' && mode !== 'retry' && !(mode === 'review' && sessionLength < 3);
   if (breathe) {
     const withIntro = intro && Boolean(SUBTYPES[mode] && getMethod(mode));
     const tasks = sessionLength === 1 ? t('train.tasksOne') : t('train.tasksMany', { n: sessionLength });

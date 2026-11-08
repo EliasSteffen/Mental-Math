@@ -13,6 +13,7 @@ Alle nennenswerten Änderungen an Mental Math. Format nach [Keep a Changelog](ht
 - Gruppen für Freunde, Team oder Kurs: per Link oder Code beitreten, eigene Rangliste und eigene Wettbewerbe mit Kategorie, Anzahl, Stufe und Dauer.
 - Nach deinem Versuch kannst du dieselben Aufgaben ungewertet nachüben. Fällt das Netz aus, wird dein Ergebnis abgegeben, sobald du wieder online bist.
 - Training passt sich schneller an dich an: Nach drei sicheren Treffern wird ein Aufgabentyp schwerer, nach zwei Fehlern leichter. Hakt es auch auf „Leicht“, kommen zwischendurch die Grundlagen – bis hinunter zum kleinen 1×1.
+- Neu beim ersten Start: ein kurzer Einstufungstest mit bis zu 10 Aufgaben findet deine Startstufe – vom kleinen 1×1 bis zu Prozenten. Wiederholen kannst du ihn unter Profil → Training.
 
 ## [1.16.2] - 2026-11-05
 

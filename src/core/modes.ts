@@ -1,10 +1,11 @@
 // Trainingsmodi: Kategorie-ID | Subtyp-ID | 'all' | 'weak' | 'review' | 'daily' | 'retry' | 'custom' | 'challenge'
-// ('challenge' = gewerteter Wettbewerb; nur über #/challenge/<id>, #/train/challenge spielt eine gemischte Runde)
+// ('challenge' = gewerteter Wettbewerb, 'placement' = Einstufungstest – nur über #/challenge/<id> bzw. #/einstufung;
+// #/train/challenge und #/train/placement spielen eine gemischte Runde)
 import { t } from '../i18n/index.ts';
 import type { Mode } from '../types.ts';
 import { CATEGORIES, SUBTYPES } from './catalog.ts';
 
-const SPECIAL = ['all', 'weak', 'review', 'daily', 'retry', 'custom', 'challenge'] as const;
+const SPECIAL = ['all', 'weak', 'review', 'daily', 'retry', 'custom', 'challenge', 'placement'] as const;
 
 const has = (o: object, k: string): boolean => Object.prototype.hasOwnProperty.call(o, k);
 

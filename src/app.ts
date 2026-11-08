@@ -1,8 +1,9 @@
-import { startRouter } from './router.ts';
+import { go, startRouter } from './router.ts';
 import { initTheme } from './ui/theme.ts';
 import { startActivityTracker } from './features/activity.ts';
 import { appReady, bootPlatform, startPlatform } from './platform/index.ts';
-import { getAttempts, getSettings, initStorage } from './data/storage.ts';
+import { getAttempts, getSettings, initStorage, onChange } from './data/storage.ts';
+import { setPlacement } from './core/adaptive.ts';
 import { detectLang, setLang } from './i18n/index.ts';
 import { restoreAccount, watchAccountRestore } from './features/account.ts';
 import { startSync } from './features/sync.ts';
@@ -20,6 +21,10 @@ if (await bootPlatform() === 'reload') await new Promise((r) => setTimeout(r, 5_
 
 await initStorage();
 
+// Einstufungstest: Startstufen je Aufgabentyp (auch nach Sync von einem anderen Gerät)
+setPlacement(getSettings().placement?.theta ?? null);
+onChange(() => setPlacement(getSettings().placement?.theta ?? null));
+
 // Einführung nur bei Neuinstallation – vor maybeShowWhatsNew() entscheiden, das dabei lastSeenVersion setzt.
 // Beide schließen sich aus: „Was ist neu?“ bleibt bei Neuinstallationen stumm (merkt sich nur die Version).
 const { onboardingDone, lastSeenVersion } = getSettings();
@@ -35,7 +40,8 @@ watchAccountRestore(); // Offline-Kaltstart: Anmeldung wiederherstellen, sobald 
 watchPending(); // Gewertete Challenge: offene Abgabe senden, sobald angemeldet bzw. wieder online
 startSync();
 startPush();
-if (firstRun) showOnboarding(openAccountOnProfile);
+// Neuinstallation: Einführung, am Ende das Angebot des Einstufungstests
+if (firstRun) showOnboarding(openAccountOnProfile, () => go('#/einstufung'));
 maybeShowWhatsNew();
 startAppUpdateCheck(); // nur iOS: neue Version im App Store
 appReady(); // nur iOS: Oberfläche läuft – bestätigt ein Live-Update, sucht nach neuen

@@ -17,6 +17,7 @@ Details: [docs/SPEC.md](docs/SPEC.md)
 - **Optionale KI-Erklärungen** (Google Gemini, nur auf Knopfdruck) – siehe unten
 - **Tagesziel & Serie** (Minuten pro Tag, einstellbar), Aktivitäts-Heatmap, Level/XP
 - **Schwierigkeitsstufen** Leicht/Mittel/Schwer – fest oder „Auto“: je Aufgabentyp eine Treppe (3 sichere Treffer → schwerer, 2 Fehler unter den letzten 4 → leichter). Unter „Leicht“ übt die App dazwischen die Grundlage, auf der der Typ aufbaut (z. B. 2-stellig × 1-stellig → kleines 1×1), bis hinunter zu einem Einstiegs-1×1 mit ×2, ×5 und ×10 (`src/core/adaptive.ts`)
+- **Einstufungstest** am Ende des Onboardings (und unter Profil → Training): bis zu 10 Aufgaben auf einer Leiter vom kleinen 1×1 bis zu 2-stellig × 2-stellig und Prozent-Veränderungen – bestanden → höher, ein Patzer → zweite Chance, zwei Fehler → tiefer. Das Ergebnis (0–6, in den Einstellungen, synchronisiert) legt die Startstufe jedes Aufgabentyps fest (`src/core/placement.ts`, `startStep`)
 - **Fehler-Wiederholung über Tage** (Leitner-Boxen: 1, 2, 4, 7, 14 Tage) und eine **Tagesempfehlung** auf der Startseite
 - **Verlauf pro Kategorie** (14 Tage) auf der Analyse-Seite
 - **Themes** (Neon, OLED, Pastel, System), Einstellungen, Haptik/Sound, ±-Taste für Minus auf iOS

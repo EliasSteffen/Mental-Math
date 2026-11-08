@@ -197,6 +197,8 @@ export interface Settings {
   reviewAskedAt: number;
   /** Einführung gesehen (abgeschlossen oder übersprungen); geräte-lokal */
   onboardingDone: boolean;
+  /** Ergebnis des Einstufungstests (0 = Grundlagen … 6 = Profi) und wann; null = keiner gemacht (src/core/placement.ts) */
+  placement: { theta: number; ts: number } | null;
 }
 
 export interface ReviewItem { box: number; dueAt: number; lastTs: number }

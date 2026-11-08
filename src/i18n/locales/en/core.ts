@@ -132,6 +132,7 @@ export const core: Record<keyof typeof De, string> = {
   'mode.retry': 'Retry',
   'mode.custom': 'Custom training',
   'mode.challenge': 'Competition',
+  'mode.placement': 'Placement test',
   'mode.sub': '{cat} · {sub}',
   'label.nullen': 'Zeros error',
   'label.ungenau': 'Inaccurate',
