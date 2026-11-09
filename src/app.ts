@@ -30,18 +30,23 @@ onChange(() => setPlacement(getSettings().placement?.theta ?? null));
 const { onboardingDone, lastSeenVersion } = getSettings();
 const firstRun = shouldShowOnboarding({ onboardingDone, lastSeenVersion, attempts: getAttempts().length });
 
-initTheme(getSettings().theme);
-startActivityTracker();
-startPlatform();
-setLang(detectLang(getSettings().lang));
-startRouter();
-void restoreAccount();
-watchAccountRestore(); // Offline-Kaltstart: Anmeldung wiederherstellen, sobald das Netz zurück ist
-watchPending(); // Gewertete Challenge: offene Abgabe senden, sobald angemeldet bzw. wieder online
-startSync();
-startPush();
+/** Startschritt ausführen; ein Fehler darf die übrigen Schritte nicht verhindern (sonst bleibt die Seite leer). */
+const safely = (label: string, fn: () => unknown): void => {
+  try { fn(); } catch (e) { console.error(`start: ${label}`, e); }
+};
+
+safely('theme', () => initTheme(getSettings().theme));
+safely('activity', startActivityTracker);
+safely('platform', startPlatform);
+safely('lang', () => setLang(detectLang(getSettings().lang)));
+safely('router', startRouter); // zeichnet selbst fehlertolerant (Fehlerkarte statt leerer Seite)
+safely('account', () => { void restoreAccount(); });
+safely('account-watch', () => watchAccountRestore()); // Offline-Kaltstart: Anmeldung wiederherstellen, sobald das Netz zurück ist
+safely('challenge', () => watchPending()); // Gewertete Challenge: offene Abgabe senden, sobald angemeldet bzw. wieder online
+safely('sync', startSync);
+safely('push', startPush);
 // Neuinstallation: Einführung, am Ende das Angebot des Einstufungstests
-if (firstRun) showOnboarding(openAccountOnProfile, () => go('#/einstufung'));
-maybeShowWhatsNew();
-startAppUpdateCheck(); // nur iOS: neue Version im App Store
+if (firstRun) safely('onboarding', () => showOnboarding(openAccountOnProfile, () => go('#/einstufung')));
+safely('whats-new', maybeShowWhatsNew);
+safely('app-store', startAppUpdateCheck); // nur iOS: neue Version im App Store
 appReady(); // nur iOS: Oberfläche läuft – bestätigt ein Live-Update, sucht nach neuen

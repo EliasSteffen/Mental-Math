@@ -4,7 +4,7 @@ import { PUBLIC_CONFIG } from '../generated/public-config.ts';
 import type { PasskeyAuthOptions } from '../vendor/auth.ts';
 import { appStorePlugin, loadNative, nativeIfLoaded, onNativeResume, startNative } from './native.ts';
 import { storeVersionOf } from '../features/app-update.ts';
-import { registerSW, webHaptic, webSaveFile, webShareImage, webShareText } from './web.ts';
+import { registerSW, webHaptic, webResetAppCache, webSaveFile, webShareImage, webShareText } from './web.ts';
 import type { ShareResult } from './web.ts';
 
 export type { ShareResult } from './web.ts';
@@ -95,6 +95,12 @@ export async function shareImage(blob: Blob, fileName: string, text: string): Pr
   } catch {
     return 'cancelled';
   }
+}
+
+/** Notfall „App-Cache leeren“: Website ohne alten Service-Worker-Stand neu laden; in der App nur neu laden. */
+export function resetAppCache(): Promise<void> {
+  if (isNative()) { location.reload(); return Promise.resolve(); }
+  return webResetAppCache();
 }
 
 /** Einmal beim Start: Service Worker auf der Website, App-Einrichtung in iOS. */

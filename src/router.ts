@@ -19,6 +19,7 @@ import { onLangChange, t } from './i18n/index.ts';
 import { setTitle } from './ui/title.ts';
 import { modeName } from './core/modes.ts';
 import { initShell, setPrimaryAction, setShell, type TabId } from './ui/shell.ts';
+import { renderCrash } from './ui/crash.ts';
 
 /* ---------- Cleanup-Hook (aktuelle View räumt Timer/Listener auf) ---------- */
 
@@ -247,7 +248,17 @@ export function render({ keepScroll = false }: RenderOptions = {}): void {
     app.replaceChildren();
     shownKey = key;
     shownTab = tab;
-    draw(route);
+    try {
+      draw(route);
+    } catch (e) {
+      // Nie eine leere Seite: Fehlerkarte mit Bericht; Tab-Leiste und andere Seiten bleiben nutzbar
+      console.error(e);
+      runCleanup();
+      setPrimaryAction(null);
+      renderCrash(app, e, location.hash || '#/', () => rerender());
+    }
+    // Für den Start-Wächter (public/js/boot-guard.js): Die App hat gezeichnet
+    document.documentElement.dataset['booted'] = '1';
     const y = keepY ?? (key !== null && key !== prevKey ? (scrollByKey.get(key) ?? 0) : 0);
     window.scrollTo(0, y);
     // Inhalte, die erst im nächsten Frame erscheinen, verkürzen sonst die Seite
