@@ -5,6 +5,44 @@ const DATE = '2026-10-30';
 
 export const RELEASES: Release[] = [
   {
+    version: '1.17.0', date: '2026-11-08',
+    title: { de: 'Ranglisten & Wettbewerbe', en: 'Leaderboards & competitions' },
+    highlights: [
+      { de: 'Die Daily Challenge wird gewertet: Mit Konto bekommen alle am selben Tag dieselben 15 Aufgaben, und du hast genau einen Versuch. Danach siehst du deinen Platz und wie viele du hinter dir lässt.', en: 'The daily challenge is now ranked: with an account, everyone gets the same 15 tasks on the same day, and you have exactly one attempt. Afterwards you see your rank and how many you beat.' },
+      { de: 'Ranglisten für den Tag und die Woche. Dein Name erscheint nur, wenn du zustimmst – sonst stehst du dort anonym.', en: 'Leaderboards for the day and the week. Your name only appears if you agree – otherwise you are listed anonymously.' },
+      { de: 'Gruppen für Freunde, Team oder Kurs: per Link oder Code beitreten, eigene Rangliste und eigene Wettbewerbe mit Kategorie, Anzahl, Stufe und Dauer.', en: 'Groups for friends, team or class: join with a link or code, with their own leaderboard and their own competitions by category, number, level and duration.' },
+      { de: 'Nach deinem Versuch kannst du dieselben Aufgaben ungewertet nachüben. Fällt das Netz aus, wird dein Ergebnis abgegeben, sobald du wieder online bist.', en: 'After your attempt you can practice the same tasks unranked. If the connection drops, your result is submitted as soon as you are back online.' },
+      { de: 'Training passt sich schneller an dich an: Nach drei sicheren Treffern wird ein Aufgabentyp schwerer, nach zwei Fehlern leichter. Hakt es auch auf „Leicht“, kommen zwischendurch die Grundlagen – bis hinunter zum kleinen 1×1.', en: 'Training adapts to you faster: after three confident answers a task type gets harder, after two mistakes easier. If even “Easy” is tough, the basics come in between – all the way down to the times tables.' },
+      { de: 'Neu beim ersten Start: ein kurzer Einstufungstest mit bis zu 10 Aufgaben findet deine Startstufe – vom kleinen 1×1 bis zu Prozenten. Wiederholen kannst du ihn unter Profil → Training.', en: 'New on first launch: a short placement test with up to 10 tasks finds your starting level – from times tables to percentages. You can repeat it under Profile → Training.' },
+    ],
+  },
+  {
+    version: '1.16.2', date: '2026-11-05',
+    title: { de: 'Updates, die man sieht', en: 'Updates you can see' },
+    highlights: [
+      { de: 'Lädt die iPhone-App eine neue Version, zeigt sie das unten mit einem kleinen Fortschrittsbalken an – ohne dich beim Üben zu stören.', en: 'When the iPhone app downloads a new version, a small progress bar at the bottom shows it – without interrupting your practice.' },
+      { de: 'Ist das Update bereit, kannst du es mit „Jetzt aktualisieren“ sofort laden oder einfach beim nächsten Öffnen. Mitten in einer Runde passiert nie etwas.', en: 'Once the update is ready, tap “Update now” to load it right away or simply get it the next time you open the app. Nothing ever happens in the middle of a round.' },
+      { de: 'Nach dem Wechsel bestätigt die App kurz die neue Version und zeigt auf Wunsch, was neu ist.', en: 'After switching, the app briefly confirms the new version and shows you what’s new if you like.' },
+    ],
+  },
+  {
+    version: '1.16.1', date: '2026-11-05',
+    title: { de: 'Schritt für Schritt lernen', en: 'Learn step by step' },
+    highlights: [
+      { de: 'Neu im Lernen-Tab: „Schritt für Schritt lernen“. Ein Rechentrick wird erst an einem Beispiel gezeigt, dann rechnest du jeden Zwischenschritt selbst – mit einem Tipp genau für den Schritt, an dem es hakt.', en: 'New in the Learn tab: "Learn step by step". A math trick is first shown with an example, then you work out each intermediate step yourself – with a hint for exactly the step you are stuck on.' },
+      { de: 'Kleine Grafiken machen die Tricks sichtbar: Flächenmodell, Zahlenstrahl, Anteilsbalken und Stellenwerte.', en: 'Small graphics make the tricks visible: area model, number line, fraction bars and place values.' },
+      { de: 'Mehr Abwechslung im Training: Dieselbe Aufgabe kommt nicht mehr kurz hintereinander, und viele Aufgabentypen haben deutlich mehr Varianten.', en: 'More variety in training: the same task no longer comes up again right away, and many task types have far more variants.' },
+    ],
+  },
+  {
+    version: '1.16.0', date: '2026-11-04',
+    title: { de: 'Schnellere Verbesserungen', en: 'Faster improvements' },
+    highlights: [
+      { de: 'Kleine Verbesserungen und Fehlerbehebungen erreichen die iPhone-App jetzt direkt – ohne Update aus dem App Store. Die App prüft beim Start, lädt im Hintergrund und wechselt erst beim nächsten Öffnen.', en: 'Small improvements and fixes now reach the iPhone app directly – without an App Store update. The app checks on launch, downloads in the background and switches over the next time you open it.' },
+      { de: 'Jedes Update ist signiert und wird vor dem Einsatz geprüft. Startet eine neue Version nicht sauber, kehrt die App automatisch zur vorherigen zurück.', en: 'Every update is signed and verified before it is used. If a new version does not start cleanly, the app automatically returns to the previous one.' },
+    ],
+  },
+  {
     version: '1.15.0', date: '2026-11-01',
     title: { de: 'iPhone-App, Einführung & Teilen', en: 'iPhone app, intro & sharing' },
     highlights: [

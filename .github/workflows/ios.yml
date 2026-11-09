@@ -1,13 +1,16 @@
-# iOS-App: baut die Web-App, kopiert sie mit Capacitor ins Xcode-Projekt (ios/) und
+# iOS-App (iPhone und iPad): baut die Web-App, kopiert sie mit Capacitor ins Xcode-Projekt (ios/) und
 # - prüft bei jedem Push und Pull Request, dass die App für den Simulator baut,
-# - lädt sie zu App Store Connect (TestFlight) hoch, wenn die Version in package.json steigt
-#   oder per Hand (Actions → iOS → Run workflow).
+# - lädt einen Release-Kandidaten zu App Store Connect (TestFlight) hoch: bei jedem Push auf develop oder hotfix/*,
+#   solange die Version in package.json neuer ist als auf release (also noch nicht veröffentlicht), oder per Hand
+#   (Actions → iOS → Run workflow). release selbst lädt nicht hoch – das Release-Gate (release-gate.yml) lässt die
+#   Website erst live gehen, wenn genau dieser Code schon in TestFlight liegt. Der Upload-Schritt muss
+#   „Zu App Store Connect hochladen (TestFlight)“ heißen (scripts/release-gate.ts sucht ihn).
 # Einmalige Einrichtung (Apple-Konto, App Store Connect, Secrets): siehe README.md → iOS-App.
 name: iOS
 
 on:
   push:
-    branches: [main]
+    branches: [release, develop, 'hotfix/**']
   pull_request:
   workflow_dispatch:
     inputs:
@@ -31,6 +34,9 @@ jobs:
       PUBLIC_SUPABASE_URL: ${{ vars.PUBLIC_SUPABASE_URL }}
       PUBLIC_SUPABASE_ANON_KEY: ${{ vars.PUBLIC_SUPABASE_ANON_KEY }}
       PUBLIC_API_ORIGIN: ${{ vars.PUBLIC_API_ORIGIN }}
+      # Live-Updates (docs/PLAN-live-updates.md): öffentliche Schlüssel, denen das eingebaute Bundle vertraut
+      PUBLIC_LIVE_UPDATE_KEYS: ${{ vars.LIVE_UPDATE_PUBLIC_KEYS }}
+      PUBLIC_LIVE_UPDATE_BETA_KEYS: ${{ vars.LIVE_UPDATE_BETA_PUBLIC_KEYS }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -51,18 +57,21 @@ jobs:
         shell: bash
         env:
           EVENT: ${{ github.event_name }}
+          REF: ${{ github.ref }}
           UPLOAD: ${{ inputs.upload }}
-          BEFORE: ${{ github.event.before }}
           HAS_KEY: ${{ secrets.ASC_KEY_P8 != '' && secrets.ASC_KEY_ID != '' && secrets.ASC_ISSUER_ID != '' && vars.APPLE_TEAM_ID != '' }}
         run: |
           version=$(node -p "require('./package.json').version")
           echo "version=$version" >> "$GITHUB_OUTPUT"
           upload=false
           if [ "$EVENT" = workflow_dispatch ] && [ "$UPLOAD" = true ]; then upload=true; fi
-          # Push auf main: nur wenn die Version gegenüber dem letzten Stand gestiegen ist
-          if [ "$EVENT" = push ] && git cat-file -e "$BEFORE:package.json" 2>/dev/null; then
-            before=$(git show "$BEFORE:package.json" | node -p "JSON.parse(require('fs').readFileSync(0, 'utf8')).version")
-            if [ "$before" != "$version" ]; then upload=true; fi
+          # Push auf develop/hotfix/*: Release-Kandidat, solange die Version neuer ist als auf release. Jeder weitere Push
+          # lädt einen neuen Build derselben Version hoch – das Release-Gate verlangt einen Build genau dieses Codes.
+          if [ "$EVENT" = push ] && [ "$REF" != refs/heads/release ]; then
+            released=$(git show origin/release:package.json | node -p "JSON.parse(require('fs').readFileSync(0, 'utf8')).version")
+            newer=$(node -e "import('./src/releases.ts').then((m) => console.log(m.compareVersions(process.argv[1], process.argv[2]) > 0))" "$version" "$released")
+            echo "Version $version, auf release $released, neuer: $newer"
+            if [ "$newer" = true ]; then upload=true; fi
           fi
           if [ "$upload" = true ] && [ "$HAS_KEY" != true ]; then
             echo "::warning::Upload übersprungen: Secrets/Variablen für App Store Connect fehlen (README → iOS-App)"
@@ -117,6 +126,16 @@ jobs:
           ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
         run: node scripts/asc-check.ts
+
+      # Jeder Lauf legt über den API-Schlüssel ein neues Entwicklungszertifikat an (der Runner hat keins); sein privater
+      # Schlüssel verschwindet mit dem Runner. Alte davon widerrufen, sonst „maximum number of certificates“.
+      # Nur „Created via API“, nur Entwicklung, nur älter als 3 Stunden (scripts/asc-certs.ts).
+      - name: Alte CI-Zertifikate widerrufen
+        if: steps.release.outputs.upload == 'true'
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+        run: node scripts/asc-certs.ts
 
       - name: Archivieren (Release)
         if: steps.release.outputs.upload == 'true'

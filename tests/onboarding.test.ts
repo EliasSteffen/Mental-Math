@@ -20,8 +20,8 @@ test('shouldShowOnboarding: nur bei Neuinstallation', () => {
 });
 
 test('Schritte: Begrüßung, dann die vier Tabs in Leisten-Reihenfolge', () => {
-  assert.deepEqual(ONBOARDING_STEPS.map((s) => s.id), ['welcome', 'today', 'learn', 'progress', 'profile']);
-  assert.deepEqual(ONBOARDING_STEPS.map((s) => s.tab), [null, 'today', 'learn', 'progress', 'profile']);
+  assert.deepEqual(ONBOARDING_STEPS.map((s) => s.id), ['welcome', 'today', 'learn', 'progress', 'profile', 'placement']);
+  assert.deepEqual(ONBOARDING_STEPS.map((s) => s.tab), [null, 'today', 'learn', 'progress', 'profile', null]);
   assert.equal(new Set(ONBOARDING_STEPS.map((s) => s.icon)).size, ONBOARDING_STEPS.length, 'Icons verschieden');
 });
 

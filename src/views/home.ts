@@ -1,5 +1,6 @@
-// Tab „Heute“ (Ruhiger Fokus): Begrüßung, Empfehlung als Hero, Status Line, andere Übungen, Kategorie-Chips, CTA.
-// Alle Daten liegen synchron vor – kein Skeleton (E22). Texte, Zahlen und Ziele aus home-data.ts.
+// Tab „Heute“: passt ohne Scrollen auf einen Bildschirm. Kopf (Begrüßung, Datum, Status), die Empfehlung als
+// antippbare Karte mit „Jetzt üben“, darunter Kacheln (Daily, Wettbewerbe, Gemischt, Kategorie, Weitere Modi und –
+// solange offen – Einstufung). Kategorien und weitere Modi liegen in Sheets. Daten synchron (E22), Logik in home-data.ts.
 import { CATEGORIES, SUBTYPES, activeCategories } from '../core/catalog.ts';
 import { categoryStats } from '../core/scoring.ts';
 import { dueReviews } from '../core/review.ts';
@@ -7,10 +8,12 @@ import { dayKey, recommendation, streakInfo } from '../core/progress.ts';
 import { fmtSeconds } from '../core/numbers.ts';
 import { getActivity, getAttempts, getDailyResults, getReviews, getSettings } from '../data/storage.ts';
 import { app, appendChildren, h } from '../ui/dom.ts';
-import { card, chip, chips, group, largeTitle, list, masteryOf, row, statusLine } from '../ui/kit.ts';
-import { setPrimaryAction } from '../ui/shell.ts';
+import { icon, largeTitle, list, masteryMark, masteryOf, row, statusLine, type IconName } from '../ui/kit.ts';
 import { openSheet, type SheetHandle } from '../ui/sheet.ts';
-import { addCleanup } from '../router.ts';
+import { addCleanup, rerender } from '../router.ts';
+import { challengeDay, dailyId } from '../core/challenge.ts';
+import { accountEnabled, onAccountChange } from '../features/account.ts';
+import { cachedResult, pendingAttempt, rankedAvailable } from '../features/challenge.ts';
 import { locale, t } from '../i18n/index.ts';
 import type { Recommendation } from '../types.ts';
 import { dateLine, daypart, heroPlan, timeGap, type HeroPlan, type TimeGap } from './home-data.ts';
@@ -25,38 +28,67 @@ function labelled(template: string, value: string): HTMLSpanElement {
 
 /** Balken Ziel vs. Dein Schnitt: ganze Breite = dein Median, Füllung und Marke = Zielzeit (E9). */
 function timeBar(gap: TimeGap): HTMLElement {
-  const bar = h('div', { class: 'today-bar', 'aria-hidden': 'true' },
+  const bar = h('span', { class: 'today-bar', 'aria-hidden': 'true' },
     h('span', { class: 'today-bar-lost' }),
     h('span', { class: 'today-bar-fill' }),
     h('span', { class: 'today-bar-mark' }));
   bar.style.setProperty('--w', String(Math.round((gap.targetMs / gap.medianMs) * 1000) / 10));
-  return h('div', { class: 'today-insight' },
-    h('p', { class: 'today-insight-text' }, t('home.slowest')),
+  return h('span', { class: 'today-insight' },
+    h('span', { class: 'today-insight-text' }, t('home.slowest')),
     bar,
-    h('p', { class: 'today-legend' },
+    h('span', { class: 'today-legend' },
       labelled(t('home.timeTarget'), fmtSeconds(gap.targetMs)),
       labelled(t('home.timeYours'), fmtSeconds(gap.medianMs))));
 }
 
 /**
- * Hero „Empfohlen für heute“: Titel („Kategorie · Subtyp“), Ablauf und darunter der Zeit-Balken (E9) oder der Grund
- * als ruhiger Text. Beim Erststart (noch keine Versuche) begrüßt die Karte statt „Noch nie geübt“.
+ * Empfehlung als eine große, antippbare Karte (Link auf den Plan): Titel („Kategorie · Subtyp“), Ablauf, darunter der
+ * Zeit-Balken (E9) oder der Grund, unten „Jetzt üben · ca. N min“. Beim Erststart begrüßt sie statt „Noch nie geübt“.
+ * Nur <span> im Link (keine verschachtelten Bedienelemente).
  */
-function hero(rec: Recommendation, plan: HeroPlan, gap: TimeGap | null, fresh: boolean): HTMLElement {
+function hero(rec: Recommendation, plan: HeroPlan, gap: TimeGap | null, fresh: boolean): HTMLAnchorElement {
   const sub = rec.subtype ? SUBTYPES[rec.subtype] : undefined;
   const catName = sub ? CATEGORIES.find((c) => c.id === sub.category)?.name : undefined;
-  const title = sub && catName ? `${catName} · ${rec.title}` : rec.title;
+  // Geschützte Bindestriche: „2-stellig × 1-stellig“ bricht nicht mitten im Wort um
+  const title = (sub && catName ? `${catName} · ${rec.title}` : rec.title).replace(/(\d)-/g, '$1\u2011');
   const planText = plan.kind === 'method' ? t('home.planMethod')
     : plan.kind === 'review' ? t('home.planReview')
     : t('home.planRound', { n: plan.tasks });
   const reason = fresh && rec.kind === 'new' ? t('home.firstReason') : rec.reason;
-  return card([
-    h('div', { class: 'today-hero-head' },
-      h('p', { class: 'today-hero-label' }, t('home.recLabel')),
-      h('h2', { class: 'today-hero-title' }, title),
-      h('p', { class: 'today-hero-sub' }, planText)),
-    gap ? timeBar(gap) : h('div', { class: 'today-insight' }, h('p', { class: 'today-insight-text is-quiet' }, reason)),
-  ], { hero: true });
+  return h('a', { class: 'card hero today-hero press', href: plan.href },
+    h('span', { class: 'today-hero-head' },
+      h('span', { class: 'today-hero-label' }, t('home.recLabel')),
+      h('span', { class: 'today-hero-title' }, title),
+      h('span', { class: 'today-hero-sub' }, planText)),
+    gap ? timeBar(gap) : h('span', { class: 'today-insight' }, h('span', { class: 'today-insight-text is-quiet' }, reason)),
+    h('span', { class: 'btn primary cta is-full today-hero-go' },
+      icon('play', 20),
+      h('span', { class: 'btn-label' }, t('home.ctaPractice')),
+      h('span', { class: 'btn-meta' }, `· ${t('home.ctaMinutes', { n: plan.minutes })}`)));
+}
+
+interface TileOptions {
+  icon: IconName;
+  label: string;
+  sub?: string;
+  /** Zusatz rechts oben (Zustand, z. B. „offen“, „Platz 3/40“) */
+  value?: string;
+  accent?: boolean;
+  href?: string;
+  onClick?: () => void;
+}
+
+/** Kachel im Raster: Link oder Button mit Icon, Titel und kurzer Unterzeile. */
+function tile(o: TileOptions): HTMLElement {
+  const kids = [
+    h('span', { class: 'tile-top' },
+      h('span', { class: 'tile-icon' }, icon(o.icon, 22)),
+      o.value ? h('span', { class: `tile-value${o.accent ? ' is-accent' : ''}` }, o.value) : null),
+    h('span', { class: 'tile-label' }, o.label),
+    o.sub ? h('span', { class: 'tile-sub' }, o.sub) : null,
+  ];
+  if (o.href) return h('a', { class: 'tile press', href: o.href, onclick: o.onClick ?? null }, ...kids);
+  return h('button', { type: 'button', class: 'tile press', 'aria-haspopup': 'dialog', onclick: () => o.onClick?.() }, ...kids);
 }
 
 export function renderHome(): void {
@@ -77,48 +109,65 @@ export function renderHome(): void {
   const stats = categoryStats(attempts);
   const daily = getDailyResults()[dayKey(now)];
 
-  // „Weitere Modi“ als Bottom Sheet (E7): Tippen auf eine Zeile schließt das Sheet, der Link navigiert danach
-  let sheet: SheetHandle | null = null;
-  const modeRow = (label: string, sub: string, href: string): HTMLElement =>
-    row({ label, sub, href, onClick: () => sheet?.close() });
-  const openModes = (): void => {
-    if (sheet) return;
-    sheet = openSheet({
-      title: t('home.moreModes'),
-      children: [list([
-        modeRow(t('home.chainTitle'), t('home.chainSub'), '#/chain'),
-        modeRow(t('home.parallelTitle'), t('home.parallelSub'), '#/parallel'),
-        modeRow(t('home.estimateTitle'), t('home.estimateSub'), '#/train/all?est=1'),
-        modeRow(t('home.customTitle'), t('home.customSub'), '#/custom'),
-      ])],
-      onClose: () => { sheet = null; },
+  // Mit Konto ist die Daily gewertet (ein Versuch, Rangliste); ohne bleibt sie lokal und ungewertet
+  const ranked = rankedAvailable();
+  const rankedId = dailyId(challengeDay(now));
+  const rankedRes = ranked ? cachedResult(rankedId) : null;
+  const dailyTile = ranked
+    ? tile({
+      icon: 'calendar', label: t('home.dailyChallenge'), sub: t('home.dailyRankedShort'), href: `#/challenge/${rankedId}`,
+      value: rankedRes
+        ? (rankedRes.rank !== null ? t('compete.rankShort', { rank: rankedRes.rank, total: rankedRes.total }) : `${rankedRes.correct}/${rankedRes.n}`)
+        : pendingAttempt()?.id === rankedId ? t('compete.stateRunning') : t('home.dailyOpen'),
+      accent: !rankedRes,
+    })
+    : tile({
+      icon: 'calendar', label: t('home.dailyChallenge'), sub: t('home.dailySub'), href: '#/train/daily',
+      value: daily ? `${daily.correct}/${daily.n}` : t('home.dailyOpen'), accent: !daily,
     });
+  // Anmeldung kommt beim Start oft erst nach dem ersten Bild: dann die Daily-Kachel umstellen
+  if (accountEnabled()) addCleanup(onAccountChange(() => rerender({ keepScroll: true })));
+
+  // Sheets: Weitere Modi (E7) und Kategorien; Tippen auf eine Zeile schließt das Sheet, der Link navigiert danach
+  let sheet: SheetHandle | null = null;
+  const close = (): void => sheet?.close();
+  const open = (title: string, rows: HTMLElement[]): void => {
+    if (sheet) return;
+    sheet = openSheet({ title, children: [list(rows)], onClose: () => { sheet = null; } });
   };
-  addCleanup(() => sheet?.close());
+  addCleanup(close);
+  const modeRow = (label: string, sub: string, href: string): HTMLElement => row({ label, sub, href, onClick: close });
+  const openModes = (): void => open(t('home.moreModes'), [
+    modeRow(t('home.chainTitle'), t('home.chainSub'), '#/chain'),
+    modeRow(t('home.parallelTitle'), t('home.parallelSub'), '#/parallel'),
+    modeRow(t('home.estimateTitle'), t('home.estimateSub'), '#/train/all?est=1'),
+    modeRow(t('home.customTitle'), t('home.customSub'), '#/custom'),
+  ]);
+  const openCategories = (): void => open(t('home.categories'), activeCategories(settings.enabledCategories).map((c) => row({
+    leading: masteryMark(masteryOf(stats[c.id]?.score)), label: c.name, href: `#/train/${c.id}`, onClick: close,
+  })));
 
-  const moreRow = row({
-    icon: 'link', label: t('home.moreModes'), sub: t('home.moreModesSub'), onClick: openModes, chevron: true,
-    attrs: { 'aria-haspopup': 'dialog' },
-  });
+  // Noch keine Einstufung (neu dabei, „Auto“): kurzer Test, der die Startstufe findet
+  const needsPlacement = !settings.placement && settings.difficulty === 'auto' && attempts.length < 100;
+  const tiles: HTMLElement[] = [
+    needsPlacement ? tile({ icon: 'target', label: t('home.placementTitle'), sub: t('home.placementSub'), value: t('home.placementValue'), accent: true, href: '#/einstufung' }) : null,
+    dailyTile,
+    accountEnabled() ? tile({ icon: 'trophy', label: t('home.competeShort'), sub: t('home.competeTileSub'), href: '#/wettbewerbe' }) : null,
+    tile({ icon: 'grid', label: t('home.mixedShort'), sub: t('home.mixedSub'), href: '#/train/all' }),
+    tile({ icon: 'plus-minus', label: t('home.categories'), sub: t('home.categoriesSub'), onClick: openCategories }),
+    tile({ icon: 'link', label: t('home.moreModes'), sub: t('home.moreModesShort'), onClick: openModes }),
+  ].filter((x): x is HTMLElement => x !== null);
 
-  // Ab 768 px umbrechen statt horizontal scrollen
-  const catChips = chips(activeCategories(settings.enabledCategories).map((c) =>
-    chip({ label: c.name, href: `#/train/${c.id}`, mastery: masteryOf(stats[c.id]?.score) })), { wrap: true });
+  // Seite passt auf einen Bildschirm (CSS: .screen.is-today, ohne Scrollen auf dem Telefon)
+  app.classList.add('is-today');
+  document.body.classList.add('is-today');
+  addCleanup(() => { app.classList.remove('is-today'); document.body.classList.remove('is-today'); });
 
   appendChildren(app, [
-    largeTitle(t(GREETING[daypart(new Date(now).getHours())]), dateLine(now, locale())),
+    h('div', { class: 'today-head' },
+      largeTitle(t(GREETING[daypart(new Date(now).getHours())]), dateLine(now, locale())),
+      statusLine({ todayMin: Math.floor(st.todayMs / 60000), goalMin, streak: st.current })),
     hero(rec, plan, gap, fresh),
-    statusLine({ todayMin: Math.floor(st.todayMs / 60000), goalMin, streak: st.current }),
-    group(t('home.otherTitle'), list([
-      row({
-        icon: 'calendar', label: t('home.dailyChallenge'), href: '#/train/daily',
-        value: daily ? `${daily.correct}/${daily.n}` : t('home.dailyOpen'), valueTone: daily ? 'muted' : 'accent',
-      }),
-      row({ icon: 'grid', label: t('home.allMixed'), href: '#/train/all' }),
-      moreRow,
-    ])),
-    group(t('home.categories'), catChips),
+    h('nav', { class: `today-tiles${tiles.length % 2 ? ' is-odd' : ''}`, 'aria-label': t('home.otherTitle') }, ...tiles),
   ]);
-
-  setPrimaryAction({ label: t('home.ctaPractice'), meta: t('home.ctaMinutes', { n: plan.minutes }), href: plan.href });
 }

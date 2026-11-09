@@ -45,6 +45,8 @@ const RES_TRIPLES: string[][] = [
   ['€/Jahr', '÷', 'Mitarbeiter', '÷', 'Stück/Mitarbeiter'], ['€', '÷', 'Stück', '÷', 'Tag'],
   ['km/h', '×', 'h/Tag', '×', 'Tag'], ['€/Mitarbeiter', '×', 'Mitarbeiter', '÷', 'Jahr'],
   ['Stück', '×', '€/Stück', '÷', 'Mitarbeiter'], ['€/Min.', '×', 'Min./h', '×', 'h/Jahr'],
+  ['€/Monat', '×', 'Monat/Jahr', '÷', 'Mitarbeiter'], ['Stück/Tag', '×', 'Tag/Jahr', '÷', 'Mitarbeiter'],
+  ['Kunde', '×', '€/Kunde', '÷', 'Monat'], ['h/Tag', '×', 'Tag/Jahr', '×', '€/h'], ['km', '÷', 'h', '×', 'h/Tag'],
 ];
 const QUANT: Record<string, string[]> = {
   '€/Jahr': ['Umsatz', 'Personalkosten', 'Gewinn'], '€': ['Kosten', 'Budget', 'Investition'],
@@ -141,7 +143,7 @@ export const unitsGen: Record<string, Gen> = {
     });
   },
   'units.result': (rng: Rng, L: Level): Task => {
-    const ex = L === 3 ? pick(RES_TRIPLES, rng) : pick(L === 1 ? RES_PAIRS.slice(0, 9) : RES_PAIRS, rng);
+    const ex = L === 3 ? pick(RES_TRIPLES, rng) : pick(L === 1 ? RES_PAIRS.slice(0, 12) : RES_PAIRS, rng);
     const res = evalExpr(ex);
     const prompt = ex.map((x, i) => (i % 2 === 0 ? `[${x}]` : x)).join(' ') + ' = ?';
     const alt: string[] = [];

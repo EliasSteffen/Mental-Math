@@ -1,18 +1,35 @@
-# Typprüfung, Tests und Build (TypeScript → dist/js, statische Dateien → dist/), danach Deploy auf Cloudflare Pages.
-# Einmalige Einrichtung (Secrets, Pages-Projekt, Domain): siehe README.md → Deployment.
+# Website: Typprüfung, Tests, Build und Deploy auf Cloudflare Pages. Das Ziel hängt vom Anlass ab:
+#   Pull Request      → Vorschau   https://pr-<nr>.mental-math-8ez.pages.dev  (nur PRs aus diesem Repo; Forks: nur Tests)
+#   Push auf develop  → Vorschau   https://preview.mental-math.elias-steffen.de (eigenes Pages-Projekt mental-math-preview,
+#                                  dessen Produktions-Branch develop ist – die Domain liegt bei Strato, nicht bei Cloudflare-DNS)
+#   Push auf release  → Produktion https://mental-math.elias-steffen.de  – nur mit iOS-Build desselben Codes (Release-Gate)
+# release und develop veröffentlichen zusätzlich ein Live-Update der iOS-App (/ota/manifest.json, Kanal production bzw.
+# beta; docs/PLAN-live-updates.md).
+# Vorschauen bauen mit DEPLOY_CHANNEL=preview (noindex, „Vorschau“ unter Profil → Über, eigener Name auf dem
+# Home-Bildschirm). Die develop-Vorschau nutzt dasselbe Supabase und dieselben Passkeys wie die Produktion
+# (RP-ID mental-math.elias-steffen.de gilt auch für preview.…); PR-Vorschauen (*.pages.dev) laufen ohne Konto,
+# weil Passkeys dort nicht gehen.
+# Einrichtung: README.md → Deployment und → Branches, Vorschau & Release.
 name: Deploy
 
 on:
   push:
-    branches: [main]
+    branches: [release, develop]
+  pull_request:
   workflow_dispatch:
+    inputs:
+      skip_ios_gate:
+        description: 'Nur release: ohne iOS-Build desselben Codes deployen (Notfall)'
+        type: boolean
+        default: false
 
 permissions:
   contents: read
   deployments: write
+  actions: read
 
 concurrency:
-  group: deploy-production
+  group: deploy-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.ref_name }}
   cancel-in-progress: true
 
 jobs:
@@ -28,12 +45,29 @@ jobs:
       - run: npm run typecheck
       - run: npm test
 
+  # Produktion nur, wenn genau dieser Code schon als iOS-Build in TestFlight liegt (scripts/release-gate.ts)
+  release-gate:
+    name: Release-Gate
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/release' && !inputs.skip_ios_gate
+    uses: ./.github/workflows/release-gate.yml
+
   deploy:
-    needs: test
+    needs: [test, release-gate]
+    # Gate übersprungen = Vorschau oder Notfall; Pull Requests aus Forks bekommen keine Secrets und damit keine Vorschau
+    if: >-
+      ${{ !cancelled() && needs.test.result == 'success'
+      && (needs.release-gate.result == 'success' || needs.release-gate.result == 'skipped')
+      && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
     runs-on: ubuntu-latest
     environment:
-      name: production
-      url: https://mental-math.elias-steffen.de
+      name: ${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/release' && 'production' || 'preview' }}
+      url: ${{ steps.target.outputs.url || steps.deploy.outputs.pages-deployment-alias-url || steps.deploy.outputs.deployment-url }}
+    env:
+      # Wie im iOS-Build (ios.yml): Ein Live-Update ist dieses dist/, es muss dieselbe API und dieselben Schlüssel kennen.
+      # Fehlen die Schlüssel, nimmt die App nach diesem Update keine weiteren an (scripts/live-update.ts prüft das).
+      PUBLIC_API_ORIGIN: ${{ vars.PUBLIC_API_ORIGIN }}
+      PUBLIC_LIVE_UPDATE_KEYS: ${{ vars.LIVE_UPDATE_PUBLIC_KEYS }}
+      PUBLIC_LIVE_UPDATE_BETA_KEYS: ${{ vars.LIVE_UPDATE_BETA_PUBLIC_KEYS }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -41,15 +75,89 @@ jobs:
           node-version: lts/*
           cache: npm
       - run: npm ci
-      - run: npm run build
+
+      - name: Ziel bestimmen
+        id: target
+        shell: bash
+        env:
+          EVENT: ${{ github.event_name }}
+          PR: ${{ github.event.pull_request.number }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          # account: Konto (Supabase + Passkeys) nur in Produktion und auf preview.mental-math.elias-steffen.de
+          if [ "$EVENT" = pull_request ]; then
+            branch="pr-$PR"; channel=preview; account=false; project=mental-math
+          elif [ "$REF_NAME" = release ]; then
+            # Cloudflare-Seite: „main“ ist dort der Produktions-Branch des Pages-Projekts (nicht der Git-Branch)
+            branch=main; channel=production; account=true; project=mental-math
+            echo "url=https://mental-math.elias-steffen.de" >> "$GITHUB_OUTPUT"
+          elif [ "$REF_NAME" = develop ]; then
+            # Eigenes Projekt: Mit DNS außerhalb von Cloudflare zeigt eine eigene Domain immer auf die Produktion ihres
+            # Projekts, nie auf einen Branch-Alias. In mental-math-preview ist develop der Produktions-Branch.
+            branch=develop; channel=preview; account=true; project=mental-math-preview
+            echo "url=https://preview.mental-math.elias-steffen.de" >> "$GITHUB_OUTPUT"
+          else
+            # Branch-Alias wie bei Cloudflare: klein, nur a–z, 0–9 und Bindestrich, höchstens 28 Zeichen
+            branch=$(printf '%s' "$REF_NAME" | tr 'A-Z' 'a-z' | tr -c 'a-z0-9-' '-' | cut -c1-28); channel=preview; account=false; project=mental-math
+          fi
+          echo "branch=$branch" >> "$GITHUB_OUTPUT"
+          echo "channel=$channel" >> "$GITHUB_OUTPUT"
+          echo "account=$account" >> "$GITHUB_OUTPUT"
+          echo "project=$project" >> "$GITHUB_OUTPUT"
+          echo "Ziel: $channel (Branch-Alias $branch, Konto: $account)"
+
+      - name: Bauen (Produktion)
+        if: steps.target.outputs.channel == 'production'
+        run: npm run build
         env:
           PUBLIC_SUPABASE_URL: ${{ vars.PUBLIC_SUPABASE_URL }}
           PUBLIC_SUPABASE_ANON_KEY: ${{ vars.PUBLIC_SUPABASE_ANON_KEY }}
           # Passkeys der iOS-App: erzeugt /.well-known/apple-app-site-association (README → iOS-App)
           APPLE_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
+
+      - name: Bauen (Vorschau mit Konto, develop)
+        if: steps.target.outputs.channel == 'preview' && steps.target.outputs.account == 'true'
+        run: npm run build
+        env:
+          DEPLOY_CHANNEL: preview
+          # Dasselbe Supabase wie die Produktion: gleiche Konten, gleiche Daten
+          PUBLIC_SUPABASE_URL: ${{ vars.PUBLIC_SUPABASE_URL }}
+          PUBLIC_SUPABASE_ANON_KEY: ${{ vars.PUBLIC_SUPABASE_ANON_KEY }}
+
+      - name: Bauen (Vorschau ohne Konto, Pull Requests)
+        if: steps.target.outputs.channel == 'preview' && steps.target.outputs.account != 'true'
+        run: npm run build
+        env:
+          DEPLOY_CHANNEL: preview
+
+      # Live-Update der iOS-App (docs/PLAN-live-updates.md): signiertes dist/ota/manifest.json – production von release
+      # (nach dem Release-Gate), beta von develop. Ohne Secret LIVE_UPDATE_SIGNING_KEY im Environment entsteht keins.
+      # Not-Aus: Variable LIVE_UPDATE=off (nichts Neues laden) bzw. reset (zurück zum eingebauten Bundle), dann neu deployen.
+      - name: Live-Update veröffentlichen
+        if: steps.target.outputs.channel == 'production' || steps.target.outputs.branch == 'develop'
+        env:
+          LIVE_UPDATE_SIGNING_KEY: ${{ secrets.LIVE_UPDATE_SIGNING_KEY }}
+          LIVE_UPDATE: ${{ vars.LIVE_UPDATE }}
+          CHANNEL: ${{ steps.target.outputs.channel == 'production' && 'production' || 'beta' }}
+        run: node scripts/live-update.ts publish --channel "$CHANNEL"
+
       - uses: cloudflare/wrangler-action@v3
+        id: deploy
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy dist --project-name=mental-math --branch=main
+          command: pages deploy dist --project-name=${{ steps.target.outputs.project }} --branch=${{ steps.target.outputs.branch }}
           gitHubToken: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Adresse
+        shell: bash
+        env:
+          CHANNEL: ${{ steps.target.outputs.channel }}
+          URL: ${{ steps.target.outputs.url || steps.deploy.outputs.pages-deployment-alias-url || steps.deploy.outputs.deployment-url }}
+          COMMIT_URL: ${{ steps.deploy.outputs.deployment-url }}
+        run: |
+          {
+            echo "### Deploy ($CHANNEL)"
+            echo "- Adresse: $URL"
+            echo "- Dieser Commit: $COMMIT_URL"
+          } >> "$GITHUB_STEP_SUMMARY"

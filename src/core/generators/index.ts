@@ -4,6 +4,8 @@ import { round, pick } from '../numbers.ts';
 import type { Rng } from '../numbers.ts';
 import { CATEGORIES, SUBTYPES, LEVEL_WEIGHT, activeCategories, mixCategories } from '../catalog.ts';
 import type { Gen } from './helpers.ts';
+import { HAS_BASIC } from '../adaptive.ts';
+import type { TaskPlan } from '../adaptive.ts';
 import { tableGen } from './table.ts';
 import { multGen } from './mult.ts';
 import { divGen } from './div.ts';
@@ -21,22 +23,28 @@ import { customTask } from './custom.ts';
 
 export { parseU, uMul, uDiv, uInv, uMap, uStr, uRaw, p10 } from '../units.ts';
 export { CATEGORIES, SUBTYPES, LEVEL_NAMES, LEVEL_WEIGHT, activeCategories, mixCategories } from '../catalog.ts';
+export { RECENT_WINDOW, FRESH_TRIES, taskKey, pushRecent, pickFresh, noRepeat } from './recent.ts';
+export type { FreshOptions, NoRepeat } from './recent.ts';
 
 const GEN: Record<string, Gen> = {
   ...tableGen, ...multGen, ...divGen, ...bigGen, ...pctGen, ...fracGen, ...growthGen, ...bizGen, ...estGen, ...unitsGen, ...magGen, ...tricksGen, ...exhibitGen,
 };
 
 const LEVEL_TIME: Record<Level, number> = { 1: 1, 2: 1, 3: 1.3 };
+/** Einstieg zählt weniger Punkte als „Leicht“ */
+const BASIC_WEIGHT = 0.7;
 const normLevel = (l: unknown): Level => (l === 1 || l === 3 ? l : 2);
 
-export function generate(subtypeId: SubtypeId, rng: Rng = Math.random, { level = 2, custom }: GenerateOptions = {}): Task {
+export function generate(subtypeId: SubtypeId, rng: Rng = Math.random, { level = 2, custom, basic = false }: GenerateOptions = {}): Task {
   const s = SUBTYPES[subtypeId];
   const g: Gen | undefined = s?.category === 'custom' ? (r) => customTask(subtypeId, r, custom) : GEN[subtypeId];
   if (!g || !s) throw new Error(`Unbekannter Aufgabentyp: ${subtypeId}`);
   const L = normLevel(level);
-  const t = g(rng, L);
+  const easy = basic && L === 1 && HAS_BASIC.has(subtypeId);
+  const t = g(rng, L, { basic: easy });
   t.level = L;
-  t.weight = round(s.weight * LEVEL_WEIGHT[L], 4);
+  t.weight = round(s.weight * LEVEL_WEIGHT[L] * (easy ? BASIC_WEIGHT : 1), 4);
+  if (easy) t.basic = true;
   t.targetMs = Math.round(s.targetMs * LEVEL_TIME[L]);
   return t;
 }
@@ -48,6 +56,8 @@ export interface ModeContext {
   weakSubtypes?: Array<string | { subtype: string }>;
   reviewSubtypes?: Array<string | { subtype: string }>;
   levelFor?: (subtype: SubtypeId) => Level;
+  /** Adaptive Auswahl („Auto“): Stufe, Einstieg oder Grundlage je Typ (src/core/adaptive.ts → planTask); vor levelFor */
+  plan?: (subtype: SubtypeId) => TaskPlan;
   enabledCategories?: CategoryId[] | null;
   /** Bereich für Modus 'custom' / custom.* */
   custom?: CustomRange;
@@ -55,7 +65,7 @@ export interface ModeContext {
 
 export function generateForMode(
   mode: Mode,
-  { weakSubtypes = [], reviewSubtypes = [], levelFor, enabledCategories = null, custom }: ModeContext = {},
+  { weakSubtypes = [], reviewSubtypes = [], levelFor, plan, enabledCategories = null, custom }: ModeContext = {},
   rng: Rng = Math.random,
 ): Task {
   const cats = activeCategories(enabledCategories);
@@ -82,6 +92,13 @@ export function generateForMode(
     id = valid.length ? pick(valid, rng) : any();
   } else {
     id = any();
+  }
+  if (typeof plan === 'function' && mode !== 'custom') {
+    const p = plan(id);
+    const t = generate(p.subtype, rng, { level: p.level, basic: p.basic });
+    if (p.foundationFor && p.foundationFor !== p.subtype) t.foundationFor = p.foundationFor;
+    t.mode = mode;
+    return t;
   }
   const lvl = typeof levelFor === 'function' ? levelFor(id) : 2;
   const t = generate(id, rng, { level: lvl, custom });

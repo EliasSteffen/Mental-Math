@@ -10,10 +10,16 @@ import { renderTrain } from './views/train/index.ts';
 import { renderLernen } from './views/lernen.ts';
 import { renderAnalyse } from './views/analyse.ts';
 import { renderSettings } from './views/settings.ts';
+import { renderCompete } from './views/compete.ts';
+import { renderChallenge } from './views/challenge.ts';
+import { renderPlacement } from './views/placement.ts';
+import { parseBoardQuery, renderLeaderboard, type BoardRoute } from './views/leaderboard.ts';
+import { isChallengeId } from './core/challenge.ts';
 import { onLangChange, t } from './i18n/index.ts';
 import { setTitle } from './ui/title.ts';
 import { modeName } from './core/modes.ts';
 import { initShell, setPrimaryAction, setShell, type TabId } from './ui/shell.ts';
+import { renderCrash } from './ui/crash.ts';
 
 /* ---------- Cleanup-Hook (aktuelle View räumt Timer/Listener auf) ---------- */
 
@@ -49,10 +55,14 @@ type Route =
   | { name: 'today' }
   | { name: 'progress' }
   | { name: 'profile' }
-  | { name: 'learn'; id: string | null }
+  | { name: 'learn'; id: string | null; guide: boolean }
   | { name: 'chain' }
   | { name: 'parallel' }
   | { name: 'custom' }
+  | { name: 'compete'; query: URLSearchParams }
+  | { name: 'board'; board: BoardRoute }
+  | { name: 'challenge'; id: string }
+  | { name: 'placement' }
   | { name: 'train'; mode: string; n: number | null; intro: boolean; estimate: boolean; custom: CustomRange | null };
 
 /** Alte Pfade (Lesezeichen, PWA-Start) → neue; die Query (z. B. ?tab=) bleibt erhalten (E6). */
@@ -105,10 +115,17 @@ function parseRoute(): Route {
   const p1 = parts[1];
   if (p0 === 'fortschritt') return { name: 'progress' };
   if (p0 === 'profil') return { name: 'profile' };
-  if (p0 === 'lernen') return { name: 'learn', id: p1 && Object.hasOwn(SUBTYPES, p1) ? p1 : null };
+  if (p0 === 'lernen') {
+    const id = p1 && Object.hasOwn(SUBTYPES, p1) ? p1 : null;
+    return { name: 'learn', id, guide: id !== null && parts[2] === 'schritte' };
+  }
   if (p0 === 'chain') return { name: 'chain' };
   if (p0 === 'parallel') return { name: 'parallel' };
   if (p0 === 'custom') return { name: 'custom' };
+  if (p0 === 'wettbewerbe') return { name: 'compete', query };
+  if (p0 === 'einstufung') return { name: 'placement' };
+  if (p0 === 'rangliste') return { name: 'board', board: parseBoardQuery(query) };
+  if (p0 === 'challenge' && isChallengeId(p1)) return { name: 'challenge', id: p1 };
   if (p0 === 'train' && p1 && isValidMode(p1)) {
     const n = parseInt(query.get('n') ?? '', 10);
     const custom = p1 === 'custom' ? parseCustom(query) : null;
@@ -124,7 +141,7 @@ function parseRoute(): Route {
 /** Tab einer Route; null = Fokus-Modus (Training, Ketten, Parallel). „Eigenes“ (Einstellungen) gehört zu Heute. */
 function tabOf(route: Route): TabId | null {
   switch (route.name) {
-    case 'today': case 'custom': return 'today';
+    case 'today': case 'custom': case 'compete': case 'board': case 'challenge': return 'today';
     case 'learn': return 'learn';
     case 'progress': return 'progress';
     case 'profile': return 'profile';
@@ -132,9 +149,9 @@ function tabOf(route: Route): TabId | null {
   }
 }
 
-/** Schlüssel für die gemerkte Scroll-Position (nur Tab-Seiten; Lernen-Liste und -Detail getrennt). */
+/** Schlüssel für die gemerkte Scroll-Position (nur Tab-Seiten; Lernen-Liste, -Detail und -Schritte getrennt). */
 function scrollKey(route: Route): string | null {
-  if (route.name === 'learn') return route.id ? `learn/${route.id}` : 'learn';
+  if (route.name === 'learn') return route.id ? `learn/${route.id}${route.guide ? '/guide' : ''}` : 'learn';
   return tabOf(route) ? route.name : null;
 }
 
@@ -146,6 +163,10 @@ function routeTitle(route: Route): string | null {
     case 'chain': return t('settings.routeChain');
     case 'parallel': return t('settings.routeParallel');
     case 'custom': return t('settings.routeCustom');
+    case 'compete': return t('compete.title');
+    case 'board': return t('compete.boardTitle');
+    case 'challenge': return t('compete.title');
+    case 'placement': return t('placement.title');
     case 'train': return modeName(route.mode);
     default: return t('settings.routeTraining');
   }
@@ -153,11 +174,15 @@ function routeTitle(route: Route): string | null {
 
 function draw(route: Route): void {
   if (route.name === 'progress') renderAnalyse();
-  else if (route.name === 'learn') renderLernen(route.id);
+  else if (route.name === 'learn') renderLernen(route.id, route.guide);
   else if (route.name === 'profile') renderSettings();
   else if (route.name === 'chain') renderChain();
   else if (route.name === 'parallel') renderParallel();
   else if (route.name === 'custom') renderCustom();
+  else if (route.name === 'compete') renderCompete(route.query);
+  else if (route.name === 'board') renderLeaderboard(route.board);
+  else if (route.name === 'challenge') renderChallenge(route.id);
+  else if (route.name === 'placement') renderPlacement();
   else if (route.name === 'train') renderTrain(route.mode, { n: route.n, intro: route.intro, estimate: route.estimate, custom: route.custom });
   else renderHome();
 }
@@ -223,7 +248,17 @@ export function render({ keepScroll = false }: RenderOptions = {}): void {
     app.replaceChildren();
     shownKey = key;
     shownTab = tab;
-    draw(route);
+    try {
+      draw(route);
+    } catch (e) {
+      // Nie eine leere Seite: Fehlerkarte mit Bericht; Tab-Leiste und andere Seiten bleiben nutzbar
+      console.error(e);
+      runCleanup();
+      setPrimaryAction(null);
+      renderCrash(app, e, location.hash || '#/', () => rerender());
+    }
+    // Für den Start-Wächter (public/js/boot-guard.js): Die App hat gezeichnet
+    document.documentElement.dataset['booted'] = '1';
     const y = keepY ?? (key !== null && key !== prevKey ? (scrollByKey.get(key) ?? 0) : 0);
     window.scrollTo(0, y);
     // Inhalte, die erst im nächsten Frame erscheinen, verkürzen sonst die Seite

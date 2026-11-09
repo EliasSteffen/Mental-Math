@@ -16,7 +16,8 @@ Details: [docs/SPEC.md](docs/SPEC.md)
 - **Lernbereich** (`#/lernen`): Methode, Vorgehen, Trick und typische Fehler für alle Aufgabentypen, mit Beispiel zum Mitrechnen
 - **Optionale KI-Erklärungen** (Google Gemini, nur auf Knopfdruck) – siehe unten
 - **Tagesziel & Serie** (Minuten pro Tag, einstellbar), Aktivitäts-Heatmap, Level/XP
-- **Schwierigkeitsstufen** Leicht/Mittel/Schwer – automatisch nach Skill oder fest
+- **Schwierigkeitsstufen** Leicht/Mittel/Schwer – fest oder „Auto“: je Aufgabentyp eine Treppe (3 sichere Treffer → schwerer, 2 Fehler unter den letzten 4 → leichter). Unter „Leicht“ übt die App dazwischen die Grundlage, auf der der Typ aufbaut (z. B. 2-stellig × 1-stellig → kleines 1×1), bis hinunter zu einem Einstiegs-1×1 mit ×2, ×5 und ×10 (`src/core/adaptive.ts`)
+- **Einstufungstest** am Ende des Onboardings (und unter Profil → Training): bis zu 10 Aufgaben auf einer Leiter vom kleinen 1×1 bis zu 2-stellig × 2-stellig und Prozent-Veränderungen – bestanden → höher, ein Patzer → zweite Chance, zwei Fehler → tiefer. Das Ergebnis (0–6, in den Einstellungen, synchronisiert) legt die Startstufe jedes Aufgabentyps fest (`src/core/placement.ts`, `startStep`)
 - **Fehler-Wiederholung über Tage** (Leitner-Boxen: 1, 2, 4, 7, 14 Tage) und eine **Tagesempfehlung** auf der Startseite
 - **Verlauf pro Kategorie** (14 Tage) auf der Analyse-Seite
 - **Themes** (Neon, OLED, Pastel, System), Einstellungen, Haptik/Sound, ±-Taste für Minus auf iOS
@@ -51,10 +52,18 @@ npm test           # Tests (node --test, TypeScript direkt per Type-Stripping)
 ## Deployment (GitHub Actions → Cloudflare Pages)
 
 - **Repo:** `mental-math`
-- **Cloudflare-Pages-Projekt:** `mental-math` (→ `mental-math.pages.dev`)
+- **Cloudflare-Pages-Projekt:** `mental-math` (→ `mental-math-8ez.pages.dev`; `mental-math.pages.dev` gehört **nicht** zu diesem Projekt)
 - **Domain:** `mental-math.elias-steffen.de`
 
-Jeder Push auf `main` startet [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml). Der Workflow führt erst die Tests aus und deployt dann `dist/` (Build-Ausgabe aus `public/` + `src/`) auf Cloudflare Pages. Schlagen die Tests fehl, wird nichts deployt. Manuell anstoßen lässt er sich über **Actions → Deploy → Run workflow**.
+[`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) führt erst Typprüfung und Tests aus und deployt dann `dist/` (Build-Ausgabe aus `public/` + `src/`) auf Cloudflare Pages. Schlagen die Tests fehl, wird nichts deployt. Das Ziel hängt vom Anlass ab:
+
+| Anlass | Ziel | Adresse |
+|---|---|---|
+| Pull Request (aus diesem Repo) | Vorschau | `https://pr-<nr>.mental-math-8ez.pages.dev` – im PR unter „View deployment“ |
+| Push auf `develop` | Vorschau der nächsten Version | `https://preview.mental-math.elias-steffen.de` (eigenes Pages-Projekt `mental-math-preview` = `mental-math-preview.pages.dev`) |
+| Push auf `release` | Produktion, **nur mit iOS-Build desselben Codes** | `https://mental-math.elias-steffen.de` |
+
+Vorschauen bauen mit `DEPLOY_CHANNEL=preview`: Suchmaschinen bleiben draußen (`X-Robots-Tag: noindex`), unter *Profil → Über* steht „Vorschau“ und auf dem Home-Bildschirm „MM Preview“. Die `develop`-Vorschau nutzt **dasselbe Supabase und dieselben Passkeys wie die Produktion**: Die RP-ID `mental-math.elias-steffen.de` gilt auch für die Subdomain `preview.…`, man meldet sich dort also mit demselben Passkey an und sieht dieselben Daten. PR-Vorschauen (`*.pages.dev`) laufen ohne Konto und Sync, weil Passkeys dort nicht möglich sind. Pull Requests aus Forks bekommen keine Secrets und damit nur Tests. Ablauf von Release und Hotfix: [Branches, Vorschau & Release](#branches-vorschau--release).
 
 ### Einmalige Einrichtung
 
@@ -72,6 +81,8 @@ Jeder Push auf `main` startet [`.github/workflows/deploy.yml`](.github/workflows
    npx wrangler pages project create mental-math --production-branch=main
    ```
 
+   `main` ist hier nur der Name des Produktions-Branches **bei Cloudflare**. `deploy.yml` deployt den Git-Branch `release` unter diesem Namen.
+
 4. **GitHub-Secrets** im Repo setzen, entweder unter *Settings → Secrets and variables → Actions* oder per CLI:
 
    ```bash
@@ -82,7 +93,7 @@ Jeder Push auf `main` startet [`.github/workflows/deploy.yml`](.github/workflows
    gh secret set CLOUDFLARE_ACCOUNT_ID
    ```
 
-5. **Auf `main` pushen.** Danach ist die Seite unter `https://mental-math.pages.dev` erreichbar.
+5. **Auf `release` pushen** (per Release-PR, siehe unten). Danach ist die Seite unter `https://<projekt>.pages.dev` erreichbar, hier `https://mental-math-8ez.pages.dev`.
 6. **Eigene Domain:** Pages-Projekt `mental-math` → *Custom domains → Set up a custom domain* → `mental-math.elias-steffen.de`. Liegt die Zone `elias-steffen.de` bei Cloudflare, wird der DNS-Eintrag automatisch angelegt.
 
 > ⚠️ Das Pages-Projekt **nicht zusätzlich** per „Connect to Git“ mit GitHub verbinden, sonst wird doppelt deployt.
@@ -95,6 +106,64 @@ npx wrangler pages deploy dist --project-name=mental-math
 ```
 
 `public/_headers` (landet über `dist/_headers` im Deployment) setzt Security-Header (u. a. eine strikte Content-Security-Policy). Die App lädt nichts von externen Quellen.
+
+### Branches, Vorschau & Release
+
+- **`release`** ist, was live ist (Website und App Store). Jeder Merge dorthin ist eine neue Version. Direkt pushen geht nicht, nur per Pull Request.
+  Weil es `release` als Branch gibt, sind Branches `release/…` nicht möglich. Releases laufen direkt per PR `develop` → `release`.
+- **`develop`** ist die nächste Version und der Standard-Branch, immer unter der Vorschau-Adresse erreichbar.
+- Neue Arbeit kommt per Pull Request nach `develop`. Jeder PR bekommt seine eigene Vorschau. Gemergte Branches löscht GitHub automatisch.
+
+**Release** – die Website geht erst live, wenn genau dieser Code als iOS-Build in TestFlight liegt:
+
+1. Auf `develop` die Version in `package.json` erhöhen, Release Notes in `src/releases.ts` ergänzen, `npm run changelog`.
+2. Push auf `develop`. [`ios.yml`](.github/workflows/ios.yml) lädt einen Build zu TestFlight hoch. Das passiert bei jedem Push auf `develop`, solange die Version neuer ist als auf `release`; TestFlight hat also immer den aktuellen Stand. Testen auf iPhone und iPad.
+3. Release-PR `develop` → `release` öffnen. Die Prüfung **Release-Gate** ([`release-gate.yml`](.github/workflows/release-gate.yml), [`scripts/release-gate.ts`](scripts/release-gate.ts)) sucht einen erfolgreichen TestFlight-Upload mit demselben Git-Tree. Läuft der iOS-Build noch, wartet sie bis zu 45 Minuten darauf.
+4. Mergen. `deploy.yml` prüft das Gate noch einmal und deployt die Produktion.
+5. In App Store Connect den Build der Version zuordnen und zur Prüfung einreichen.
+
+Kommt nach dem iOS-Build noch ein Commit dazu, lädt `ios.yml` einen neuen Build hoch, und das Gate wartet auf ihn. Ein Commit auf `release` ohne iOS-Build hält das Deploy an.
+
+**Hotfix:** Branch `hotfix/<name>` von `release`, Patch-Version erhöhen, pushen (lädt zu TestFlight hoch), PR nach `release`, mergen und danach `release` in `develop` mergen. **Notfall** ohne iOS-Build: *Actions → Deploy → Run workflow* auf `release` mit „ohne iOS-Build desselben Codes deployen“.
+
+#### Ohne GitHub Actions (lokal)
+
+Ist das Actions-Kontingent aufgebraucht, laufen dieselben Schritte auf dem eigenen Mac ([`scripts/local-release.ts`](scripts/local-release.ts)). Jeder Befehl prüft vorher, wie CI: richtiger Branch, keine ungespeicherten Änderungen, Stand gepusht, `typecheck` und `test` grün.
+
+| Befehl | Branch | Was |
+|---|---|---|
+| `npm run local:preview` | `develop` | Vorschau-Build → Pages-Projekt `mental-math-preview`, dazu das Beta-Live-Update |
+| `npm run local:testflight` | `develop`, `release`, `hotfix/*` | `ios:sync`, Xcode-Archiv, Prüfung der Associated Domain, Upload zu TestFlight. Build-Nummer `yyMMddHHmm` |
+| `npm run local:production` | `release` | Produktions-Build → Pages-Projekt `mental-math`, dazu das Live-Update für alle |
+
+Einmalig:
+
+- **Cloudflare:** `npx wrangler login`
+- **Xcode:** *Settings → Accounts* mit der Apple-ID des Teams. Damit signiert und lädt Xcode hoch, ohne API-Schlüssel.
+- **Live-Update-Schlüssel:** `npm run local:keys` legt sie an. Die privaten liegen in `~/.config/mental-math/` (chmod 600) und gehören zusätzlich in den Passwort-Manager. Die öffentlichen stehen in [`config/live-update-keys.json`](config/live-update-keys.json) und gehen in jeden Build. Dieselben Schlüssel stehen in GitHub (Environment-Secrets `LIVE_UPDATE_SIGNING_KEY`, Variablen `LIVE_UPDATE_*PUBLIC_KEYS`), damit CI und lokale Builds zusammenpassen.
+
+Release lokal: Release-PR `develop` → `release` mergen, `git switch release && git pull`, `npm run local:testflight`, `npm run local:production`. Danach in App Store Connect den Build zuordnen und einreichen. Das Release-Gate (gleicher Code in TestFlight) prüft hier niemand automatisch: erst TestFlight, dann Produktion.
+
+#### Einmalige Einrichtung der Vorschau
+
+1. **Standard-Branch:** *Settings → General → Default branch* → `develop`, damit neue PRs dorthin zeigen (eingerichtet).
+2. **Regeln** (*Settings → Rules → Rulesets*, eingerichtet):
+   - `release`: Pull Request erforderlich (nur Merge-Commits), kein Löschen, kein Force-Push, erforderliche Prüfungen `iOS-Build desselben Codes` (Release-Gate), `test` (Deploy) und `ios` (iOS)
+   - `develop`: kein Löschen, kein Force-Push
+   - Umgebung `production` (*Settings → Environments*): Deploy nur vom Branch `release`
+   - *Settings → General → Automatically delete head branches* an
+3. **Domain** (eingerichtet): Die Vorschau ist ein eigenes Pages-Projekt `mental-math-preview` mit `develop` als Produktions-Branch, die Domain `preview.mental-math.elias-steffen.de` hängt dort. Grund: `elias-steffen.de` liegt bei Strato. Mit DNS außerhalb von Cloudflare liefert eine eigene Domain immer die Produktion ihres Projekts aus, ein CNAME auf `develop.<projekt>.pages.dev` wirkt nicht. Bei Strato: CNAME `preview.mental-math` → `mental-math-preview.pages.dev`.
+4. **Functions der Vorschau:** Cloudflare → `mental-math-preview` → *Settings → Variables and Secrets*, Umgebung **Production** (und für PR-Vorschauen `mental-math` → **Preview**):
+   - **KI:** `GOOGLE_API_KEY`, optional; es reicht derselbe Gratis-Schlüssel.
+   - **Konto (dasselbe wie in der Produktion):** `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` und `AUTH_JWT_KEY` mit denselben Werten wie in **Production**. Dazu `AUTH_RP_ID=mental-math.elias-steffen.de`, also dieselbe RP-ID wie in der Produktion, nicht die Vorschau-Domain. Und `AUTH_ORIGINS=https://mental-math.elias-steffen.de,https://preview.mental-math.elias-steffen.de` – die Produktion zuerst, denn der erste Eintrag ist der Aussteller (`iss`) der Tokens.
+   - **Rate-Limit:** unter *Bindings → Preview* `RATE_LIMITER` wie in der Produktion; Vorschau und Produktion teilen sich dann die Grenzen.
+   - **Erinnerungen:** Mit diesen Werten gehen auch die Push-Erinnerungen in der Vorschau, über denselben Takt wie die Produktion.
+   - Ein neues Deploy (Push auf `develop`) übernimmt geänderte Werte.
+   - PR-Vorschauen (`*.pages.dev`) haben bewusst keine Passkeys (docs/PLAN-auth.md, D12). Der Build lässt dort das Konto weg.
+5. **Achtung, gleiche Daten:** Die Vorschau schreibt in die echten Konten. Änderungen am Datenformat (Sync, Speicher, SQL) müssen deshalb abwärtskompatibel sein, bevor sie auf `develop` landen. Die Produktion liest sonst, was die Vorschau geschrieben hat.
+6. **Optional:** die Vorschau mit Cloudflare Access (Zero Trust) auf dich beschränken. So verbraucht niemand sonst das KI-Kontingent.
+
+Alte PR-Vorschauen bleiben bei Cloudflare liegen. Löschen geht im Dashboard unter *Deployments* oder mit `npx wrangler pages deployment delete`.
 
 ## KI-Erklärungen (optional)
 
@@ -156,7 +225,7 @@ Zusätzlich gilt: keine Erinnerung, wenn die App in den letzten 20 Minuten offen
 
 Mehr ist nicht nötig: Die VAPID-Schlüssel erzeugt der Server beim ersten Aufruf selbst und legt sie in `push_config` ab; das Token, mit dem der Cron `/api/push/tick` aufruft, erzeugt das SQL-Skript. Bis die Skripte gelaufen sind, blendet die App die Erinnerungen aus.
 
-- **Adresse des Takts:** Standard ist `https://mental-math.pages.dev/api/push/tick` (gleiche Production-Deployment wie die eigene Domain, aber ohne deren Bot-Schutz, der Aufrufe von Supabase sonst blockieren könnte). Anderes Pages-Projekt: `update public.push_config set tick_url = 'https://<projekt>.pages.dev/api/push/tick' where id = 1;`
+- **Adresse des Takts:** Standard ist `https://mental-math-8ez.pages.dev/api/push/tick` (gleiche Production-Deployment wie die eigene Domain, aber ohne deren Bot-Schutz, der Aufrufe von Supabase sonst blockieren könnte). Anderes Pages-Projekt: `update public.push_config set tick_url = 'https://<projekt>.pages.dev/api/push/tick' where id = 1;`
 - **iPhone/iPad** (ab iOS 16.4): Web Push gibt es nur in der installierten App – erst *Teilen → Zum Home-Bildschirm*, dann in der App einschalten.
 - **iOS-App:** braucht nichts davon. Dort plant das Gerät die Erinnerungen selbst als lokale Benachrichtigungen (`src/core/reminder-plan.ts` spielt dieselben Regeln aus `src/core/reminders.ts` durch, zwei Wochen im Voraus).
 - **Optional:** Pages-Variable `PUSH_SUBJECT` (`mailto:…` oder `https://…`) als Kontakt für die Push-Dienste; Standard ist die eigene Origin.
@@ -190,7 +259,7 @@ npm run ios:sync
 npm run ios:open
 ```
 
-**Pipeline** (`.github/workflows/ios.yml`, macOS-Runner – für öffentliche Repos kostenlos): Bei jedem Push und Pull Request laufen Typprüfung, Tests und ein Simulator-Build. Steigt auf `main` die Version in `package.json`, wird die App signiert, archiviert und zu App Store Connect hochgeladen (Version = `package.json`, Build-Nummer = Lauf-Nummer). Vorher prüft `scripts/asc-check.ts` Schlüssel und App. Xcode signiert und exportiert nur die `.ipa`; hochgeladen wird mit `scripts/asc-upload.ts` über die App Store Connect API, denn Xcodes eigener Upload lehnt den Team-Schlüssel mit „Cannot verify client's JWT headers“ ab. Das Skript wartet, bis Apple den Build verarbeitet hat, und meldet Ablehnungsgründe im Log. Vor dem Upload gibt die Pipeline die Entitlements der signierten App aus und bricht ab, wenn die Associated Domain `webcredentials:` fehlt (ohne sie scheitern die Passkeys der App). Per Hand: *Actions → iOS → Run workflow*. Danach in App Store Connect den Build der Version zuordnen und zur Prüfung einreichen.
+**Pipeline** (`.github/workflows/ios.yml`, macOS-Runner – für öffentliche Repos kostenlos): Bei jedem Push und Pull Request laufen Typprüfung, Tests und ein Simulator-Build. Bei jedem Push auf `develop` oder `hotfix/*` mit einer Version in `package.json`, die neuer ist als auf `release`, wird die App signiert, archiviert und zu App Store Connect hochgeladen (Release-Kandidat; Version = `package.json`, Build-Nummer = Lauf-Nummer). `release` selbst lädt nicht hoch, das [Release-Gate](#branches-vorschau--release) verlangt den Build vorher. Vorher prüft `scripts/asc-check.ts` Schlüssel und App. Xcode signiert und exportiert nur die `.ipa`; hochgeladen wird mit `scripts/asc-upload.ts` über die App Store Connect API, denn Xcodes eigener Upload lehnt den Team-Schlüssel mit „Cannot verify client's JWT headers“ ab. Das Skript wartet, bis Apple den Build verarbeitet hat, und meldet Ablehnungsgründe im Log. Vor dem Upload gibt die Pipeline die Entitlements der signierten App aus und bricht ab, wenn die Associated Domain `webcredentials:` fehlt (ohne sie scheitern die Passkeys der App). Per Hand: *Actions → iOS → Run workflow*. Danach in App Store Connect den Build der Version zuordnen und zur Prüfung einreichen.
 
 ### Einmalige Einrichtung
 
@@ -225,13 +294,36 @@ npm run ios:open
 - **EU:** Händlerstatus nach dem Digital Services Act angeben
 - Exportkonformität ist im `Info.plist` erledigt (`ITSAppUsesNonExemptEncryption = NO`)
 
+### Live-Updates (ohne Store-Release)
+
+Fehlerbehebungen und neue Trainingsmodi erreichen die App, ohne dass eine neue Version durch das App Review muss. Der Deploy von `release` (nach dem Release-Gate) veröffentlicht neben der Website ein signiertes `/ota/manifest.json`. Die App prüft es bei jedem Start, lädt geänderte Dateien im Hintergrund und wechselt beim nächsten Start. Meldet sich die neue Oberfläche nicht binnen 10 s, schaltet ein nativer Wächter (`LiveUpdatePlugin.swift`) auf die vorherige zurück. Native Änderungen (Swift, `Info.plist`, Capacitor-Plugins) brauchen weiter einen Store-Release: `npm test` meldet sie, dann Version auf die nächste Store-Version setzen und `npm run native:stamp`. Einrichtung (Schlüssel, Environments), Not-Aus (`LIVE_UPDATE=off|reset`), Beta-Kanal für TestFlight und Apples Regeln: [docs/PLAN-live-updates.md](docs/PLAN-live-updates.md).
+
+## Ranglisten & Wettbewerbe
+
+Mit Konto wird die Daily Challenge gewertet: Alle bekommen am selben Tag (00:00 Europe/Berlin) dieselben 15 Aufgaben, jede Person hat **genau einen Versuch**, das Ergebnis landet in der Rangliste. Dazu kommen Wochen-Ranglisten, Gruppen (Beitritt per Code oder Link `#/wettbewerbe?join=CODE`) und Wettbewerbe – für alle per SQL, in Gruppen von der Person, die sie angelegt hat. Ohne Konto bleibt die Daily lokal und ungewertet. Plan und Regeln: [docs/PLAN-wettbewerb.md](docs/PLAN-wettbewerb.md).
+
+**So funktioniert es:** `/api/challenge/*` (`functions/api/challenge/[[path]].ts` → `server/challenge.ts`) prüft das Access-Token von `/api/auth`. Der Server erzeugt die Aufgaben (de + en aus demselben Seed, `src/core/challenge.ts`), speichert sie und gibt sie erst beim Start heraus. Der Primärschlüssel `(challenge_id, user_id)` lässt nur einen Versuch zu. Die Abgabe bewertet der Server mit `evaluate()` neu. Was nach 30 Minuten kommt, gilt als `expired`; unplausibel schnelle richtige Antworten (≥ 3 unter 350 ms) als `flagged` – beides erscheint nicht öffentlich. Der Client hält jede Antwort in einer Outbox (`src/features/challenge.ts`): Ein Abbruch, ein Neuladen oder ein Funkloch führt zur Abgabe beim nächsten Start. Namen erscheinen in globalen Ranglisten nur mit Opt-in, sonst „Anonym“.
+
+**Einrichten (einmalig):** `sql/006_challenges.sql` im Supabase-SQL-Editor ausführen (idempotent, nur `service_role`). Weitere Variablen braucht es nicht: Die Function nutzt dieselben wie `/api/auth` (`SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `AUTH_JWT_KEY`, `AUTH_RP_ID`, `AUTH_ORIGINS`, optional `RATE_LIMITER`), in der Produktion und in `mental-math-preview`. Die Daily eines Tages legt der erste Aufruf an; Challenges werden rund 400 Tage nach ihrem Ende gelöscht.
+
+**Wettbewerb für alle anlegen** (Aufgaben entstehen beim ersten Aufruf):
+
+```sql
+insert into public.challenges (id, kind, title, starts_at, ends_at, config, seed)
+values ('comp-prozente-kw47', 'competition', '{"de":"Prozente-Woche","en":"Percentage week"}',
+        '2026-11-16 00:00 Europe/Berlin', '2026-11-23 00:00 Europe/Berlin',
+        '{"count":20,"level":2,"categories":["pct"]}', encode(gen_random_bytes(16), 'hex'));
+```
+
+**Moderation:** Name ausblenden mit `update public.challenge_profiles set listed = false where lower(display_name) = lower('…');`, einen Versuch aus der Wertung nehmen mit `update public.challenge_attempts set status = 'flagged' where …;`.
+
 ## Daten
 
 Fortschritt und Statistiken liegen lokal in IndexedDB. Ohne Konto bleibt alles auf dem Gerät, es gibt kein Tracking. Mit Konto (Passkey) werden die Trainingsdaten über Supabase zwischen deinen Geräten synchronisiert. In den Einstellungen lassen sich die Daten als JSON exportieren, importieren oder löschen.
 
 **Wiederherstellungscode:** Beim Anlegen des Kontos zeigt die App einmalig einen Code (20 Zeichen). Wer alle Passkeys verliert, legt damit unter *Einstellungen → Daten & Account → Passkey verloren?* einen neuen Passkey an; danach gibt es einen neuen Code. Gespeichert wird nur ein SHA-256-Hash.
 
-**Supabase-SQL (einmalig, in dieser Reihenfolge im SQL-Editor):** `packages/passkey-auth/sql/001_passkey_auth.sql`, `packages/offline-sync/sql/offline_sync_guard.sql`, `sql/002_training_data.sql`, `packages/passkey-auth/sql/003_recovery_codes.sql`, für Erinnerungen außerdem `sql/004_push.sql` und `sql/005_push_cron.sql`. Alle Skripte sind idempotent.
+**Supabase-SQL (einmalig, in dieser Reihenfolge im SQL-Editor):** `packages/passkey-auth/sql/001_passkey_auth.sql`, `packages/offline-sync/sql/offline_sync_guard.sql`, `sql/002_training_data.sql`, `packages/passkey-auth/sql/003_recovery_codes.sql`, für Erinnerungen außerdem `sql/004_push.sql` und `sql/005_push_cron.sql`, für Ranglisten und Wettbewerbe `sql/006_challenges.sql`. Alle Skripte sind idempotent.
 
 **Update auf 1.14.0:** `packages/passkey-auth/sql/001_passkey_auth.sql` (Gnadenfrist und Wiederverwendungserkennung beim Refresh, Sitzungen höchstens 90 Tage) und `sql/002_training_data.sql` (Löschen samt Lösch-Markierung in einem Aufruf) erneut einspielen. Beide sind idempotent; ob zuerst SQL oder Server ausgerollt wird, ist egal.
 
@@ -259,14 +351,17 @@ functions/api/explain.ts    ← Cloudflare Pages Function (KI-Endpoint, bleibt i
 server/explain.ts           ← Validierung, Prompt (de/en), Gemini-Aufruf
 server/rate-limit.ts        ← Rate-Limit-Logik (In-Memory-Fallback + Durable-Object-Client)
 functions/api/push/[[path]].ts ← Push-Erinnerungen (Abo, Einstellungen, Test, Cron-Takt)
+functions/api/challenge/[[path]].ts ← Gewertete Daily, Wettbewerbe, Ranglisten, Gruppen
+server/challenge*.ts        ← Challenge-Handler und Speicher (SQL-Funktionen aus sql/006_challenges.sql)
 server/push*.ts             ← Push-Handler, Web-Push-Verschlüsselung + VAPID, Supabase-Speicher (Texte: src/core/reminder-messages.ts)
 server/app-origin.ts        ← CORS für die iOS-App (capacitor://localhost), functions/api/_middleware.ts
-ios/                        ← Xcode-Projekt der iOS-App (Capacitor), eigenes Plugin NativeAuthPlugin.swift
+ios/                        ← Xcode-Projekt der iOS-App (Capacitor), eigene Plugins NativeAuth, AppStore, LiveUpdate; native-version.json (minNative)
 capacitor.config.json       ← App-ID, Name, WebView-Optionen
-sql/                        ← Supabase-SQL der App (Trainingsdaten, Push + Cron)
+sql/                        ← Supabase-SQL der App (Trainingsdaten, Push + Cron, Challenges)
 workers/rate-limiter/       ← Worker mit dem Durable Object RateLimiter (eigener Deploy-Workflow)
 tests/                      ← node --test (*.test.ts)
-docs/                       ← SPEC, ARCHITECTURE, PLAN-v5
-.github/workflows/deploy.yml  ← CI/CD: Tests + Build + Deploy auf Cloudflare Pages
-.github/workflows/ios.yml     ← iOS: Simulator-Build bei jedem Push, Upload zu App Store Connect bei neuer Version
+docs/                       ← SPEC, ARCHITECTURE, PLAN-*
+.github/workflows/deploy.yml  ← CI/CD: Tests + Build + Deploy auf Cloudflare Pages (PR- und develop-Vorschau, Produktion mit Release-Gate, Live-Update-Manifest)
+.github/workflows/release-gate.yml ← Produktion nur mit iOS-Build desselben Codes (scripts/release-gate.ts)
+.github/workflows/ios.yml     ← iOS: Simulator-Build bei jedem Push, TestFlight-Upload für Release-Kandidaten auf develop/hotfix/*
 ```

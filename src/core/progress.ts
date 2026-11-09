@@ -5,6 +5,7 @@ import type {
 import { t } from '../i18n/index.ts';
 import { SUBTYPES, activeCategories, mixCategories } from './catalog.ts';
 import { weaknesses } from './scoring.ts';
+import { shakyFoundation } from './adaptive.ts';
 import { dueReviews } from './review.ts';
 
 const pad = (n: number): string => String(n).padStart(2, '0');
@@ -122,6 +123,15 @@ export function recommendation(
   }
   const weak = weaknesses(attempts, 1, { enabledCategories })[0];
   if (weak) {
+    // Steht die Schwäche schon unter „Leicht“ und wackelt ihre Grundlage, zuerst die Grundlage (z. B. das kleine 1×1)
+    const base = shakyFoundation(weak.subtype, attempts);
+    const baseSub = base ? SUBTYPES[base] : undefined;
+    if (baseSub && active.has(baseSub.category)) {
+      return {
+        kind: 'weak', mode: baseSub.id, subtype: baseSub.id, title: baseSub.name,
+        reason: t('core.rec.basis.reason', { sub: weak.name }),
+      };
+    }
     return {
       kind: 'weak', mode: weak.subtype, subtype: weak.subtype,
       title: weak.name,

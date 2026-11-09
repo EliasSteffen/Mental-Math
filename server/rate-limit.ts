@@ -36,6 +36,11 @@ export function authChecks(ip: string): LimitCheck[] {
   return [{ key: `ip:${ip}:auth:min`, windowMs: MIN, max: 30 }];
 }
 
+/** Grenze für /api/challenge/*: je IP 60/min über alle Routen (Ranglisten laden mehrfach), eigene Schlüssel */
+export function challengeChecks(ip: string): LimitCheck[] {
+  return [{ key: `ip:${ip}:challenge:min`, windowMs: MIN, max: 60 }];
+}
+
 /** Gültige Prüfliste aus einem Request-Body (für das Durable Object) oder null */
 export function parseChecks(body: unknown): LimitCheck[] | null {
   const raw = body && typeof body === 'object' ? (body as { checks?: unknown }).checks : null;

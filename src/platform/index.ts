@@ -4,7 +4,7 @@ import { PUBLIC_CONFIG } from '../generated/public-config.ts';
 import type { PasskeyAuthOptions } from '../vendor/auth.ts';
 import { appStorePlugin, loadNative, nativeIfLoaded, onNativeResume, startNative } from './native.ts';
 import { storeVersionOf } from '../features/app-update.ts';
-import { registerSW, webHaptic, webSaveFile, webShareImage, webShareText } from './web.ts';
+import { registerSW, webHaptic, webResetAppCache, webSaveFile, webShareImage, webShareText } from './web.ts';
 import type { ShareResult } from './web.ts';
 
 export type { ShareResult } from './web.ts';
@@ -97,10 +97,63 @@ export async function shareImage(blob: Blob, fileName: string, text: string): Pr
   }
 }
 
+/** Notfall „App-Cache leeren“: Website ohne alten Service-Worker-Stand neu laden; in der App nur neu laden. */
+export function resetAppCache(): Promise<void> {
+  if (isNative()) { location.reload(); return Promise.resolve(); }
+  return webResetAppCache();
+}
+
 /** Einmal beim Start: Service Worker auf der Website, App-Einrichtung in iOS. */
 export function startPlatform(): void {
   if (isNative()) startNative();
   else registerSW();
+}
+
+/**
+ * Ganz am Anfang, vor dem Laden der Daten: In der App ein vorgemerktes Live-Update anwenden (docs/PLAN-live-updates.md).
+ * 'reload': Die WebView lädt gleich ein anderes Bundle, nichts zeichnen. Auf der Website immer 'ok'.
+ */
+export async function bootPlatform(): Promise<'ok' | 'reload'> {
+  if (!isNative()) return 'ok';
+  try {
+    const m = await import('./live-update.ts');
+    const r = await m.bootLiveUpdate();
+    liveUpdated = r.updatedTo;
+    return r.action;
+  } catch {
+    return 'ok';
+  }
+}
+
+let liveUpdated: string | null = null;
+
+/** Erster Start nach einem Live-Update: die neue Version (nach bootPlatform), sonst null. Auf der Website immer null. */
+export function liveUpdatedTo(): string | null {
+  return liveUpdated;
+}
+
+/** Nach dem ersten Bild: Die Oberfläche läuft. In der App bestätigt das ein Live-Update und sucht nach neuen. */
+export function appReady(): void {
+  if (!isNative()) return;
+  void import('./live-update.ts').then((m) => m.liveUpdateReady()).catch(() => undefined);
+}
+
+/** Beta-Updates (develop) an? null: nicht verfügbar – nur TestFlight-Installationen mit Beta-Schlüssel im Build. */
+export async function liveUpdateBeta(): Promise<boolean | null> {
+  if (!isNative()) return null;
+  try {
+    const m = await import('./live-update.ts');
+    const s = await m.liveUpdateStatus();
+    return s.betaAvailable ? s.state.beta : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Beta-Updates ein/aus; prüft sofort (gilt ab dem nächsten Start). */
+export function setLiveUpdateBeta(on: boolean): void {
+  if (!isNative()) return;
+  void import('./live-update.ts').then((m) => m.setLiveUpdateBeta(on)).catch(() => undefined);
 }
 
 /** Optionen für den Passkey-Client: Browser-Standard auf der Website, native Passkeys + Keychain in der App. */

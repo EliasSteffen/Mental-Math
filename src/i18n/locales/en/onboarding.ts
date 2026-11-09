@@ -21,4 +21,9 @@ export const onboarding: Record<keyof typeof De, string> = {
   progressText: 'Your stats, your weak spots and due reviews at a glance.',
   profileTitle: 'Profile',
   profileText: 'Reminders, appearance and – if you like – an account with a passkey to sync between your devices.',
+  // Einstufungstest als letzter Schritt
+  placementTitle: 'Where do you stand?',
+  placementText: 'A short placement test – up to 10 tasks, about 2 minutes – sets the difficulty for you. You can also take it later under Profile → Training.',
+  placementStart: 'Start test',
+  later: 'Later',
 };

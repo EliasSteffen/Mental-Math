@@ -60,7 +60,21 @@ export const common = {
   // App-Update (platform/web.ts)
   updateReady: 'Neue Version verfügbar',
   updateReload: 'Neu laden',
+  // Live-Update der iOS-App (platform/live-update.ts, features/whats-new.ts)
+  liveUpdateLoading: 'Update {version} wird geladen',
+  liveUpdateReady: 'Update {version} bereit',
+  liveUpdateApply: 'Jetzt aktualisieren',
+  liveUpdateDone: 'Aktualisiert auf {version}',
+  liveUpdateWhatsNew: 'Was ist neu?',
   // App-Update aus dem App Store (features/app-store.ts)
   storeUpdate: 'Update verfügbar',
   storeUpdateAction: 'Aktualisieren',
+  // Fehlerkarte statt leerer Seite (ui/crash.ts) und Start-Wächter (public/js/boot-guard.js)
+  crashTitle: 'Diese Seite konnte nicht geladen werden',
+  crashText: 'Ein Fehler hat das Anzeigen abgebrochen. Deine Daten sind sicher. Die anderen Tabs funktionieren in der Regel weiter – und der Fehlerbericht hilft, das zu beheben.',
+  crashRetry: 'Erneut versuchen',
+  crashCopy: 'Fehlerbericht kopieren',
+  crashCopied: 'Fehlerbericht kopiert',
+  crashReset: 'App-Cache leeren und neu laden',
+  crashResetHelp: 'Lädt die App frisch vom Server. Trainingsdaten und Konto bleiben erhalten.',
 } as const;

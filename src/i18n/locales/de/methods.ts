@@ -416,12 +416,13 @@ export const methods = {
       'Nimm dieses Prozent von 8.760 h (0,1 % = 1/1.000 → 8,76 h).',
       'Bei 99,99 %: in Minuten rechnen (1 Jahr = 525.600 min), 0,01 % ≈ 52,6 min.',
       'Die Ausfallzeit ändert sich proportional zum Anteil: halber Anteil, halbe Zeit.',
+      'Anderer Zeitraum, gleiche Rechnung: Monat (30 Tage) = 720 h, Woche = 168 h, Tag = 24 h = 1.440 min.',
     ],
     trick: '99,9 %: 0,1 % von 8.760 h = 8,76 h ≈ 8,8 h. 99,5 %: 0,5 % von 8.760 = 43,8 h. 99,99 %: 0,01 % von 525.600 min ≈ 52,6 min.',
     pitfalls: [
       'Die Verfügbarkeit statt des Ausfallanteils nehmen.',
       'Prozent und Promille verwechseln – 0,1 % ist 1/1.000, nicht 1/100.',
-      'Bei 99,99 % in Stunden angeben statt in Minuten.',
+      'Wird nach Minuten gefragt (unter 1 h), in Stunden antworten.',
     ],
   },
 

@@ -6,6 +6,8 @@ import { RELEASES, releasesSince } from '../releases.ts';
 import { getAttempts, getSettings, setSettings } from '../data/storage.ts';
 import { h } from '../ui/dom.ts';
 import { openModal } from '../ui/modal.ts';
+import { toast } from '../ui/toast.ts';
+import { liveUpdatedTo } from '../platform/index.ts';
 
 const MAX_SHOWN = 3;
 
@@ -33,22 +35,38 @@ function body(releases: Release[]): HTMLElement {
   return h('div', { class: 'releases' }, ...releases.map(releaseBlock));
 }
 
+/** Modal „Was ist neu in …?“ für die Releases seit `seen` (ohne neue: ganzer Verlauf). */
+function openWhatsNew(seen: string, onClose?: () => void): void {
+  const list: Release[] = releasesSince(seen).slice(0, MAX_SHOWN);
+  if (list.length === 0) { openChangelog(); onClose?.(); return; }
+  openModal({
+    title: t('release.whatsNew', { version: BUILD_INFO.version }),
+    body: body(list),
+    actions: [{ label: t('release.letsGo'), primary: true }],
+    onClose,
+  });
+}
+
 export function maybeShowWhatsNew(): void {
   const seen: string = getSettings().lastSeenVersion;
+  // iOS-App, erster Start nach einem Live-Update: kurze Bestätigung statt Modal, „Was ist neu?“ auf Wunsch
+  const live = liveUpdatedTo();
+  if (live !== null) {
+    setSettings({ lastSeenVersion: BUILD_INFO.version });
+    toast(t('common.liveUpdateDone', { version: live }), {
+      kind: 'success', durationMs: 8000,
+      action: { label: t('common.liveUpdateWhatsNew'), onClick: () => openWhatsNew(seen) },
+    });
+    return;
+  }
   if (seen === BUILD_INFO.version) return;
   if (seen === '' && getAttempts().length === 0) {
     setSettings({ lastSeenVersion: BUILD_INFO.version });
     return;
   }
-  const list: Release[] = releasesSince(seen).slice(0, MAX_SHOWN);
   const remember = (): void => { setSettings({ lastSeenVersion: BUILD_INFO.version }); };
-  if (list.length === 0) { remember(); return; }
-  openModal({
-    title: t('release.whatsNew', { version: BUILD_INFO.version }),
-    body: body(list),
-    actions: [{ label: t('release.letsGo'), primary: true }],
-    onClose: remember,
-  });
+  if (releasesSince(seen).length === 0) { remember(); return; }
+  openWhatsNew(seen, remember);
 }
 
 export function openChangelog(): void {

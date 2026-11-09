@@ -138,6 +138,16 @@ export async function createSyncProvider(): Promise<RemoteSyncProvider | null> {
   return mod.createSupabaseSyncProvider(db as never, st.user.id, APP_SUPABASE_SCHEMA);
 }
 
+/** Gültiges Access-Token für eigene API-Routen (z. B. /api/challenge); null, wenn nicht angemeldet. */
+export async function accessToken(): Promise<string | null> {
+  if (state.status !== 'signed-in') return null;
+  try {
+    return await (await load()).auth.getAccessToken();
+  } catch {
+    return null;
+  }
+}
+
 export async function support(): Promise<SupportInfo> { return (await load()).auth.support(); }
 /** Konto anlegen; liefert den einmalig sichtbaren Wiederherstellungscode (null, wenn der Server keinen speichern konnte). */
 export async function register(username: string): Promise<string | null> {

@@ -572,6 +572,34 @@
   }
   .toast.has-action > .toast-text { flex:1 1 auto; min-width:0; }
   .toast.has-action > .btn { flex:none; }
+  /* Fortschritt (progressToast, Live-Update der iOS-App): Text, Zähler, Balken mit leisem Glanz */
+  .toast.has-progress { display:grid; gap:var(--space-2); min-width:min(100%, 280px); text-align:start; }
+  .toast-row { display:flex; align-items:center; gap:var(--space-2); }
+  .toast-row > .toast-text { flex:1 1 auto; min-width:0; }
+  .toast-count { flex:none; color:var(--muted); font-size:var(--text-xs); }
+  .toast-dot {
+    flex:none; width:8px; height:8px; border-radius:50%; background:var(--accent);
+    animation:toast-pulse 1.4s ease-in-out infinite;
+  }
+  .toast-progress {
+    position:relative; display:block; height:4px; border-radius:999px; overflow:hidden;
+    background:color-mix(in srgb, var(--accent) 16%, transparent);
+  }
+  .toast-progress-fill {
+    position:absolute; inset:0; border-radius:inherit; background:var(--accent);
+    transform-origin:left center; transform:scaleX(var(--progress, 0));
+    transition:transform var(--dur-state, 200ms) var(--ease-out);
+  }
+  .toast-progress-fill::after {
+    content:''; position:absolute; inset:0 auto 0 -60%; width:60%;
+    background:linear-gradient(90deg, transparent, color-mix(in srgb, var(--on-accent) 45%, transparent), transparent);
+    animation:sheen 1.6s ease-in-out infinite;
+  }
+  @keyframes toast-pulse { 50% { opacity:.35; transform:scale(.8); } }
+  @media (prefers-reduced-motion: reduce) {
+    .toast-dot, .toast-progress-fill::after { animation:none; }
+    .toast-progress-fill::after { display:none; }
+  }
 
   /* ---------- Feiern (charts.confetti, nur mit Einstellung „Feiern“): einmalig, kein Loop ---------- */
   .confetti { position:fixed; inset:0; z-index:70; pointer-events:none; overflow:hidden; }
@@ -598,5 +626,17 @@
     .btn.quiet:hover { color:var(--text); }
     .btn.danger:hover { color:var(--bad); }
     :is(a, button).chip:hover { border-color:color-mix(in srgb, var(--accent) 45%, var(--border)); }
+  }
+
+  /* Fehlerkarte statt leerer Seite (src/ui/crash.ts, public/js/boot-guard.js) */
+  .crash {
+    display:flex; flex-direction:column; gap:var(--space-3); min-width:0;
+    padding:var(--space-5) var(--space-4); border-radius:var(--radius-lg); background:var(--surface); border:1px solid var(--border);
+  }
+  .crash-title { margin:0; font-size:var(--text-lg); font-weight:var(--weight-bold); line-height:1.25; }
+  .crash-text, .crash-help { margin:0; font-size:var(--text-sm); line-height:1.5; color:var(--muted); }
+  .crash-report {
+    margin:0; padding:var(--space-3); max-height:40vh; overflow:auto; border-radius:var(--radius-md); background:var(--surface-2);
+    font-size:12px; line-height:1.45; white-space:pre-wrap; overflow-wrap:anywhere; user-select:text; -webkit-user-select:text;
   }
 }

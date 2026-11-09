@@ -4,6 +4,40 @@ Alle nennenswerten Änderungen an Mental Math. Format nach [Keep a Changelog](ht
 
 <!-- Automatisch erzeugt mit `npm run changelog` aus src/releases.ts – nicht von Hand bearbeiten. -->
 
+## [1.17.0] - 2026-11-08
+
+### Ranglisten & Wettbewerbe
+
+- Die Daily Challenge wird gewertet: Mit Konto bekommen alle am selben Tag dieselben 15 Aufgaben, und du hast genau einen Versuch. Danach siehst du deinen Platz und wie viele du hinter dir lässt.
+- Ranglisten für den Tag und die Woche. Dein Name erscheint nur, wenn du zustimmst – sonst stehst du dort anonym.
+- Gruppen für Freunde, Team oder Kurs: per Link oder Code beitreten, eigene Rangliste und eigene Wettbewerbe mit Kategorie, Anzahl, Stufe und Dauer.
+- Nach deinem Versuch kannst du dieselben Aufgaben ungewertet nachüben. Fällt das Netz aus, wird dein Ergebnis abgegeben, sobald du wieder online bist.
+- Training passt sich schneller an dich an: Nach drei sicheren Treffern wird ein Aufgabentyp schwerer, nach zwei Fehlern leichter. Hakt es auch auf „Leicht“, kommen zwischendurch die Grundlagen – bis hinunter zum kleinen 1×1.
+- Neu beim ersten Start: ein kurzer Einstufungstest mit bis zu 10 Aufgaben findet deine Startstufe – vom kleinen 1×1 bis zu Prozenten. Wiederholen kannst du ihn unter Profil → Training.
+
+## [1.16.2] - 2026-11-05
+
+### Updates, die man sieht
+
+- Lädt die iPhone-App eine neue Version, zeigt sie das unten mit einem kleinen Fortschrittsbalken an – ohne dich beim Üben zu stören.
+- Ist das Update bereit, kannst du es mit „Jetzt aktualisieren“ sofort laden oder einfach beim nächsten Öffnen. Mitten in einer Runde passiert nie etwas.
+- Nach dem Wechsel bestätigt die App kurz die neue Version und zeigt auf Wunsch, was neu ist.
+
+## [1.16.1] - 2026-11-05
+
+### Schritt für Schritt lernen
+
+- Neu im Lernen-Tab: „Schritt für Schritt lernen“. Ein Rechentrick wird erst an einem Beispiel gezeigt, dann rechnest du jeden Zwischenschritt selbst – mit einem Tipp genau für den Schritt, an dem es hakt.
+- Kleine Grafiken machen die Tricks sichtbar: Flächenmodell, Zahlenstrahl, Anteilsbalken und Stellenwerte.
+- Mehr Abwechslung im Training: Dieselbe Aufgabe kommt nicht mehr kurz hintereinander, und viele Aufgabentypen haben deutlich mehr Varianten.
+
+## [1.16.0] - 2026-11-04
+
+### Schnellere Verbesserungen
+
+- Kleine Verbesserungen und Fehlerbehebungen erreichen die iPhone-App jetzt direkt – ohne Update aus dem App Store. Die App prüft beim Start, lädt im Hintergrund und wechselt erst beim nächsten Öffnen.
+- Jedes Update ist signiert und wird vor dem Einsatz geprüft. Startet eine neue Version nicht sauber, kehrt die App automatisch zur vorherigen zurück.
+
 ## [1.15.0] - 2026-11-01
 
 ### iPhone-App, Einführung & Teilen
