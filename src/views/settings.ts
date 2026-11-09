@@ -1,5 +1,5 @@
-// Profil (Ruhiger Fokus): eine gruppierte Seite statt Tabs – Konto, Training, Darstellung, Rückmeldung, Daten, Über
-// und Erweitert (E2–E5). Eingaben kommen aus dem Kit, aktualisieren sich lokal und speichern sofort: kein Toast (E21),
+// Profil (Ruhiger Fokus): eine gruppierte Seite statt Tabs – Konto, Training, Erinnerungen, Während der Runde, Eingabe,
+// Darstellung & Feedback, Daten, Über & Hilfe (E2–E5, neu sortiert in 1.17). Eingaben kommen aus dem Kit, aktualisieren sich lokal und speichern sofort: kein Toast (E21),
 // kein rerender() (Fix A11). Konto-Verwaltung und Kategorien liegen in modalen Sheets.
 import type { CategoryId, Level, Settings, ThemeSetting, TimerDisplay } from '../types.ts';
 import { getSettings, setSettings, resetAll, exportJSON, getAttempts, getSessions, getProfile } from '../data/storage.ts';
@@ -69,7 +69,7 @@ function profGroup(title: string, ...children: Child[]): HTMLElement {
   return el;
 }
 
-/* ---------- Training ---------- */
+/* ---------- Training: was und wie viel ---------- */
 
 const TIMER_HELP: Record<TimerDisplay, `settings.${string}`> = {
   calm: 'settings.timerCalmHelp', precise: 'settings.timerPreciseHelp', off: 'settings.timerOffHelp',
@@ -77,6 +77,65 @@ const TIMER_HELP: Record<TimerDisplay, `settings.${string}`> = {
 
 type DiffValue = 'auto' | '1' | '2' | '3';
 
+/** Zeile „Kategorien“ mit Sheet: ein Switch je Kategorie (gemischte Runden, Empfehlung); mindestens eine bleibt aktiv. */
+function categoriesRow(s: Settings): HTMLElement {
+  // Versteckte Kategorien (z. B. „Eigenes“) gehören nicht in die Auswahl (wie activeCategories)
+  const visible = CATEGORIES.filter((c) => !c.hidden);
+  const all: CategoryId[] = visible.map((c) => c.id);
+  let enabled: CategoryId[] = Array.isArray(s.enabledCategories) ? all.filter((id) => s.enabledCategories?.includes(id)) : all;
+  if (enabled.length === 0) enabled = all;
+
+  const catValue = (): string => (enabled.length >= all.length
+    ? t('settings.catsAll') : t('settings.catsSome', { n: enabled.length, total: all.length }));
+  const cats = row({
+    icon: 'grid', label: t('settings.categories'), value: catValue(), chevron: true, onClick: () => openCategories(),
+    attrs: { 'aria-haspopup': 'dialog' },
+  });
+  const setEnabled = (ids: CategoryId[]): void => {
+    enabled = ids;
+    save({ enabledCategories: ids.length >= all.length ? null : ids });
+    const v = cats.querySelector('.row-value');
+    if (v) v.textContent = catValue();
+  };
+
+  function openCategories(): void {
+    const box = list([]);
+    const lastHint = h('p', { class: 'prof-note', role: 'status' });
+    const allBtn = button({ label: t('settings.enableAll'), full: true });
+    let ctls: Array<readonly [CategoryId, SwitchControl]> = [];
+    const paint = (): void => {
+      const last = enabled.length === 1;
+      lastHint.textContent = last ? t('settings.lastCategory') : '';
+      lastHint.hidden = !last;
+      allBtn.disabled = enabled.length >= all.length;
+      for (const [id, ctl] of ctls) ctl.setDisabled(last && enabled.includes(id));
+    };
+    const draw = (): void => {
+      ctls = visible.map((c) => [c.id, switchRow({
+        label: c.name, help: c.description, checked: enabled.includes(c.id),
+        onChange: (on) => {
+          setEnabled(on ? all.filter((id) => id === c.id || enabled.includes(id)) : enabled.filter((id) => id !== c.id));
+          paint();
+        },
+      })] as const);
+      box.replaceChildren(...ctls.map(([, ctl]) => ctl.el));
+      paint();
+    };
+    allBtn.addEventListener('click', () => {
+      setEnabled(all);
+      draw();
+      box.querySelector<HTMLElement>('button[role="switch"]')?.focus();
+    });
+    draw();
+    openSheet({
+      title: t('settings.categories'),
+      children: [h('p', { class: 'prof-sheet-text' }, t('settings.categoriesHint')), box, lastHint, allBtn],
+    });
+  }
+  return cats;
+}
+
+/** Training: Schwierigkeit (mit Einstufungstest), Tagesziel, Rundenlänge, Kategorien. */
 function trainingGroup(s: Settings): HTMLElement {
   const diff = segmented<DiffValue>({
     label: t('settings.difficulty'),
@@ -84,6 +143,21 @@ function trainingGroup(s: Settings): HTMLElement {
     value: s.difficulty === 'auto' ? 'auto' : (String(s.difficulty) as DiffValue),
     help: t('settings.diffHelp'),
     onChange: (v) => save({ difficulty: v === 'auto' ? 'auto' : (Number(v) as Level) }),
+  });
+
+  // Einstufungstest: Startstufe neu bestimmen (stellt die Schwierigkeit auf „Auto“)
+  const placed = s.placement;
+  const placement = row({
+    icon: 'target', label: t('settings.placement'), href: '#/einstufung',
+    sub: placed
+      ? t('settings.placementDone', { name: t(`placement.theta${placed.theta}`), date: new Date(placed.ts).toLocaleDateString(locale()) })
+      : t('settings.placementNone'),
+  });
+
+  const goal = stepper({
+    label: t('settings.dailyGoal'), value: s.dailyGoalMin, min: 5, max: 60, step: 5,
+    format: (n) => t('settings.minutes', { n }),
+    onChange: (n) => save({ dailyGoalMin: n }),
   });
 
   // Alte Werte (z. B. 30) bleiben wählbar, bis man umstellt
@@ -97,6 +171,12 @@ function trainingGroup(s: Settings): HTMLElement {
     onChange: (v) => save({ sessionLength: Number(v) }),
   });
 
+  return profGroup(t('settings.training'), list([diff.el, placement, goal, len.el, categoriesRow(s)]));
+}
+
+/* ---------- Während der Runde: Zeit, Abgabe, Hilfen ---------- */
+
+function roundGroup(s: Settings): HTMLElement {
   const timer = segmented<TimerDisplay>({
     label: t('settings.timerDisplay'),
     options: [['calm', t('settings.timerCalm')], ['precise', t('settings.timerPrecise')], ['off', t('settings.timerOff')]],
@@ -108,29 +188,49 @@ function trainingGroup(s: Settings): HTMLElement {
     },
   });
 
-  const goal = stepper({
-    label: t('settings.dailyGoal'), value: s.dailyGoalMin, min: 5, max: 60, step: 5,
-    format: (n) => t('settings.minutes', { n }),
-    onChange: (n) => save({ dailyGoalMin: n }),
+  // Auto-Fail ist nur mit Zeitwertung sinnvoll: gesperrt und als „aus“ gezeigt, solange `timer` aus ist
+  const autoFailHelp = (on: boolean): string => t(on ? 'settings.autoFailOn' : 'settings.autoFailNeedsTimer');
+  const autoFail = switchRow({
+    label: t('settings.autoFail'), help: autoFailHelp(s.timer),
+    checked: s.autoFail && s.timer, disabled: !s.timer, onChange: (v) => save({ autoFail: v }),
   });
+  const onTimer = (v: boolean): void => {
+    save({ timer: v });
+    autoFail.set(getSettings().autoFail && v);
+    autoFail.setDisabled(!v);
+    autoFail.setHelp(autoFailHelp(v));
+  };
 
-  // Einstufungstest: Startstufe neu bestimmen (stellt die Schwierigkeit auf „Auto“)
-  const placed = s.placement;
-  const placement = row({
-    icon: 'target', label: t('settings.placement'), href: '#/einstufung',
-    sub: placed
-      ? t('settings.placementDone', { name: t(`placement.theta${placed.theta}`), date: new Date(placed.ts).toLocaleDateString(locale()) })
-      : t('settings.placementNone'),
-  });
-
-  return profGroup(t('settings.training'), list([
-    diff.el, placement, len.el, timer.el, goal,
+  return profGroup(t('settings.inRound'), list([
+    timer.el,
+    switchRow({ label: t('settings.timer'), help: t('settings.timerHint'), checked: s.timer, onChange: onTimer }).el,
+    autoFail.el,
+    switchRow({ label: t('settings.autoSubmit'), help: t('settings.autoSubmitHint'), checked: s.autoSubmit, onChange: (v) => save({ autoSubmit: v }) }).el,
+    switchRow({ label: t('settings.estimate'), help: t('settings.estimateHint'), checked: s.estimateMode, onChange: (v) => save({ estimateMode: v }) }).el,
+    switchRow({ label: t('settings.ghost'), help: t('settings.ghostHint'), checked: s.ghost, onChange: (v) => save({ ghost: v }) }).el,
     switchRow({ label: t('settings.breathe'), help: t('settings.breatheHelp'), checked: s.breathe, onChange: (v) => save({ breathe: v }) }).el,
-    switchRow({ label: t('settings.confetti'), help: t('settings.confettiHelp'), checked: s.confetti, onChange: (v) => save({ confetti: v }) }).el,
   ]));
 }
 
-/* ---------- Darstellung ---------- */
+/* ---------- Eingabe: Tastenfeld ---------- */
+
+function inputGroup(s: Settings): HTMLElement {
+  const keypad = segmented<Settings['keypad']>({
+    label: t('settings.keypad'),
+    options: [['auto', t('settings.keypadAuto')], ['on', t('settings.keypadOn')], ['off', t('settings.keypadOff')]],
+    value: s.keypad || 'auto', help: t('settings.keypadHint'),
+    onChange: (v) => save({ keypad: v }),
+  });
+  const pad = segmented<Settings['numpadLayout']>({
+    label: t('settings.numpadLayout'), inline: true, even: true,
+    options: [['calculator', t('settings.numpadCalculator')], ['phone', t('settings.numpadPhone')]],
+    value: s.numpadLayout,
+    onChange: (v) => save({ numpadLayout: v }),
+  });
+  return profGroup(t('settings.input'), list([keypad.el, pad.el]));
+}
+
+/* ---------- Darstellung & Feedback ---------- */
 
 type ThemePick = Exclude<ThemeSetting, 'oled'>;
 
@@ -176,22 +276,11 @@ function appearanceGroup(s: Settings): HTMLElement {
   });
   lang.el.setAttribute('data-prof', 'lang');
 
-  const pad = segmented<Settings['numpadLayout']>({
-    label: t('settings.numpadLayout'), inline: true, even: true,
-    options: [['calculator', t('settings.numpadCalculator')], ['phone', t('settings.numpadPhone')]],
-    value: s.numpadLayout,
-    onChange: (v) => save({ numpadLayout: v }),
-  });
-
-  return profGroup(t('settings.appearance'), list([themeSeg.el, oled.el, lang.el, pad.el]));
-}
-
-/* ---------- Rückmeldung ---------- */
-
-function feedbackGroup(s: Settings): HTMLElement {
-  return profGroup(t('settings.feedback'), list([
+  return profGroup(t('settings.appearanceFeedback'), list([
+    themeSeg.el, oled.el, lang.el,
     switchRow({ label: t('settings.haptics'), help: t(isNative() ? 'settings.hapticsHelpApp' : 'settings.hapticsHelp'), checked: s.haptics, onChange: (v) => save({ haptics: v }) }).el,
     switchRow({ label: t('settings.sound'), help: t('settings.soundHelp'), checked: s.sound, onChange: (v) => save({ sound: v }) }).el,
+    switchRow({ label: t('settings.confetti'), help: t('settings.confettiHelp'), checked: s.confetti, onChange: (v) => save({ confetti: v }) }).el,
   ]));
 }
 
@@ -310,102 +399,13 @@ function aboutGroup(): HTMLElement {
   });
   const meta = (label: string, value: string, title?: string): HTMLElement =>
     h('div', null, h('dt', null, label), h('dd', { class: 'num', title }, value));
-  return profGroup(t('settings.about'),
-    list([news, intro, help, privacy, store, source, beta.el]),
+  return profGroup(t('settings.aboutHelp'),
+    list([help, intro, news, store, beta.el, privacy, source]),
     h('dl', { class: 'prof-meta' },
       meta(t('settings.build'), [BUILD_INFO.build, fmtIsoDate(BUILD_INFO.date), BUILD_INFO.channel === 'preview' ? t('settings.channelPreview') : '']
         .filter(Boolean).join(' · ')),
       meta(t('settings.deviceId'), short(profile.deviceId), profile.deviceId),
       meta(t('settings.profileId'), short(profile.id), profile.id)));
-}
-
-/* ---------- Erweitert (E5) ---------- */
-
-function advancedGroup(s: Settings): HTMLElement {
-  // Versteckte Kategorien (z. B. „Eigenes“) gehören nicht in die Auswahl (wie activeCategories)
-  const visible = CATEGORIES.filter((c) => !c.hidden);
-  const all: CategoryId[] = visible.map((c) => c.id);
-  let enabled: CategoryId[] = Array.isArray(s.enabledCategories) ? all.filter((id) => s.enabledCategories?.includes(id)) : all;
-  if (enabled.length === 0) enabled = all;
-
-  const catValue = (): string => (enabled.length >= all.length
-    ? t('settings.catsAll') : t('settings.catsSome', { n: enabled.length, total: all.length }));
-  const cats = row({
-    label: t('settings.categories'), value: catValue(), chevron: true, onClick: () => openCategories(),
-    attrs: { 'aria-haspopup': 'dialog' },
-  });
-  const setEnabled = (ids: CategoryId[]): void => {
-    enabled = ids;
-    save({ enabledCategories: ids.length >= all.length ? null : ids });
-    const v = cats.querySelector('.row-value');
-    if (v) v.textContent = catValue();
-  };
-
-  /** Bottom Sheet mit einem Switch je Kategorie; mindestens eine bleibt aktiv. */
-  function openCategories(): void {
-    const box = list([]);
-    const lastHint = h('p', { class: 'prof-note', role: 'status' });
-    const allBtn = button({ label: t('settings.enableAll'), full: true });
-    let ctls: Array<readonly [CategoryId, SwitchControl]> = [];
-    const paint = (): void => {
-      const last = enabled.length === 1;
-      lastHint.textContent = last ? t('settings.lastCategory') : '';
-      lastHint.hidden = !last;
-      allBtn.disabled = enabled.length >= all.length;
-      for (const [id, ctl] of ctls) ctl.setDisabled(last && enabled.includes(id));
-    };
-    const draw = (): void => {
-      ctls = visible.map((c) => [c.id, switchRow({
-        label: c.name, help: c.description, checked: enabled.includes(c.id),
-        onChange: (on) => {
-          setEnabled(on ? all.filter((id) => id === c.id || enabled.includes(id)) : enabled.filter((id) => id !== c.id));
-          paint();
-        },
-      })] as const);
-      box.replaceChildren(...ctls.map(([, ctl]) => ctl.el));
-      paint();
-    };
-    allBtn.addEventListener('click', () => {
-      setEnabled(all);
-      draw();
-      box.querySelector<HTMLElement>('button[role="switch"]')?.focus();
-    });
-    draw();
-    openSheet({
-      title: t('settings.categories'),
-      children: [h('p', { class: 'prof-sheet-text' }, t('settings.categoriesHint')), box, lastHint, allBtn],
-    });
-  }
-
-  const keypad = segmented<Settings['keypad']>({
-    label: t('settings.keypad'),
-    options: [['auto', t('settings.keypadAuto')], ['on', t('settings.keypadOn')], ['off', t('settings.keypadOff')]],
-    value: s.keypad || 'auto', help: t('settings.keypadHint'),
-    onChange: (v) => save({ keypad: v }),
-  });
-
-  // Auto-Fail ist nur mit Zeitwertung sinnvoll: gesperrt und als „aus“ gezeigt, solange `timer` aus ist
-  const autoFailHelp = (timer: boolean): string => t(timer ? 'settings.autoFailOn' : 'settings.autoFailNeedsTimer');
-  const autoFail = switchRow({
-    label: t('settings.autoFail'), help: autoFailHelp(s.timer),
-    checked: s.autoFail && s.timer, disabled: !s.timer, onChange: (v) => save({ autoFail: v }),
-  });
-  const onTimer = (v: boolean): void => {
-    save({ timer: v });
-    autoFail.set(getSettings().autoFail && v);
-    autoFail.setDisabled(!v);
-    autoFail.setHelp(autoFailHelp(v));
-  };
-
-  return profGroup(t('settings.advanced'), list([
-    cats,
-    keypad.el,
-    switchRow({ label: t('settings.autoSubmit'), help: t('settings.autoSubmitHint'), checked: s.autoSubmit, onChange: (v) => save({ autoSubmit: v }) }).el,
-    switchRow({ label: t('settings.estimate'), help: t('settings.estimateHint'), checked: s.estimateMode, onChange: (v) => save({ estimateMode: v }) }).el,
-    switchRow({ label: t('settings.timer'), help: t('settings.timerHint'), checked: s.timer, onChange: onTimer }).el,
-    autoFail.el,
-    switchRow({ label: t('settings.ghost'), help: t('settings.ghostHint'), checked: s.ghost, onChange: (v) => save({ ghost: v }) }).el,
-  ]));
 }
 
 /* ---------- Konto (Passkey) ---------- */
@@ -932,23 +932,25 @@ function scrollToAnchor(groups: Readonly<Record<TabAnchor, HTMLElement>>): void 
 export function renderSettings(): void {
   const s = getSettings();
   const live = h('p', { class: 'sr-only', role: 'status' });
+  // Alte Links mit ?tab= scrollen zur passenden Gruppe (E6)
   const groups: Record<TabAnchor, HTMLElement> = {
     gameplay: trainingGroup(s),
     general: appearanceGroup(s),
     data: dataGroup(live),
     about: aboutGroup(),
   };
-  // Kein Floating CTA auf Profil (der Router setzt setPrimaryAction(null))
+  // Kein Floating CTA auf Profil (der Router setzt setPrimaryAction(null)). Reihenfolge nach Häufigkeit:
+  // Konto, Training, Erinnerungen, Während der Runde, Eingabe, Darstellung & Feedback, Daten, Über & Hilfe
   appendChildren(app, [
     largeTitle(t('settings.title')),
     accountCard(),
     groups.gameplay,
     remindersGroup(),
+    roundGroup(s),
+    inputGroup(s),
     groups.general,
-    feedbackGroup(s),
     groups.data,
     groups.about,
-    advancedGroup(s),
     live,
   ]);
   scrollToAnchor(groups);
