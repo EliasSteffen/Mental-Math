@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { buildReminderState } from '../src/core/reminder-state.ts';
-import { detectSupport } from '../src/platform/web-push.ts';
+import { detectSupport } from '../src/platform/web-reminders.ts';
 import { dayKey } from '../src/core/progress.ts';
 import { parseState } from '../src/core/reminders.ts';
 import type { Attempt } from '../src/types.ts';

@@ -4,7 +4,7 @@ import { train } from './train.ts';
 import { parallel } from './parallel.ts';
 import { chain } from './chain.ts';
 import { custom } from './custom.ts';
-import { analyse } from './analyse.ts';
+import { analyse } from './progress.ts'; // Datei nicht „analyse.ts“: /analyse.js steht in EasyPrivacy
 import { lernen } from './lernen.ts';
 import { settings } from './settings.ts';
 import { release } from './release.ts';

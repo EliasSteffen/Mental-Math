@@ -59,7 +59,7 @@ src/
 ├─ data/storage.ts          Schema v2 + Migration + In-Memory-Cache (write-through)
 ├─ ui/                      dom.ts (h, appendChildren), charts.ts, icons.ts, keypad.ts, fx.ts, theme.ts, toast.ts
 ├─ features/                ai-client.ts, activity.ts, pwa.ts
-├─ views/                   home.ts, lernen.ts, analyse.ts, settings.ts, daily.ts, chain.ts
+├─ views/                   home.ts, lernen.ts, progress.ts, settings.ts, daily.ts, chain.ts
 │  └─ train/                index.ts (Ablauf), timer.ts, answer.ts (Zahl/choice), feedback.ts, result.ts, ghost.ts
 ├─ router.ts  app.ts
 ├─ sw.ts                    eigener tsconfig (lib webworker), Precache-Liste wird beim Build generiert

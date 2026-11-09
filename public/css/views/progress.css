@@ -1,4 +1,4 @@
-/* View „Fortschritt“ (src/views/analyse.ts). Nur View-spezifische Regeln; Bausteine und Diagramme (Heatmap, Lernkurve,
+/* View „Fortschritt“ (src/views/progress.ts). Nur View-spezifische Regeln; Bausteine und Diagramme (Heatmap, Lernkurve,
    Fortschrittsbalken) kommen aus components.css. Dynamische Werte nur über CSS-Variablen: --h (Höhe 0–100), --w (Breite 0–100). */
 @layer views {
   /* ---------- Fokus-Karte (Hero) ---------- */

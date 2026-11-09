@@ -3,10 +3,10 @@
 import type { ReminderPrefs } from '../core/reminders.ts';
 import { isNative } from './index.ts';
 import * as local from './native-reminders.ts';
-import * as web from './web-push.ts';
-import type { EnableResult, PushConfig, PushSupport, TestResult } from './web-push.ts';
+import * as web from './web-reminders.ts';
+import type { EnableResult, PushConfig, PushSupport, TestResult } from './web-reminders.ts';
 
-export type { EnableResult, PushConfig, PushSupport, TestResult } from './web-push.ts';
+export type { EnableResult, PushConfig, PushSupport, TestResult } from './web-reminders.ts';
 
 export const pushSupport = (): PushSupport => (isNative() ? local.pushSupport() : web.pushSupport());
 export const notificationPermission = (): NotificationPermission | 'unsupported' =>
