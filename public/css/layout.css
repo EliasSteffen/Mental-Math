@@ -152,9 +152,10 @@
   .sheet-body { display:flex; flex-direction:column; gap:var(--space-3); min-width:0; }
 
   /* ---------- Modales Bottom Sheet (<dialog>.showModal) ---------- */
+  /* --kb: von der Bildschirmtastatur verdeckter Streifen unten (src/ui/keyboard-inset.ts); das Sheet sitzt darüber */
   dialog.sheet.is-modal {
-    position:fixed; inset:auto 0 0 0; z-index:90;
-    width:100%; max-width:none; max-height:min(92dvh, calc(100dvh - 24px));
+    position:fixed; inset:auto 0 var(--kb, 0px) 0; z-index:90;
+    width:100%; max-width:none; max-height:min(92dvh, calc(100dvh - 24px - var(--kb, 0px)));
     margin:0; border:0;
     /* Opak auch in Aurora (durchscheinende --surface über --bg) */
     background:linear-gradient(var(--surface), var(--surface)), var(--bg);
@@ -164,7 +165,9 @@
   }
   dialog.sheet.is-modal:not([open]) { display:none; }
   dialog.sheet.is-modal.is-dragging { transition:none; }
-  dialog.sheet.is-modal:not(.is-dragging) { transition:transform var(--dur-state) var(--ease-out); }
+  dialog.sheet.is-modal:not(.is-dragging) { transition:transform var(--dur-state) var(--ease-out), bottom var(--dur-state) var(--ease-out); }
+  /* Tastatur offen: ganz im sichtbaren Bereich (--vvh), ohne Abstand zum Home-Indikator */
+  html.has-keyboard dialog.sheet.is-modal { max-height:calc(var(--vvh, 100dvh) - 24px); padding-bottom:var(--space-4); }
   dialog.sheet.is-modal.is-closing { animation:sheet-out var(--dur-exit) var(--ease-out) forwards; }
   /* Nach dem Wischen gleitet das Sheet über die transform-Transition ganz hinaus (--drag: 100%) */
   dialog.sheet.is-modal.is-closing.is-swiped { animation:none; }
@@ -215,8 +218,8 @@
 
     /* Modales Sheet wird ein zentrierter Dialog */
     dialog.sheet.is-modal {
-      inset:0; margin:auto;
-      width:min(var(--focus-max), calc(100% - 32px)); max-height:min(80dvh, 720px);
+      inset:var(--vvt, 0px) 0 var(--kb, 0px) 0; margin:auto;
+      width:min(var(--focus-max), calc(100% - 32px)); max-height:min(80dvh, 720px, calc(100dvh - 32px - var(--kb, 0px)));
       border-radius:var(--radius-lg);
       padding-bottom:var(--space-4);
     }

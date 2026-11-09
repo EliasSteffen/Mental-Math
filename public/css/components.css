@@ -463,7 +463,10 @@
   /* ---------- Dialog (ui/modal.ts): <dialog> im Top-Layer, auch über offenen Sheets ---------- */
   dialog.modal {
     display:flex; flex-direction:column; gap:var(--space-3);
-    width:min(calc(100% - 2 * var(--gutter)), 420px); max-width:none; max-height:min(85dvh, 640px);
+    width:min(calc(100% - 2 * var(--gutter)), 420px); max-width:none;
+    max-height:min(85dvh, 640px);
+    /* Mittig im sichtbaren Bereich über der Bildschirmtastatur (--vvt/--kb, src/ui/keyboard-inset.ts) */
+    inset:var(--vvt, 0px) 0 var(--kb, 0px) 0;
     margin:auto; padding:20px; border:0; border-radius:var(--radius-lg);
     overflow:hidden; /* Titel und Aktionen bleiben stehen, nur der Inhalt scrollt */
     /* Opak auch in Aurora (durchscheinende --surface über --bg) */
@@ -471,6 +474,7 @@
     box-shadow:var(--shadow-2);
     animation:rise-in var(--dur-enter) var(--ease-out) both;
   }
+  html.has-keyboard dialog.modal { max-height:min(640px, calc(var(--vvh, 100dvh) - 32px)); }
   dialog.modal:not([open]) { display:none; }
   dialog.modal.is-closing { animation:fade-out var(--dur-exit) var(--ease-out) forwards; }
   dialog.modal::backdrop {
