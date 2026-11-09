@@ -8,7 +8,7 @@ import { app } from './ui/dom.ts';
 import { renderHome } from './views/home.ts';
 import { renderTrain } from './views/train/index.ts';
 import { renderLernen } from './views/lernen.ts';
-import { renderAnalyse } from './views/analyse.ts';
+import { renderAnalyse } from './views/progress.ts';
 import { renderSettings } from './views/settings.ts';
 import { renderCompete } from './views/compete.ts';
 import { renderChallenge } from './views/challenge.ts';
