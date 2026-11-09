@@ -1,15 +1,29 @@
 // Sheets (Ruhiger Fokus): inline im Training (ersetzt das Dock an Ort und Stelle) und modal als <dialog>.
-// Modal: showModal() liefert Fokusfalle und Esc; dazu Scrim (::backdrop), Griff, Wisch nach unten ab 80 px,
-// ✕-Button, Tipp auf den Scrim, Sperre des Seiten-Scrolls und Rückfokus auf das auslösende Element.
+// Modal: showModal() liefert Fokusfalle und Esc; dazu Scrim (::backdrop), Griff, Wisch nach unten ab 80 px
+// (per Touch auf dem ganzen Sheet), ✕-Button, Tipp auf den Scrim, Sperre des Seiten-Scrolls und Rückfokus auf das
+// auslösende Element.
 import { appendChildren, h, type Child } from './dom.ts';
 import { icon } from './kit.ts';
 import { lockScroll } from './scroll-lock.ts';
+import { pullIntent } from './sheet-gesture.ts';
 import { t } from '../i18n/index.ts';
 
 /** Ab dieser Zugstrecke (px) schließt das Sheet beim Loslassen. */
 const SWIPE_CLOSE_PX = 80;
 /** Ausblenden (--dur-exit 200 ms) plus Puffer, danach wird der Dialog geschlossen und entfernt. */
 const EXIT_MS = 220;
+/** Bis zu dieser Zugstrecke (px) gilt die Bewegung noch als Tippen; der Klick darf durch. */
+const TAP_SLOP_PX = 10;
+/** In Eingaben gehört ein Wisch dem Cursor und der Auswahl, nicht dem Sheet. */
+const NO_PULL = 'input, textarea, select, [contenteditable="true"]';
+
+/** Nichts zwischen dem berührten Element und dem Sheet (einschließlich) ist nach unten gescrollt. */
+function atTop(target: EventTarget | null, sheet: HTMLElement): boolean {
+  for (let n = target instanceof Element ? target : null; n; n = n === sheet ? null : n.parentElement) {
+    if (n.scrollTop > 0) return false;
+  }
+  return true;
+}
 
 let uid = 0;
 let openCount = 0;
@@ -99,30 +113,66 @@ export function openSheet(o: SheetOptions): SheetHandle {
     downOutside = false;
   });
 
-  // Wisch nach unten am Griff/Titel (touch-action: none in layout.css)
-  let startY: number | null = null;
-  let dy = 0;
-  head.addEventListener('pointerdown', (e) => {
-    if (state !== 'open' || e.button !== 0 || (e.target instanceof Element && e.target.closest('button'))) return;
-    startY = e.clientY;
-    dy = 0;
-    try { head.setPointerCapture(e.pointerId); } catch { /* Zeiger schon weg */ }
-    el.classList.add('is-dragging');
-  });
-  head.addEventListener('pointermove', (e) => {
-    if (startY === null) return;
-    dy = Math.max(0, e.clientY - startY);
-    el.style.setProperty('--drag', `${dy}px`);
-  });
+  let dragY = 0;
+  const beginDrag = (): void => { dragY = 0; el.classList.add('is-dragging'); };
+  const moveDrag = (dy: number): void => { dragY = Math.max(0, dy); el.style.setProperty('--drag', `${dragY}px`); };
   const endDrag = (): void => {
-    if (startY === null) return;
-    startY = null;
-    if (dy >= SWIPE_CLOSE_PX) { close(true); return; }
+    if (dragY >= SWIPE_CLOSE_PX) { close(true); return; }
     el.classList.remove('is-dragging');
     el.style.setProperty('--drag', '0px');
   };
-  head.addEventListener('pointerup', endDrag);
-  head.addEventListener('pointercancel', endDrag);
+
+  // Maus/Stift: am Griff/Titel (touch-action: none in layout.css)
+  let pointerY: number | null = null;
+  head.addEventListener('pointerdown', (e) => {
+    if (e.pointerType === 'touch' || state !== 'open' || e.button !== 0 || (e.target instanceof Element && e.target.closest('button'))) return;
+    pointerY = e.clientY;
+    try { head.setPointerCapture(e.pointerId); } catch { /* Zeiger schon weg */ }
+    beginDrag();
+  });
+  head.addEventListener('pointermove', (e) => { if (pointerY !== null) moveDrag(e.clientY - pointerY); });
+  const endPointer = (): void => {
+    if (pointerY === null) return;
+    pointerY = null;
+    endDrag();
+  };
+  head.addEventListener('pointerup', endPointer);
+  head.addEventListener('pointercancel', endPointer);
+
+  // Touch: auf dem ganzen Sheet, solange es ganz oben steht; sonst scrollt der Finger den Inhalt
+  let touch: { x: number; y: number; pulling: boolean } | null = null;
+  el.addEventListener('touchstart', (e) => {
+    if (touch?.pulling) return;
+    const first = e.touches[0];
+    const onSheet = first !== undefined && first.clientY >= el.getBoundingClientRect().top;
+    const inField = e.target instanceof Element && e.target.closest(NO_PULL) !== null;
+    touch = state === 'open' && e.touches.length === 1 && first && onSheet && !inField
+      ? { x: first.clientX, y: first.clientY, pulling: false }
+      : null;
+  }, { passive: true });
+  el.addEventListener('touchmove', (e) => {
+    const first = e.touches[0];
+    if (!touch || !first) return;
+    const dy = first.clientY - touch.y;
+    if (!touch.pulling) {
+      const intent = pullIntent(first.clientX - touch.x, dy, atTop(e.target, el));
+      if (intent === 'undecided') return;
+      if (intent === 'none' || !e.cancelable) { touch = null; return; }
+      touch.pulling = true;
+      beginDrag();
+    }
+    e.preventDefault();
+    moveDrag(dy);
+  }, { passive: false });
+  const endTouch = (e: TouchEvent): void => {
+    const pulled = touch?.pulling === true;
+    touch = null;
+    if (!pulled) return;
+    if (dragY > TAP_SLOP_PX && e.cancelable) e.preventDefault(); // kein Klick auf die Zeile, auf der der Wisch begann
+    endDrag();
+  };
+  el.addEventListener('touchend', endTouch);
+  el.addEventListener('touchcancel', endTouch);
 
   window.addEventListener('hashchange', onRoute);
   openCount += 1;
