@@ -62,11 +62,13 @@ async function request<T>(method: 'GET' | 'POST', path: string, body?: unknown, 
     clearTimeout(timer);
   }
   let data: unknown = null;
-  try { data = await res.json(); } catch { /* leer */ }
+  try { data = await res.json(); } catch { /* leer oder kein JSON */ }
   if (!res.ok) {
     const code = (data as { error?: { code?: unknown } } | null)?.error?.code;
     throw new ChallengeError(typeof code === 'string' && KNOWN.includes(code) ? code as ChallengeErrorCode : 'server_error');
   }
+  // Ein Server ohne diese Route liefert z. B. die HTML-Startseite (200): das ist kein Netzproblem, sondern der Server
+  if (data === null || typeof data !== 'object') throw new ChallengeError('server_error');
   return data as T;
 }
 
