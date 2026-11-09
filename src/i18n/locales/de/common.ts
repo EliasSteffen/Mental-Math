@@ -59,10 +59,13 @@ export const common = {
   xpGain: '{n} XP',
   // App-Update (platform/web.ts)
   updateReady: 'Neue Version verfügbar',
-  updateReload: 'Neu laden',
+  updateReload: 'Jetzt aktualisieren',
+  updateReadySub: 'Ein Tipp lädt sie – deine Daten bleiben.',
   // Live-Update der iOS-App (platform/live-update.ts, features/whats-new.ts)
   liveUpdateLoading: 'Update {version} wird geladen',
+  liveUpdateLoadingSub: 'Im Hintergrund – du kannst weiterüben.',
   liveUpdateReady: 'Update {version} bereit',
+  liveUpdateReadySub: 'Kurzer Neustart der App, deine Daten bleiben.',
   liveUpdateApply: 'Jetzt aktualisieren',
   liveUpdateDone: 'Aktualisiert auf {version}',
   liveUpdateWhatsNew: 'Was ist neu?',

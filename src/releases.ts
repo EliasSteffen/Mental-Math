@@ -5,6 +5,14 @@ const DATE = '2026-10-30';
 
 export const RELEASES: Release[] = [
   {
+    version: '1.17.1', date: '2026-11-09',
+    title: { de: 'Updates, die man nicht übersieht', en: 'Updates you cannot miss' },
+    highlights: [
+      { de: 'Eine neue Version meldet sich jetzt mit einer großen Karte statt einer kleinen Pille: mit Fortschritt beim Laden und einem Knopf, der so groß ist wie „Jetzt üben“.', en: 'A new version now appears as a large card instead of a small pill: with progress while loading and a button as large as “Practice now”.' },
+      { de: 'Behoben: In der Beta-App stand dauerhaft „Anmeldung abgelaufen“, und Änderungen wurden nicht mehr zwischen den Geräten abgeglichen.', en: 'Fixed: the beta app kept showing “Session expired”, and changes were no longer synced between devices.' },
+    ],
+  },
+  {
     version: '1.17.0', date: '2026-11-08',
     title: { de: 'Ranglisten & Wettbewerbe', en: 'Leaderboards & competitions' },
     highlights: [

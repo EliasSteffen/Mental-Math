@@ -66,6 +66,9 @@ jobs:
       # Wie im iOS-Build (ios.yml): Ein Live-Update ist dieses dist/, es muss dieselbe API und dieselben Schlüssel kennen.
       # Fehlen die Schlüssel, nimmt die App nach diesem Update keine weiteren an (scripts/live-update.ts prüft das).
       PUBLIC_API_ORIGIN: ${{ vars.PUBLIC_API_ORIGIN }}
+      # Optional: eigene API nur für Beta-Bundles (develop). Leer = Produktion. Nur setzen, wenn dieser Server mit
+      # demselben AUTH_JWT_KEY signiert wie die Produktion – sonst lehnt Supabase die Tokens beim Sync ab.
+      PUBLIC_PREVIEW_API_ORIGIN: ${{ vars.PUBLIC_PREVIEW_API_ORIGIN }}
       PUBLIC_LIVE_UPDATE_KEYS: ${{ vars.LIVE_UPDATE_PUBLIC_KEYS }}
       PUBLIC_LIVE_UPDATE_BETA_KEYS: ${{ vars.LIVE_UPDATE_BETA_PUBLIC_KEYS }}
     steps:

@@ -3,6 +3,7 @@
 // Die Höhe über dem unteren Rand folgt dem, was dort gerade schwebt (Tab-Leiste, CTA, Dock, Feedback-Sheet).
 // Ansage: nur eine Ebene – jeder Toast ist selbst status bzw. alert, der Stapel ist keine Live-Region (sonst doppelt).
 import { h } from './dom.ts';
+import { icon, type IconName } from './kit.ts';
 
 export type ToastKind = 'info' | 'success' | 'error';
 /** Knopf im Toast (z. B. „Neu laden“); ein Klick schließt den Toast. */
@@ -93,32 +94,56 @@ export function toast(text: string, opts: ToastOptions = {}): () => void {
   return () => dismiss(el);
 }
 
-/** Stehende Meldung mit Fortschritt (z. B. Live-Update lädt): set() ändert Anteil (0–1) und Zähler, close() schließt. */
-export interface ProgressToast { set(fraction: number, count: string): void; close(): void }
+/** Update-Banner: Fortschritt setzen (0–1, Anzeige z. B. „42 %“) bzw. schließen. */
+export interface UpdateBanner { setProgress(fraction: number, label: string): void; close(): void }
+
+export interface UpdateBannerOptions {
+  icon: IconName;
+  title: string;
+  sub?: string;
+  /** Fortschrittsbalken zeigen (Live-Update lädt) */
+  progress?: boolean;
+  /** Großer Primärknopf (so groß wie „Jetzt üben“), z. B. „Jetzt aktualisieren“; ein Tipp schließt das Banner */
+  action?: ToastAction;
+}
 
 /**
- * Fortschritts-Pille im selben Stapel: Text bleibt stehen (nur er wird angesagt, role="status" = polite), Balken und
- * Zähler ändern sich still. Animation: Pille steigt ein, ein leiser Glanz läuft über den Balken (nicht bei Reduced Motion).
+ * Großes Update-Banner im Toast-Stapel (volle Inhaltsbreite): Symbol im Kreis, Titel und Unterzeile, beim Laden ein
+ * deutlicher Balken mit Prozent, wenn bereit ein Primärknopf in voller Breite (min. 56 px wie der Play-Knopf).
+ * Steigt mit leichtem Zoom ein; das Symbol dreht sich beim Laden langsam (nicht bei Reduced Motion).
  */
-export function progressToast(text: string): ProgressToast {
+export function updateBanner(o: UpdateBannerOptions): UpdateBanner {
   const parent = getStack();
-  const fill = h('span', { class: 'toast-progress-fill' });
-  const bar = h('span', {
-    class: 'toast-progress', role: 'progressbar', 'aria-label': text,
-    'aria-valuemin': '0', 'aria-valuemax': '100', 'aria-valuenow': '0',
-  }, fill);
-  const count = h('span', { class: 'toast-count num', 'aria-hidden': 'true' });
-  const el = h('div', { class: 'toast is-info is-sticky has-progress', role: 'status' },
-    h('span', { class: 'toast-row' }, h('span', { class: 'toast-dot', 'aria-hidden': 'true' }), h('span', { class: 'toast-text' }, text), count),
-    bar);
+  const fill = h('span', { class: 'update-progress-fill' });
+  const bar = o.progress
+    ? h('span', {
+      class: 'update-progress', role: 'progressbar', 'aria-label': o.title,
+      'aria-valuemin': '0', 'aria-valuemax': '100', 'aria-valuenow': '0',
+    }, fill)
+    : null;
+  const count = o.progress ? h('span', { class: 'update-count num', 'aria-hidden': 'true' }) : null;
+  const el: HTMLElement = h('div', { class: `toast is-update is-sticky${o.progress ? ' is-loading' : ' is-ready'}`, role: 'status' },
+    h('span', { class: 'update-row' },
+      h('span', { class: 'update-icon', 'aria-hidden': 'true' }, icon(o.icon, 24)),
+      h('span', { class: 'update-text' },
+        h('span', { class: 'update-title' }, o.title),
+        o.sub ? h('span', { class: 'update-sub' }, o.sub) : null),
+      count),
+    bar,
+    o.action
+      ? h('button', {
+        type: 'button', class: 'btn primary cta is-full press update-action',
+        onclick: () => { dismiss(el); o.action?.onClick(); },
+      }, h('span', { class: 'btn-label' }, o.action.label))
+      : null);
   raise(parent);
   parent.append(el);
   return {
-    set(fraction, label) {
+    setProgress(fraction, label) {
       const f = Math.max(0, Math.min(1, Number.isFinite(fraction) ? fraction : 0));
       fill.style.setProperty('--progress', String(f));
-      bar.setAttribute('aria-valuenow', String(Math.round(f * 100)));
-      count.textContent = label;
+      bar?.setAttribute('aria-valuenow', String(Math.round(f * 100)));
+      if (count) count.textContent = label;
     },
     close() { dismiss(el); },
   };
