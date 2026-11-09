@@ -22,6 +22,13 @@ export interface PublicConfig {
 /** API der iOS-App (die Website nutzt relative Pfade); überschreibbar mit PUBLIC_API_ORIGIN */
 export const DEFAULT_API_ORIGIN = 'https://mental-math.elias-steffen.de';
 
+/**
+ * API der Vorschau (develop): Beta-Live-Updates der iOS-App sprechen sie an, damit Code und Server zusammenpassen
+ * (neue Routen wie /api/challenge gibt es dort früher als in der Produktion). Konto und Passkeys sind dieselben.
+ * Überschreibbar mit PUBLIC_PREVIEW_API_ORIGIN.
+ */
+export const DEFAULT_PREVIEW_API_ORIGIN = 'https://preview.mental-math.elias-steffen.de';
+
 /** Beta-Manifest (develop → Vorschau); überschreibbar mit PUBLIC_LIVE_UPDATE_BETA_URL */
 export const DEFAULT_LIVE_UPDATE_BETA_URL = 'https://preview.mental-math.elias-steffen.de/ota/manifest.json';
 
@@ -96,20 +103,27 @@ function loadDotEnvIfNeeded(): void {
   }
 }
 
-/** Liest die öffentliche Konfiguration; ungültige Werte werden zu leeren Strings. */
-export function readPublicConfig(): PublicConfig {
+/**
+ * Liest die öffentliche Konfiguration; ungültige Werte werden zu leeren Strings. Vorschau-Builds (DEPLOY_CHANNEL=preview)
+ * nutzen die API der Vorschau; das Produktions-Manifest der Live-Updates bleibt immer das der Produktion.
+ */
+export function readPublicConfig(channel: BuildChannel = deployChannel(process.env.DEPLOY_CHANNEL)): PublicConfig {
   loadDotEnvIfNeeded();
   const url: string = (process.env.PUBLIC_SUPABASE_URL ?? '').trim();
   const key: string = (process.env.PUBLIC_SUPABASE_ANON_KEY ?? '').trim();
   const api: string = (process.env.PUBLIC_API_ORIGIN ?? '').trim();
-  const apiOrigin: string = validApiOrigin(api) ? api : DEFAULT_API_ORIGIN;
+  const productionOrigin: string = validApiOrigin(api) ? api : DEFAULT_API_ORIGIN;
+  const previewApi: string = (process.env.PUBLIC_PREVIEW_API_ORIGIN ?? '').trim();
+  const apiOrigin: string = channel === 'preview'
+    ? (validApiOrigin(previewApi) ? previewApi : DEFAULT_PREVIEW_API_ORIGIN)
+    : productionOrigin;
   const lu: string = (process.env.PUBLIC_LIVE_UPDATE_URL ?? '').trim();
   const luBeta: string = (process.env.PUBLIC_LIVE_UPDATE_BETA_URL ?? '').trim();
   return {
     supabaseUrl: validPublicUrl(url) ? url : '',
     supabaseKey: validPublicKey(key) ? key : '',
     apiOrigin,
-    liveUpdateUrl: validManifestUrl(lu) ? lu : `${apiOrigin}/ota/manifest.json`,
+    liveUpdateUrl: validManifestUrl(lu) ? lu : `${productionOrigin}/ota/manifest.json`,
     liveUpdateBetaUrl: validManifestUrl(luBeta) ? luBeta : DEFAULT_LIVE_UPDATE_BETA_URL,
     liveUpdateKeys: parseLiveUpdateKeys(process.env.PUBLIC_LIVE_UPDATE_KEYS),
     liveUpdateBetaKeys: parseLiveUpdateKeys(process.env.PUBLIC_LIVE_UPDATE_BETA_KEYS),
@@ -139,6 +153,7 @@ export const PUBLIC_CONFIG: {
   writeFileSync(`${ROOT}src/generated/public-config.ts`, publicOut);
   console.log(`build-info: ${info.version} (${info.build}, ${info.date}, ${info.channel})`);
   console.log(`public-config: Supabase-URL ${cfg.supabaseUrl ? 'gesetzt' : 'leer'}, Schlüssel ${cfg.supabaseKey ? 'gesetzt' : 'leer'}`);
+  console.log(`public-config: API der App ${cfg.apiOrigin}`);
   console.log(`public-config: Live-Updates ${cfg.liveUpdateKeys.length} Schlüssel (${cfg.liveUpdateUrl}), Beta ${cfg.liveUpdateBetaKeys.length}`);
 }
 

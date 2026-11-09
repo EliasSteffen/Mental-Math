@@ -5,6 +5,11 @@ export const settings: Record<keyof typeof De, string> = {
   title: 'Profile',
   // Training
   training: 'Training',
+  // Gruppen des Profils (neu sortiert)
+  inRound: 'During a round',
+  input: 'Input',
+  appearanceFeedback: 'Appearance & feedback',
+  aboutHelp: 'About & help',
   difficulty: 'Difficulty',
   diffAuto: 'Auto',
   diffHelp: 'Auto adapts each task type to you: harder after 3 confident answers, easier after 2 mistakes – down to basics like the times tables if needed.',
@@ -66,7 +71,6 @@ export const settings: Record<keyof typeof De, string> = {
   numpadCalculator: '7 8 9 on top',
   numpadPhone: '1 2 3 on top',
   // Rückmeldung
-  feedback: 'Feedback',
   haptics: 'Haptics',
   hapticsHelp: 'Light vibration on Android. Colour and text always show the result on their own as well.',
   hapticsHelpApp: 'A light tap with every answer. Colour and text always show the result on their own as well.',
@@ -109,7 +113,6 @@ export const settings: Record<keyof typeof De, string> = {
   deviceId: 'Device ID',
   profileId: 'Profile ID',
   // Erweitert
-  advanced: 'Advanced',
   categories: 'Categories',
   catsAll: 'all',
   catsSome: '{n} of {total}',

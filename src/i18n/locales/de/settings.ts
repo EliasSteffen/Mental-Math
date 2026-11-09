@@ -3,6 +3,11 @@ export const settings = {
   title: 'Profil',
   // Training
   training: 'Training',
+  // Gruppen des Profils (neu sortiert)
+  inRound: 'Während der Runde',
+  input: 'Eingabe',
+  appearanceFeedback: 'Darstellung & Feedback',
+  aboutHelp: 'Über & Hilfe',
   difficulty: 'Schwierigkeit',
   diffAuto: 'Auto',
   diffHelp: 'Auto passt jeden Aufgabentyp an dich an: nach 3 sicheren Treffern schwerer, nach 2 Fehlern leichter – wenn nötig bis zu den Grundlagen wie dem kleinen 1×1.',
@@ -64,7 +69,6 @@ export const settings = {
   numpadCalculator: '7 8 9 oben',
   numpadPhone: '1 2 3 oben',
   // Rückmeldung
-  feedback: 'Rückmeldung',
   haptics: 'Haptik',
   hapticsHelp: 'Leichte Vibration auf Android. Farbe und Text zeigen das Ergebnis immer auch allein.',
   hapticsHelpApp: 'Leichtes Tippen bei jeder Antwort. Farbe und Text zeigen das Ergebnis immer auch allein.',
@@ -107,7 +111,6 @@ export const settings = {
   deviceId: 'Geräte-ID',
   profileId: 'Profil-ID',
   // Erweitert
-  advanced: 'Erweitert',
   categories: 'Kategorien',
   catsAll: 'alle',
   catsSome: '{n} von {total}',

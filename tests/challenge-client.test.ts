@@ -118,3 +118,14 @@ test('Fehlercodes vom Server kommen als ChallengeError an', async () => {
   offline = true;
   await assert.rejects(ch.loadOverview(), (e: unknown) => ch.challengeErrorCode(e) === 'network');
 });
+
+test('Antwort ohne JSON (Server ohne diese Route liefert HTML) gilt als Serverfehler, nicht als Netzproblem', async () => {
+  reply = () => ({ status: 200, body: '<!doctype html>' as unknown });
+  const orig = globalThis.fetch;
+  globalThis.fetch = (async () => new Response('<!doctype html><title>x</title>', { status: 200, headers: { 'Content-Type': 'text/html' } })) as typeof fetch;
+  try {
+    await assert.rejects(ch.loadOverview(), (e: unknown) => ch.challengeErrorCode(e) === 'server_error');
+  } finally {
+    globalThis.fetch = orig;
+  }
+});
