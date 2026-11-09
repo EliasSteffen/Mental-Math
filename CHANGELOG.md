@@ -4,6 +4,13 @@ Alle nennenswerten Änderungen an Mental Math. Format nach [Keep a Changelog](ht
 
 <!-- Automatisch erzeugt mit `npm run changelog` aus src/releases.ts – nicht von Hand bearbeiten. -->
 
+## [1.17.2] - 2026-11-09
+
+### Läuft wieder überall
+
+- Behoben: Mit einem Werbe- oder Tracking-Blocker wie uBlock Origin startete die Website nicht – ein Dateiname stand auf dessen Liste und hat die ganze App blockiert.
+- Eingabefenster wie „Gruppe erstellen“ oder „Mit Code beitreten“ liegen auf dem iPhone nicht mehr hinter der Tastatur.
+
 ## [1.17.1] - 2026-11-09
 
 ### Updates, die man nicht übersieht

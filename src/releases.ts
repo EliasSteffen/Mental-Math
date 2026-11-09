@@ -5,6 +5,14 @@ const DATE = '2026-10-30';
 
 export const RELEASES: Release[] = [
   {
+    version: '1.17.2', date: '2026-11-09',
+    title: { de: 'Läuft wieder überall', en: 'Works everywhere again' },
+    highlights: [
+      { de: 'Behoben: Mit einem Werbe- oder Tracking-Blocker wie uBlock Origin startete die Website nicht – ein Dateiname stand auf dessen Liste und hat die ganze App blockiert.', en: 'Fixed: with an ad or tracking blocker such as uBlock Origin the website did not start – one file name was on its list and blocked the whole app.' },
+      { de: 'Eingabefenster wie „Gruppe erstellen“ oder „Mit Code beitreten“ liegen auf dem iPhone nicht mehr hinter der Tastatur.', en: 'Input sheets such as “Create group” or “Join with code” no longer hide behind the keyboard on iPhone.' },
+    ],
+  },
+  {
     version: '1.17.1', date: '2026-11-09',
     title: { de: 'Updates, die man nicht übersieht', en: 'Updates you cannot miss' },
     highlights: [
