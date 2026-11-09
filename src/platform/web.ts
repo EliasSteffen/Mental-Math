@@ -61,6 +61,22 @@ function watchUpdates(reg: ServiceWorkerRegistration, t: Translate, toast: Toast
 
 /** Kurze Vibration, wenn das Gerät sie kann. Ohne vorherige Nutzergeste (z. B. Parallel-Stream direkt nach dem Laden)
  * blockiert der Browser vibrate() und meldet einen Fehler – dann still. */
+/**
+ * App-Cache zurücksetzen (Notfall bei leerer Seite): Service Worker abmelden und dessen Caches löschen, dann neu laden.
+ * Trainingsdaten (IndexedDB, localStorage) bleiben unberührt.
+ */
+export async function webResetAppCache(): Promise<void> {
+  try {
+    const regs = (await navigator.serviceWorker?.getRegistrations?.()) ?? [];
+    await Promise.all(regs.map((r) => r.unregister().catch(() => false)));
+  } catch { /* ohne Service Worker */ }
+  try {
+    const keys = await caches.keys();
+    await Promise.all(keys.filter((k) => k.startsWith('mentalmath-')).map((k) => caches.delete(k)));
+  } catch { /* Cache API nicht verfügbar */ }
+  location.reload();
+}
+
 export function webHaptic(ms: number): void {
   try {
     if (typeof navigator === 'undefined' || !('vibrate' in navigator)) return;

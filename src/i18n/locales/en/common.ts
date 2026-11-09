@@ -71,4 +71,12 @@ export const common: Record<keyof typeof De, string> = {
   // App update from the App Store (features/app-store.ts)
   storeUpdate: 'Update available',
   storeUpdateAction: 'Update',
+  // Error card instead of an empty page (ui/crash.ts) and boot guard (public/js/boot-guard.js)
+  crashTitle: 'This page could not be loaded',
+  crashText: 'An error stopped the page from showing. Your data is safe. The other tabs usually keep working – and the error report helps to fix this.',
+  crashRetry: 'Try again',
+  crashCopy: 'Copy error report',
+  crashCopied: 'Error report copied',
+  crashReset: 'Clear app cache and reload',
+  crashResetHelp: 'Loads the app fresh from the server. Training data and account stay.',
 };
