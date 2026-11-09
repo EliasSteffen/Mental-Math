@@ -15,7 +15,7 @@ import {
 import { createNotice, updatedTo, type Notice } from '../core/live-update-notice.ts';
 import { isRoundRunning } from '../features/pwa-update.ts';
 import { t } from '../i18n/index.ts';
-import { progressToast, toast, type ProgressToast } from '../ui/toast.ts';
+import { updateBanner, type UpdateBanner } from '../ui/toast.ts';
 import { liveUpdatePlugin, loadNative, onNativeResume, type LiveUpdateInfo } from './native.ts';
 
 const KEY = 'mm-live-update';
@@ -96,19 +96,23 @@ let notice: Notice | null = null;
 
 function getNotice(): Notice {
   if (notice) return notice;
-  let pill: ProgressToast | null = null;
+  let pill: UpdateBanner | null = null;
   let closeReady: (() => void) | null = null;
   notice = createNotice({
     roundRunning: () => isRoundRunning(location.hash),
     showProgress: (v) => {
-      pill ??= progressToast(t('common.liveUpdateLoading', { version: v.version }));
-      pill.set(v.total > 0 ? v.done / v.total : 0, `${v.done}/${v.total}`);
+      pill ??= updateBanner({
+        icon: 'download', progress: true,
+        title: t('common.liveUpdateLoading', { version: v.version }), sub: t('common.liveUpdateLoadingSub'),
+      });
+      pill.setProgress(v.total > 0 ? v.done / v.total : 0, `${v.percent} %`);
     },
     hideProgress: () => { pill?.close(); pill = null; },
     showReady: (version, onApply) => {
-      closeReady = toast(t('common.liveUpdateReady', { version }), {
-        durationMs: 0, action: { label: t('common.liveUpdateApply'), onClick: onApply },
-      });
+      closeReady = updateBanner({
+        icon: 'sparkles', title: t('common.liveUpdateReady', { version }), sub: t('common.liveUpdateReadySub'),
+        action: { label: t('common.liveUpdateApply'), onClick: onApply },
+      }).close;
     },
     hideReady: () => { closeReady?.(); closeReady = null; },
     apply: () => { void applyStaged(load()).catch((e: unknown) => log('Anwenden fehlgeschlagen', e)); },

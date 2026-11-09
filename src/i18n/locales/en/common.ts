@@ -61,10 +61,13 @@ export const common: Record<keyof typeof De, string> = {
   xpGain: '{n} XP',
   // App update (platform/web.ts)
   updateReady: 'New version available',
-  updateReload: 'Reload',
+  updateReload: 'Update now',
+  updateReadySub: 'One tap loads it – your data stays.',
   // Live-Update der iOS-App (platform/live-update.ts, features/whats-new.ts)
   liveUpdateLoading: 'Downloading update {version}',
+  liveUpdateLoadingSub: 'In the background – keep practicing.',
   liveUpdateReady: 'Update {version} ready',
+  liveUpdateReadySub: 'Quick app restart, your data stays.',
   liveUpdateApply: 'Update now',
   liveUpdateDone: 'Updated to {version}',
   liveUpdateWhatsNew: 'What’s new?',

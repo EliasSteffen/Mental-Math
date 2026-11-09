@@ -13,8 +13,8 @@ export function registerSW(): void {
     if (!ok) return;
     const p = (): void => { navigator.serviceWorker.register('/sw.js').then(async (reg) => {
       // lazy: Toast und i18n brauchen das DOM (diese Datei wird auch in Node-Tests geladen)
-      const [{ t }, { toast }] = await Promise.all([import('../i18n/index.ts'), import('../ui/toast.ts')]);
-      watchUpdates(reg, t, toast);
+      const [{ t }, { updateBanner }] = await Promise.all([import('../i18n/index.ts'), import('../ui/toast.ts')]);
+      watchUpdates(reg, t, updateBanner);
     }).catch(() => {}); };
     if (document.readyState === 'complete') p();
     else window.addEventListener('load', p, { once: true });
@@ -22,15 +22,18 @@ export function registerSW(): void {
 }
 
 type Translate = typeof import('../i18n/index.ts').t;
-type Toast = typeof import('../ui/toast.ts').toast;
+type Banner = typeof import('../ui/toast.ts').updateBanner;
 
-function watchUpdates(reg: ServiceWorkerRegistration, t: Translate, toast: Toast): void {
+function watchUpdates(reg: ServiceWorkerRegistration, t: Translate, banner: Banner): void {
   const container = navigator.serviceWorker;
   let closeHint: (() => void) | null = null;
   const flow = createUpdateFlow({
     hash: () => location.hash,
     showHint: (onReload) => {
-      closeHint = toast(t('common.updateReady'), { durationMs: 0, action: { label: t('common.updateReload'), onClick: onReload } });
+      closeHint = banner({
+        icon: 'sparkles', title: t('common.updateReady'), sub: t('common.updateReadySub'),
+        action: { label: t('common.updateReload'), onClick: onReload },
+      }).close;
     },
     hideHint: () => { closeHint?.(); closeHint = null; },
     activate: () => {

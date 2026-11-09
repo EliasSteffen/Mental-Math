@@ -572,33 +572,47 @@
   }
   .toast.has-action > .toast-text { flex:1 1 auto; min-width:0; }
   .toast.has-action > .btn { flex:none; }
-  /* Fortschritt (progressToast, Live-Update der iOS-App): Text, Zähler, Balken mit leisem Glanz */
-  .toast.has-progress { display:grid; gap:var(--space-2); min-width:min(100%, 280px); text-align:start; }
-  .toast-row { display:flex; align-items:center; gap:var(--space-2); }
-  .toast-row > .toast-text { flex:1 1 auto; min-width:0; }
-  .toast-count { flex:none; color:var(--muted); font-size:var(--text-xs); }
-  .toast-dot {
-    flex:none; width:8px; height:8px; border-radius:50%; background:var(--accent);
-    animation:toast-pulse 1.4s ease-in-out infinite;
+  /* Update-Banner (updateBanner: Live-Update der App, neue Version der Website): volle Inhaltsbreite, Symbol, Titel,
+     Fortschritt bzw. Primärknopf in Play-Größe; steigt mit leichtem Zoom ein, Symbol dreht sich beim Laden */
+  .toast.is-update {
+    width:100%; display:grid; gap:var(--space-3); padding:var(--space-4);
+    border-color:color-mix(in srgb, var(--accent) 45%, var(--border)); border-radius:var(--radius-lg);
+    box-shadow:var(--shadow-2), 0 0 0 4px color-mix(in srgb, var(--accent) 10%, transparent);
+    text-align:start; font-weight:400;
+    animation:update-in 420ms cubic-bezier(.2, .9, .3, 1.2) both;
   }
-  .toast-progress {
-    position:relative; display:block; height:4px; border-radius:999px; overflow:hidden;
+  .update-row { display:flex; align-items:center; gap:var(--space-3); min-width:0; }
+  .update-icon {
+    display:flex; flex:none; align-items:center; justify-content:center; width:48px; height:48px;
+    border-radius:50%; background:var(--accent-soft); color:var(--accent-text); filter:var(--glow-icon);
+  }
+  .toast.is-loading .update-icon svg { animation:update-spin 2.4s linear infinite; }
+  .toast.is-ready .update-icon { animation:update-pulse 1.8s ease-in-out infinite; }
+  .update-text { display:flex; flex:1 1 auto; flex-direction:column; gap:2px; min-width:0; }
+  .update-title { font-size:var(--text-md); font-weight:var(--weight-semibold); line-height:1.3; }
+  .update-sub { font-size:var(--text-sm); line-height:1.4; color:var(--muted); }
+  .update-count { flex:none; font-size:var(--text-sm); font-weight:var(--weight-semibold); color:var(--accent-text); }
+  .update-progress {
+    position:relative; display:block; height:8px; border-radius:999px; overflow:hidden;
     background:color-mix(in srgb, var(--accent) 16%, transparent);
   }
-  .toast-progress-fill {
+  .update-progress-fill {
     position:absolute; inset:0; border-radius:inherit; background:var(--accent);
     transform-origin:left center; transform:scaleX(var(--progress, 0));
     transition:transform var(--dur-state, 200ms) var(--ease-out);
   }
-  .toast-progress-fill::after {
+  .update-progress-fill::after {
     content:''; position:absolute; inset:0 auto 0 -60%; width:60%;
     background:linear-gradient(90deg, transparent, color-mix(in srgb, var(--on-accent) 45%, transparent), transparent);
     animation:sheen 1.6s ease-in-out infinite;
   }
-  @keyframes toast-pulse { 50% { opacity:.35; transform:scale(.8); } }
+  .update-action { min-height:var(--hit-primary); }
+  @keyframes update-in { from { opacity:0; transform:translateY(24px) scale(.94); } }
+  @keyframes update-spin { to { transform:rotate(360deg); } }
+  @keyframes update-pulse { 50% { transform:scale(1.08); box-shadow:0 0 0 8px color-mix(in srgb, var(--accent) 14%, transparent); } }
   @media (prefers-reduced-motion: reduce) {
-    .toast-dot, .toast-progress-fill::after { animation:none; }
-    .toast-progress-fill::after { display:none; }
+    .toast.is-update, .toast.is-loading .update-icon svg, .toast.is-ready .update-icon, .update-progress-fill::after { animation:none; }
+    .update-progress-fill::after { display:none; }
   }
 
   /* ---------- Feiern (charts.confetti, nur mit Einstellung „Feiern“): einmalig, kein Loop ---------- */
