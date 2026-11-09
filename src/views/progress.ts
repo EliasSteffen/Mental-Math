@@ -12,9 +12,10 @@ import { lw } from '../core/l10n.ts';
 import { getAttempts, getSettings, getReviews, getActivity, getDailyResults } from '../data/storage.ts';
 import { heatmapGrid, progressBar, sparkline } from '../ui/charts.ts';
 import { app, h, appendChildren, type Child } from '../ui/dom.ts';
-import { barList, button, card, group, icon, kpis, largeTitle, list, row, segmented, steps } from '../ui/kit.ts';
+import { barList, button, card, columns, group, icon, kpis, largeTitle, list, row, segmented, steps } from '../ui/kit.ts';
 import { openSheet } from '../ui/sheet.ts';
 import { setPrimaryAction } from '../ui/shell.ts';
+import { isTablet } from '../ui/viewport.ts';
 import { safeSteps } from '../ui/widgets.ts';
 import { t, locale } from '../i18n/index.ts';
 import {
@@ -71,6 +72,9 @@ function rich(template: string, params: Record<string, string>): Child[] {
 
 const quiet = (text: string): HTMLParagraphElement => h('p', { class: 'prog-empty' }, text);
 
+/** Geschütztes Leerzeichen vor „·“: Bricht der Titel um, bleibt der Punkt am Ende der Zeile. */
+const NBSP = String.fromCharCode(0xa0);
+
 /* ---------- Fokus-Karte ---------- */
 
 function focusCard(state: FocusState): HTMLElement {
@@ -100,7 +104,7 @@ function focusCard(state: FocusState): HTMLElement {
   return card([
     label,
     // Geschützte Bindestriche: „2-stellig“ bricht nicht am Strich um
-    h('h2', { class: 'prog-focus-title' }, `${w.categoryName} · ${w.name}`.replaceAll('-', '\u2011')),
+    h('h2', { class: 'prog-focus-title' }, `${w.categoryName}${NBSP}· ${w.name}`.replaceAll('-', '\u2011')),
     h('p', { class: 'prog-focus-text' }, ...text),
     example ? h('p', { class: 'prog-example num' }, example) : null,
     button({ label: t('analyse.focusMethod'), kind: 'link', icon: 'book', href: `#/lernen/${w.subtype}` }),
@@ -327,6 +331,20 @@ export function renderAnalyse(): void {
     { label: t('analyse.kpiMinutes'), value: fmt(minutesLastDays(getActivity(), now, 7), 0) },
   ]);
 
+  const ctaAction = focus.kind === 'focus'
+    ? { label: t('analyse.ctaFocus'), href: '#/train/weak', icon: 'target' as const }
+    : { label: t('analyse.ctaMixed'), href: '#/train/all', icon: 'grid' as const };
+
+  // Ab 720 px ist genug Platz für alles auf einmal: Dashboard statt Umschalter
+  if (isTablet()) {
+    appendChildren(app, [title, columns(
+      [focusCard(focus), overviewView(attempts, settings, now), categoriesView(attempts, settings), errorsView(attempts, now)],
+      [card([kpiRow]), historyView(attempts, settings, now)],
+    )]);
+    setPrimaryAction(ctaAction);
+    return;
+  }
+
   const build = (v: View): HTMLElement => {
     switch (v) {
       case 'categories': return categoriesView(attempts, settings);
@@ -350,8 +368,7 @@ export function renderAnalyse(): void {
     },
   });
 
+  switcher.el.classList.add('prog-switch');
   appendChildren(app, [title, focusCard(focus), kpiRow, switcher.el, panel]);
-  setPrimaryAction(focus.kind === 'focus'
-    ? { label: t('analyse.ctaFocus'), href: '#/train/weak', icon: 'target' }
-    : { label: t('analyse.ctaMixed'), href: '#/train/all', icon: 'grid' });
+  setPrimaryAction(ctaAction);
 }

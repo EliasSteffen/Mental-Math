@@ -5,6 +5,19 @@ const DATE = '2026-10-30';
 
 export const RELEASES: Release[] = [
   {
+    version: '2.0.0', date: '2026-11-09',
+    title: { de: 'Gemacht fürs iPad', en: 'Made for iPad' },
+    tour: 'v2',
+    highlights: [
+      { de: 'Neuer Rundgang: Die App zeigt dir selbst, was sie kann. Du findest ihn jederzeit unter Profil → Hilfe & Info. Die Einstellungen sind jetzt in Menüs sortiert, und jede erklärt, was sie macht.', en: 'New tour: the app shows you itself what it can do. Find it any time under Profile → Help & info. Settings are now sorted into menus, and each one explains what it does.' },
+      { de: 'Mental Math läuft jetzt als echte iPad-App: hochkant, quer und neben anderen Apps, statt als vergrößerte iPhone-Ansicht.', en: 'Mental Math now runs as a true iPad app: in portrait, in landscape and next to other apps, instead of an enlarged iPhone view.' },
+      { de: 'Auf dem iPad nutzt jede Seite den Platz: Seitenleiste statt Tab-Leiste, Kategorien und Modi direkt auf der Startseite, Fortschritt als Dashboard und Lernen mit Liste und Erklärung nebeneinander.', en: 'On iPad every page uses the space: a sidebar instead of the tab bar, categories and modes right on the home page, Progress as a dashboard, and Learn with list and explanation side by side.' },
+      { de: 'Training auf dem iPad: Die Aufgabe steht groß im Blick, das Tastenfeld hat große Tasten. Im Querformat wählst du unter Profil → Eingabe, ob es links, mittig oder rechts steht.', en: 'Training on iPad: the task is large and clear, and the keypad has large keys. In landscape you choose under Profile → Input whether it sits on the left, in the center or on the right.' },
+      { de: 'Neuer Tab „Wettkampf“: Daily Challenge, Ranglisten, Wettbewerbe und Gruppen sind jetzt auf iPhone und iPad mit einem Tipp erreichbar.', en: 'New “Compete” tab: the daily challenge, leaderboards, competitions and groups are now one tap away on iPhone and iPad.' },
+      { de: 'Die Daily steht als große Karte ganz oben, danach siehst du dort direkt deinen Platz. Auf dem iPad läuft die Rangliste des Tages gleich darunter mit.', en: 'The daily challenge is a large card at the top, and afterwards it shows your rank right there. On iPad the day’s leaderboard appears directly below it.' },
+    ],
+  },
+  {
     version: '1.17.2', date: '2026-11-09',
     title: { de: 'Läuft wieder überall', en: 'Works everywhere again' },
     highlights: [

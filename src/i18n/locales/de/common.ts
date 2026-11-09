@@ -31,6 +31,7 @@ export const common = {
   mainNav: 'Hauptnavigation',
   tabToday: 'Heute',
   tabLearn: 'Lernen',
+  tabCompete: 'Wettkampf',
   tabProgress: 'Fortschritt',
   tabProfile: 'Profil',
   // Themes

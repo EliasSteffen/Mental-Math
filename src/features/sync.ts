@@ -3,7 +3,7 @@ import type { RemoteSyncProvider, SyncStatus } from 'offline-sync';
 import { SyncEngine, SyncManager, browserSyncEnv } from '../vendor/storage.ts';
 import { APP_SYNC_SCHEMA } from '../data/sync-schema.ts';
 import {
-  emitDataChange, getAttempts, getProfile, getRepository, getSessions, getSettings, getSyncState, onChange, resetAll, updateProfile,
+  emitDataChange, getAttempts, getProfile, getRepository, getSessions, getSettings, getSyncState, isDemoData, onChange, resetAll, updateProfile,
 } from '../data/storage.ts';
 import { createSyncProvider, getAccountState, logout, onAccountChange } from './account.ts';
 import type { AccountState } from './account.ts';
@@ -173,6 +173,8 @@ function scheduleRerender(): void {
  * Seite schon mit frischen Daten gezeichnet (`redraw` = false); dann fehlt höchstens noch die Sprache.
  */
 async function applyRemoteChange(redraw: boolean): Promise<void> {
+  // Rundgang läuft: nicht dazwischenzeichnen; exitDemoData meldet die Änderung danach erneut
+  if (isDemoData()) { emitDataChange('remote'); return; }
   const settings = getSettings();
   applyTheme(settings.theme);
   // lazy: brauchen das DOM bzw. ziehen alle Views mit

@@ -14,6 +14,19 @@
   }
   .learn-empty:empty { padding:0; }
 
+  /* Auf dem Telefon ohne Wirkung; ab 720 px laufen die Gruppen in zwei Spalten, jede bleibt am Stück */
+  .learn-groups { display:contents; }
+  @media (min-width: 720px) {
+    .learn-groups { display:block; columns:2; column-gap:var(--space-5); }
+    .learn-groups > .learn-group { break-inside:avoid; margin-bottom:var(--space-5); }
+  }
+
+  /* Master-Detail ab 1024 px (renderSplit, Grundgerüst .split in layout.css): kompakte Liste ohne Tipp-Zeile */
+  .learn-master .learn-groups { display:flex; flex-direction:column; gap:var(--space-4); columns:auto; }
+  .learn-master .learn-groups > .learn-group { margin-bottom:0; }
+  .learn-master .row-sub { display:none; }
+  .learn-master .row.has-sub { min-height:48px; }
+
   /* ---------- Detail: Titel und dezente Statuszeile (der Zurück-Link steht davor) ---------- */
   .learn-head { display:flex; flex-direction:column; gap:var(--space-2); min-width:0; }
   /* Punkt bleibt neben der ersten Zeile, auch wenn der Text bei 320 px umbricht */

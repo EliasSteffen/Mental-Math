@@ -77,6 +77,16 @@ export function group(title: string | GroupTitle | null, ...children: Child[]): 
     ...children);
 }
 
+/**
+ * Zwei Spalten ab Tablet-Breite (wideOnly: erst ab 1024 px). Darunter stehen die Inhalte in DOM-Reihenfolge
+ * untereinander, als gehörten sie direkt zur Seite (CSS: display:contents).
+ */
+export function columns(left: Child[], right: Child[], o: { wideOnly?: boolean } = {}): HTMLElement {
+  return h('div', { class: `cols${o.wideOnly ? ' is-wide-only' : ''}` },
+    h('div', { class: 'col' }, ...left),
+    h('div', { class: 'col' }, ...right));
+}
+
 /** Karte mit Zeilen und Trennlinien. Kinder: row(), segmented().el, switchRow().el, stepper() oder eigene Blöcke. */
 export function list(rows: Child[]): HTMLElement {
   return h('div', { class: 'list' }, ...rows);
@@ -349,7 +359,7 @@ export function switchRow(o: {
 
 /** Stepper (− / Wert / +). Grenzen per aria-disabled, damit der Fokus auf dem Button bleibt. */
 export function stepper(o: {
-  label: string; value: number; min: number; max: number; step: number;
+  label: string; value: number; min: number; max: number; step: number; help?: string;
   format: (n: number) => string; onChange: (n: number) => void;
 }): HTMLElement {
   const labelId = nextId('stepper');
@@ -376,9 +386,11 @@ export function stepper(o: {
     o.onChange(value);
   }
   paint();
-  return h('div', { class: 'control is-inline' },
-    h('p', { class: 'control-label', id: labelId }, o.label),
-    h('div', { class: 'stepper', role: 'group', 'aria-labelledby': labelId }, dec, out, inc));
+  const box = h('div', { class: 'stepper', role: 'group', 'aria-labelledby': labelId }, dec, out, inc);
+  const help = helpSlot({ text: o.help, describe: box });
+  return h('div', { class: cx('control is-inline', help.el && 'has-help') },
+    h('div', { class: 'control-text' }, h('p', { class: 'control-label', id: labelId }, o.label), help.el),
+    box);
 }
 
 /** Chip (Link/Button/Text) mit optionalem Meisterungs-Punkt; die Stufe wird für Screenreader mitgelesen. */

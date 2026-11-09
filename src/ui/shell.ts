@@ -1,10 +1,11 @@
-// App-Shell (Ruhiger Fokus): Tab-Leiste mit 4 Tabs, schwebender Primärbutton (CTA) und Fokus-Modus.
+// App-Shell (Ruhiger Fokus): Tab-Leiste mit 5 Tabs (ab 720 px Seitenleiste), schwebender Primärbutton (CTA) und Fokus-Modus.
 // Der Router ruft vor jedem render*() setShell(...) und setPrimaryAction(null); die View setzt ihre CTA danach selbst.
 import { app } from './dom.ts';
 import { button, type IconName } from './kit.ts';
+import { getSettings } from '../data/storage.ts';
 import { onLangChange, t } from '../i18n/index.ts';
 
-export type TabId = 'today' | 'learn' | 'progress' | 'profile';
+export type TabId = 'today' | 'learn' | 'compete' | 'progress' | 'profile';
 
 export interface PrimaryAction {
   label: string;
@@ -17,11 +18,11 @@ export interface PrimaryAction {
 
 /** Kanonische Adressen der Tabs (Aliase #/analyse und #/settings löst der Router auf). */
 export const TAB_HREF: Readonly<Record<TabId, string>> = {
-  today: '#/', learn: '#/lernen', progress: '#/fortschritt', profile: '#/profil',
+  today: '#/', learn: '#/lernen', compete: '#/wettbewerbe', progress: '#/fortschritt', profile: '#/profil',
 };
 
-const TAB_LABEL: Readonly<Record<TabId, 'common.tabToday' | 'common.tabLearn' | 'common.tabProgress' | 'common.tabProfile'>> = {
-  today: 'common.tabToday', learn: 'common.tabLearn', progress: 'common.tabProgress', profile: 'common.tabProfile',
+const TAB_LABEL: Readonly<Record<TabId, 'common.tabToday' | 'common.tabLearn' | 'common.tabCompete' | 'common.tabProgress' | 'common.tabProfile'>> = {
+  today: 'common.tabToday', learn: 'common.tabLearn', compete: 'common.tabCompete', progress: 'common.tabProgress', profile: 'common.tabProfile',
 };
 
 const isTabId = (x: string | undefined): x is TabId => x !== undefined && Object.hasOwn(TAB_LABEL, x);
@@ -62,6 +63,7 @@ export function setShell(tab: TabId | null): void {
   currentTab = tab;
   const focus = tab === null;
   document.body.classList.toggle('is-focus', focus);
+  document.body.dataset['keypadSide'] = getSettings().keypadSide; // iPad quer: public/css/layout.css
   app.classList.toggle('screen', !focus);
   app.classList.toggle('focus', focus);
   for (const a of tabLinks()) {
@@ -70,7 +72,7 @@ export function setShell(tab: TabId | null): void {
   }
 }
 
-/** Setzt den schwebenden Primärbutton des aktuellen Tabs (ab 768 px am Inhaltsende); null entfernt ihn. */
+/** Setzt den schwebenden Primärbutton des aktuellen Tabs (ab 720 px unten rechts); null entfernt ihn. */
 export function setPrimaryAction(action: PrimaryAction | null): void {
   const slot = document.getElementById('cta');
   if (!slot) return;

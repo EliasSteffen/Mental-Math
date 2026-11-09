@@ -1,10 +1,14 @@
 // Namespace 'compete' (English): ranked daily, competitions, leaderboards, groups – access via t('compete.key')
 export const compete = {
-  title: 'Competitions',
+  title: 'Compete',
   subtitle: 'Daily, leaderboards and groups',
   loading: 'Loading …',
   retry: 'Try again',
-  backToHub: 'Competitions',
+  backToHub: 'Compete',
+  heroCompete: 'Compete now',
+  heroResult: 'See result',
+  heroDetails: 'Details',
+  boardAll: 'Show all',
   offline: 'Offline right now',
   noAccountBuild: 'Leaderboards and competitions need an account – this version has no account available.',
   needAccount: 'Ranked play needs an account: everyone gets the same tasks, each person has exactly one attempt, and your result goes on the leaderboard. Creating an account takes seconds with a passkey – no email.',

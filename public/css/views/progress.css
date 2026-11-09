@@ -68,6 +68,19 @@
   .prog-curve { height:72px; min-width:0; }
   .prog-curve > .spark { height:100%; }
 
+  /* ---------- Dashboard ab 720 px: alle Ansichten nebeneinander ---------- */
+  @media (min-width: 720px) {
+    .prog-focus { padding:var(--space-5); }
+    .prog-focus-title { font-size:28px; letter-spacing:-0.01em; }
+    .prog-focus-text { font-size:var(--text-md); }
+    .prog-view { gap:var(--space-5); }
+    .cols .kpis dd { font-size:32px; white-space:nowrap; }
+    .prog-week-bars { height:140px; }
+    .prog-heat { max-width:none; }
+    .heatmap { grid-auto-columns:minmax(0, 28px); }
+    .prog-curve { height:112px; }
+  }
+
   /* ---------- Fehler: Lösungsweg im Sheet ---------- */
   .prog-sheet-task { font-size:var(--text-lg); font-weight:var(--weight-semibold); line-height:1.35; overflow-wrap:anywhere; }
   .prog-sheet-detail { font-size:var(--text-sm); color:var(--muted); overflow-wrap:anywhere; }

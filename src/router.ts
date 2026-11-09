@@ -5,6 +5,7 @@ import { renderParallel } from './views/parallel/index.ts';
 import { renderCustom } from './views/custom.ts';
 import { isValidMode } from './core/modes.ts';
 import { app } from './ui/dom.ts';
+import { isDemoData } from './data/storage.ts';
 import { renderHome } from './views/home.ts';
 import { renderTrain } from './views/train/index.ts';
 import { renderLernen } from './views/lernen.ts';
@@ -19,6 +20,7 @@ import { onLangChange, t } from './i18n/index.ts';
 import { setTitle } from './ui/title.ts';
 import { modeName } from './core/modes.ts';
 import { initShell, setPrimaryAction, setShell, type TabId } from './ui/shell.ts';
+import { onLayoutChange } from './ui/viewport.ts';
 import { renderCrash } from './ui/crash.ts';
 
 /* ---------- Cleanup-Hook (aktuelle View räumt Timer/Listener auf) ---------- */
@@ -44,6 +46,12 @@ export interface RenderOptions {
 /** Aktuelle Route neu zeichnen. */
 export function rerender({ keepScroll = false }: RenderOptions = {}): void { render({ keepScroll }); }
 
+/** Seite wechseln ohne Verlaufseintrag (Rundgang: „Zurück“ führt danach nicht in Demo-Seiten). */
+export function replaceRoute(hash: string): void {
+  history.replaceState(history.state, '', hash);
+  render();
+}
+
 export function go(hash: string): void {
   if (location.hash === hash) rerender();
   else location.hash = hash;
@@ -54,7 +62,7 @@ export function go(hash: string): void {
 type Route =
   | { name: 'today' }
   | { name: 'progress' }
-  | { name: 'profile' }
+  | { name: 'profile'; section: string | null }
   | { name: 'learn'; id: string | null; guide: boolean }
   | { name: 'chain' }
   | { name: 'parallel' }
@@ -96,12 +104,18 @@ function splitHash(): { parts: string[]; queryPart: string } {
   return { parts: pathPart.split('/').filter(Boolean), queryPart };
 }
 
+/** Alte Profil-Tabs (`?tab=`) → Bereich des Profils (Lesezeichen, Links aus älteren Versionen). */
+const TAB_SECTIONS: Readonly<Record<string, string>> = { gameplay: 'training', general: 'darstellung', data: 'daten', about: 'hilfe' };
+
 /** Alias in der Adresszeile durch den kanonischen Pfad ersetzen (ohne hashchange, ohne neuen Verlaufseintrag). */
 function canonicalize(): void {
   const { parts, queryPart } = splitHash();
   const target = parts[0] && Object.hasOwn(ALIASES, parts[0]) ? ALIASES[parts[0]] : undefined;
-  if (!target) return;
-  const hash = `#/${[target, ...parts.slice(1)].join('/')}${queryPart ? `?${queryPart}` : ''}`;
+  const path = target ?? parts[0];
+  const tab = path === 'profil' && !parts[1] ? new URLSearchParams(queryPart).get('tab') : null;
+  const section = tab !== null && Object.hasOwn(TAB_SECTIONS, tab) ? TAB_SECTIONS[tab] : undefined;
+  if (!target && !section) return;
+  const hash = section ? `#/profil/${section}` : `#/${[target, ...parts.slice(1)].join('/')}${queryPart ? `?${queryPart}` : ''}`;
   try {
     history.replaceState(history.state, '', hash);
   } catch { /* z. B. in Sandboxes ohne History-API: Alias bleibt sichtbar, Route stimmt trotzdem */ }
@@ -114,7 +128,7 @@ function parseRoute(): Route {
   const p0 = parts[0] && Object.hasOwn(ALIASES, parts[0]) ? ALIASES[parts[0]] : parts[0];
   const p1 = parts[1];
   if (p0 === 'fortschritt') return { name: 'progress' };
-  if (p0 === 'profil') return { name: 'profile' };
+  if (p0 === 'profil') return { name: 'profile', section: p1 ?? null };
   if (p0 === 'lernen') {
     const id = p1 && Object.hasOwn(SUBTYPES, p1) ? p1 : null;
     return { name: 'learn', id, guide: id !== null && parts[2] === 'schritte' };
@@ -141,7 +155,8 @@ function parseRoute(): Route {
 /** Tab einer Route; null = Fokus-Modus (Training, Ketten, Parallel). „Eigenes“ (Einstellungen) gehört zu Heute. */
 function tabOf(route: Route): TabId | null {
   switch (route.name) {
-    case 'today': case 'custom': case 'compete': case 'board': case 'challenge': return 'today';
+    case 'today': case 'custom': return 'today';
+    case 'compete': case 'board': case 'challenge': return 'compete';
     case 'learn': return 'learn';
     case 'progress': return 'progress';
     case 'profile': return 'profile';
@@ -149,9 +164,18 @@ function tabOf(route: Route): TabId | null {
   }
 }
 
+/**
+ * Seiten, deren Aufbau (nicht nur das CSS) von der Layout-Stufe abhängt und die beim Drehen neu gezeichnet werden.
+ * Training und geführtes Lernen bleiben bewusst außen vor: Neu zeichnen würde die laufende Runde abbrechen.
+ */
+function redrawsOnLayout(route: Route): boolean {
+  return route.name === 'progress' || route.name === 'profile' || (route.name === 'learn' && !route.guide);
+}
+
 /** Schlüssel für die gemerkte Scroll-Position (nur Tab-Seiten; Lernen-Liste, -Detail und -Schritte getrennt). */
 function scrollKey(route: Route): string | null {
   if (route.name === 'learn') return route.id ? `learn/${route.id}${route.guide ? '/guide' : ''}` : 'learn';
+  if (route.name === 'profile') return route.section ? `profile/${route.section}` : 'profile';
   return tabOf(route) ? route.name : null;
 }
 
@@ -175,7 +199,7 @@ function routeTitle(route: Route): string | null {
 function draw(route: Route): void {
   if (route.name === 'progress') renderAnalyse();
   else if (route.name === 'learn') renderLernen(route.id, route.guide);
-  else if (route.name === 'profile') renderSettings();
+  else if (route.name === 'profile') renderSettings(route.section);
   else if (route.name === 'chain') renderChain();
   else if (route.name === 'parallel') renderParallel();
   else if (route.name === 'custom') renderCustom();
@@ -207,7 +231,8 @@ function isTransitionAbort(e: unknown): boolean {
 /** View Transition (Cross-Fade) nur beim Wechsel zwischen zwei Tabs, nie im Fokus-Modus oder bei Reduced Motion. */
 function withTransition(from: TabId | null | undefined, to: TabId | null, update: () => void): void {
   const start = (document as Document & { startViewTransition?: StartViewTransition }).startViewTransition;
-  if (typeof start !== 'function' || !from || !to || from === to || reducedMotion()) {
+  // Rundgang: Der Schnappschuss des Übergangs läge über dem Touch-Punkt, und Ziele müssen sofort da sein
+  if (typeof start !== 'function' || !from || !to || from === to || reducedMotion() || isDemoData()) {
     update();
     return;
   }
@@ -246,6 +271,8 @@ export function render({ keepScroll = false }: RenderOptions = {}): void {
     setShell(tab);
     setPrimaryAction(null);
     app.replaceChildren();
+    // Für seitenspezifische Layouts ab Tablet-Breite (public/css/layout.css)
+    app.dataset['view'] = route.name;
     shownKey = key;
     shownTab = tab;
     try {
@@ -278,5 +305,9 @@ export function startRouter(): void {
   initShell();
   window.addEventListener('hashchange', () => render());
   onLangChange(() => rerender({ keepScroll: true }));
+  // Ein offenes Sheet (Eingaben!) bleibt stehen; die Seite passt sich beim nächsten Aufruf an
+  onLayoutChange(() => {
+    if (redrawsOnLayout(parseRoute()) && !document.querySelector('dialog[open]')) rerender({ keepScroll: true });
+  });
   render();
 }

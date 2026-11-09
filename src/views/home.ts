@@ -1,6 +1,7 @@
 // Tab „Heute“: passt ohne Scrollen auf einen Bildschirm. Kopf (Begrüßung, Datum, Status), die Empfehlung als
-// antippbare Karte mit „Jetzt üben“, darunter Kacheln (Daily, Wettbewerbe, Gemischt, Kategorie, Weitere Modi und –
-// solange offen – Einstufung). Kategorien und weitere Modi liegen in Sheets. Daten synchron (E22), Logik in home-data.ts.
+// antippbare Karte mit „Jetzt üben“, darunter Kacheln (Daily, Gemischt, Kategorie, Weitere Modi und – solange offen –
+// Einstufung). Auf dem Telefon liegen Kategorien und weitere Modi in Sheets, ab 720 px direkt auf der Seite.
+// Daten synchron (E22), Logik in home-data.ts.
 import { CATEGORIES, SUBTYPES, activeCategories } from '../core/catalog.ts';
 import { categoryStats } from '../core/scoring.ts';
 import { dueReviews } from '../core/review.ts';
@@ -19,6 +20,9 @@ import type { Recommendation } from '../types.ts';
 import { dateLine, daypart, heroPlan, timeGap, type HeroPlan, type TimeGap } from './home-data.ts';
 
 const GREETING = { morning: 'home.greetMorning', day: 'home.greetDay', evening: 'home.greetEvening' } as const;
+
+/** Geschütztes Leerzeichen vor „·“: Bricht der Titel um, bleibt der Punkt am Ende der Zeile. */
+const NBSP = String.fromCharCode(0xa0);
 
 /** „Ziel {n}“ → Text mit hervorgehobener Zahl (wie die Status Line). */
 function labelled(template: string, value: string): HTMLSpanElement {
@@ -50,7 +54,7 @@ function hero(rec: Recommendation, plan: HeroPlan, gap: TimeGap | null, fresh: b
   const sub = rec.subtype ? SUBTYPES[rec.subtype] : undefined;
   const catName = sub ? CATEGORIES.find((c) => c.id === sub.category)?.name : undefined;
   // Geschützte Bindestriche: „2-stellig × 1-stellig“ bricht nicht mitten im Wort um
-  const title = (sub && catName ? `${catName} · ${rec.title}` : rec.title).replace(/(\d)-/g, '$1\u2011');
+  const title = (sub && catName ? `${catName}${NBSP}· ${rec.title}` : rec.title).replace(/(\d)-/g, '$1\u2011');
   const planText = plan.kind === 'method' ? t('home.planMethod')
     : plan.kind === 'review' ? t('home.planReview')
     : t('home.planRound', { n: plan.tasks });
@@ -68,7 +72,9 @@ function hero(rec: Recommendation, plan: HeroPlan, gap: TimeGap | null, fresh: b
 }
 
 interface TileOptions {
-  icon: IconName;
+  icon?: IconName;
+  /** Statt des Icons, z. B. der Meisterungs-Punkt einer Kategorie */
+  mark?: HTMLElement;
   label: string;
   sub?: string;
   /** Zusatz rechts oben (Zustand, z. B. „offen“, „Platz 3/40“) */
@@ -76,19 +82,27 @@ interface TileOptions {
   accent?: boolean;
   href?: string;
   onClick?: () => void;
+  /** Öffnet ein Sheet, dessen Inhalt ab 720 px ohnehin auf der Seite steht */
+  phoneOnly?: boolean;
 }
 
 /** Kachel im Raster: Link oder Button mit Icon, Titel und kurzer Unterzeile. */
 function tile(o: TileOptions): HTMLElement {
   const kids = [
     h('span', { class: 'tile-top' },
-      h('span', { class: 'tile-icon' }, icon(o.icon, 22)),
+      h('span', { class: 'tile-icon' }, o.mark ?? (o.icon ? icon(o.icon, 22) : null)),
       o.value ? h('span', { class: `tile-value${o.accent ? ' is-accent' : ''}` }, o.value) : null),
     h('span', { class: 'tile-label' }, o.label),
     o.sub ? h('span', { class: 'tile-sub' }, o.sub) : null,
   ];
-  if (o.href) return h('a', { class: 'tile press', href: o.href, onclick: o.onClick ?? null }, ...kids);
-  return h('button', { type: 'button', class: 'tile press', 'aria-haspopup': 'dialog', onclick: () => o.onClick?.() }, ...kids);
+  const cls = `tile press${o.phoneOnly ? ' is-phone-only' : ''}`;
+  if (o.href) return h('a', { class: cls, href: o.href, onclick: o.onClick ?? null }, ...kids);
+  return h('button', { type: 'button', class: cls, 'aria-haspopup': 'dialog', onclick: () => o.onClick?.() }, ...kids);
+}
+
+/** Abschnitt der Startseite ab 720 px: Überschrift und Kachel-Raster. */
+function tileSection(title: string, tiles: HTMLElement[]): HTMLElement {
+  return h('section', { class: 'today-section' }, h('h2', { class: 'group-title' }, title), h('div', { class: 'today-grid' }, ...tiles));
 }
 
 export function renderHome(): void {
@@ -152,11 +166,23 @@ export function renderHome(): void {
   const tiles: HTMLElement[] = [
     needsPlacement ? tile({ icon: 'target', label: t('home.placementTitle'), sub: t('home.placementSub'), value: t('home.placementValue'), accent: true, href: '#/einstufung' }) : null,
     dailyTile,
-    accountEnabled() ? tile({ icon: 'trophy', label: t('home.competeShort'), sub: t('home.competeTileSub'), href: '#/wettbewerbe' }) : null,
     tile({ icon: 'grid', label: t('home.mixedShort'), sub: t('home.mixedSub'), href: '#/train/all' }),
-    tile({ icon: 'plus-minus', label: t('home.categories'), sub: t('home.categoriesSub'), onClick: openCategories }),
-    tile({ icon: 'link', label: t('home.moreModes'), sub: t('home.moreModesShort'), onClick: openModes }),
+    tile({ icon: 'plus-minus', label: t('home.categories'), sub: t('home.categoriesSub'), onClick: openCategories, phoneOnly: true }),
+    tile({ icon: 'link', label: t('home.moreModes'), sub: t('home.moreModesShort'), onClick: openModes, phoneOnly: true }),
   ].filter((x): x is HTMLElement => x !== null);
+
+  // Ab 720 px stehen Kategorien und Modi direkt auf der Seite; auf dem Telefon blendet CSS den Block aus
+  const more = h('div', { class: 'today-more' },
+    tileSection(t('home.categories'), activeCategories(settings.enabledCategories).map((c) => tile({
+      mark: masteryMark(masteryOf(stats[c.id]?.score)), label: c.name,
+      sub: t('lernen.skill', { n: stats[c.id]?.score ?? '–' }), href: `#/train/${c.id}`,
+    }))),
+    tileSection(t('home.moreModes'), [
+      tile({ icon: 'link', label: t('home.chainTitle'), sub: t('home.chainSub'), href: '#/chain' }),
+      tile({ icon: 'bars', label: t('home.parallelTitle'), sub: t('home.parallelSub'), href: '#/parallel' }),
+      tile({ icon: 'target', label: t('home.estimateTitle'), sub: t('home.estimateSub'), href: '#/train/all?est=1' }),
+      tile({ icon: 'gear', label: t('home.customTitle'), sub: t('home.customSub'), href: '#/custom' }),
+    ]));
 
   // Seite passt auf einen Bildschirm (CSS: .screen.is-today, ohne Scrollen auf dem Telefon)
   app.classList.add('is-today');
@@ -167,7 +193,9 @@ export function renderHome(): void {
     h('div', { class: 'today-head' },
       largeTitle(t(GREETING[daypart(new Date(now).getHours())]), dateLine(now, locale())),
       statusLine({ todayMin: Math.floor(st.todayMs / 60000), goalMin, streak: st.current })),
-    hero(rec, plan, gap, fresh),
-    h('nav', { class: `today-tiles${tiles.length % 2 ? ' is-odd' : ''}`, 'aria-label': t('home.otherTitle') }, ...tiles),
+    h('div', { class: 'today-main' },
+      hero(rec, plan, gap, fresh),
+      h('nav', { class: `today-tiles${tiles.length % 2 ? ' is-odd' : ''}`, 'aria-label': t('home.otherTitle') }, ...tiles)),
+    more,
   ]);
 }

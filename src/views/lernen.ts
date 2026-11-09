@@ -11,11 +11,12 @@ import { renderExhibit } from '../ui/exhibit.ts';
 import { aiExplainMethod, isAiAvailable } from '../features/ai-client.ts';
 import { aiControl } from '../features/ai-view.ts';
 import { getAttempts, getSettings } from '../data/storage.ts';
-import { app, appendChildren, h } from '../ui/dom.ts';
+import { app, appendChildren, h, type Child } from '../ui/dom.ts';
 import {
   backLink, button, card, fold, group, insight, largeTitle, list, masteryMark, masteryOf, row, searchField, type Mastery,
 } from '../ui/kit.ts';
 import { setPrimaryAction } from '../ui/shell.ts';
+import { isWide } from '../ui/viewport.ts';
 import { t } from '../i18n/index.ts';
 import { pitfallList, safeSteps, stepsList } from '../ui/widgets.ts';
 import { matchesSearch, normalizeSearch, pickNext } from './lernen-search.ts';
@@ -33,14 +34,22 @@ const subtypesOf = (categoryId: string): Subtype[] => Object.values(SUBTYPES).fi
 
 interface Entry { el: HTMLElement; hay: string }
 interface Section { el: HTMLElement; entries: Entry[] }
+interface ListParts {
+  nodes: Child[];
+  /** Zeilen je Aufgabentyp (Master-Detail markiert die geöffnete) */
+  rows: ReadonlyMap<string, HTMLElement>;
+  /** Weiterlernen: erster Subtyp mit der niedrigsten Meisterung */
+  next: Subtype | null;
+}
 
-function renderList(): void {
+function listParts(): ListParts {
   const attempts = getAttempts();
   const subStats = subtypeStats(attempts);
   const catStats = categoryStats(attempts);
   const cats = activeCategories(getSettings().enabledCategories);
 
   const sections: Section[] = [];
+  const rowsById = new Map<string, HTMLElement>();
   const order: Array<{ sub: Subtype; mastery: Mastery }> = [];
   for (const c of cats) {
     const subs = subtypesOf(c.id);
@@ -52,6 +61,7 @@ function renderList(): void {
       const trick = getMethod(s.id)?.trick ?? '';
       const tip = s.tip || trick;
       const el = row({ label: s.name, sub: tip || undefined, href: `#/lernen/${s.id}`, leading: masteryMark(mastery), class: 'learn-row' });
+      rowsById.set(s.id, el);
       return { el, hay: normalizeSearch([s.name, s.tip, trick, c.name].join(' ')) };
     });
     const score = catStats[c.id]?.score;
@@ -87,16 +97,23 @@ function renderList(): void {
     apply(lastQuery);
   }
 
-  appendChildren(app, [
-    largeTitle(t('lernen.title'), t('lernen.subtitle')),
-    search,
-    sections.map((s) => s.el),
-    empty,
-  ]);
+  return {
+    nodes: [
+      largeTitle(t('lernen.title'), t('lernen.subtitle')),
+      search,
+      h('div', { class: 'learn-groups' }, sections.map((s) => s.el)),
+      empty,
+    ],
+    rows: rowsById,
+    // Kategorienreihenfolge; ohne Daten der erste
+    next: pickNext(order, (o) => MASTERY_RANK[o.mastery])?.sub ?? null,
+  };
+}
 
-  // Weiterlernen: erster Subtyp mit der niedrigsten Meisterung (Kategorienreihenfolge); ohne Daten der erste
-  const next = pickNext(order, (o) => MASTERY_RANK[o.mastery]);
-  if (next) setPrimaryAction({ label: t('lernen.continue'), meta: next.sub.name, href: `#/lernen/${next.sub.id}` });
+function renderList(): void {
+  const { nodes, next } = listParts();
+  appendChildren(app, nodes);
+  if (next) setPrimaryAction({ label: t('lernen.continue'), meta: next.name, href: `#/lernen/${next.id}` });
 }
 
 /* ---------- Detail ---------- */
@@ -163,7 +180,8 @@ function exampleGroup(sub: Subtype, lvl: Level): HTMLElement | null {
   return group(t('lernen.example'), card([exhibit, prompt, rest, again]));
 }
 
-function renderDetail(sub: Subtype): void {
+/** Inhalt der Detailseite; ohne `back`, wenn die Liste danebensteht. */
+function detailNodes(sub: Subtype, back: boolean): Child[] {
   const attempts = getAttempts();
   const score = subtypeStats(attempts)[sub.id]?.score;
   const count = attempts.reduce((n, a) => n + (a.subtype === sub.id ? 1 : 0), 0);
@@ -171,8 +189,8 @@ function renderDetail(sub: Subtype): void {
   const m = getMethod(sub.id);
   const cat = CATEGORIES.find((c) => c.id === sub.category);
 
-  appendChildren(app, [
-    backLink({ label: t('lernen.title'), href: '#/lernen', ariaLabel: t('lernen.back') }),
+  return [
+    back ? backLink({ label: t('lernen.title'), href: '#/lernen', ariaLabel: t('lernen.back') }) : null,
     h('div', { class: 'learn-head' }, largeTitle(sub.name, cat?.name), statusLine(sub, score, count, lvl)),
     hasGuided(sub.id) ? guideEntry(sub.id) : null,
     m?.idea ? group(t('lernen.idea'), card([h('p', { class: 'method-text' }, m.idea)])) : null,
@@ -181,9 +199,33 @@ function renderDetail(sub: Subtype): void {
     m?.trick ? insight({ icon: 'bulb', tone: 'accent', title: t('lernen.trick'), text: m.trick }) : null,
     m?.pitfalls?.length ? group(t('lernen.pitfalls'), card([pitfallList(m.pitfalls)])) : null,
     isAiAvailable() ? aiControl(t('lernen.aiExplain'), () => aiExplainMethod(sub.id)) : null,
-  ]);
+  ];
+}
 
+function practiceAction(sub: Subtype): void {
   setPrimaryAction({ label: t('lernen.practice'), meta: t('lernen.practiceMeta', { n: PRACTICE_N }), href: practiceHref(sub.id) });
+}
+
+function renderDetail(sub: Subtype): void {
+  appendChildren(app, detailNodes(sub, true));
+  practiceAction(sub);
+}
+
+/** Wo die Liste im Master-Detail stand: Jeder Tipp auf eine Zeile zeichnet die Seite neu. */
+let masterScrollTop = 0;
+
+/** Ab 1024 px: Liste links, Detail rechts. Ohne Auswahl steht dort der Aufgabentyp, mit dem es weitergeht. */
+function renderSplit(selected: Subtype | undefined): void {
+  const { nodes, rows, next } = listParts();
+  const shown = selected ?? next;
+  if (shown) rows.get(shown.id)?.setAttribute('aria-current', 'true');
+  const master = h('div', { class: 'split-master learn-master' }, ...nodes);
+  master.addEventListener('scroll', () => { masterScrollTop = master.scrollTop; }, { passive: true });
+  appendChildren(app, [
+    h('div', { class: 'split' }, master, h('div', { class: 'split-detail' }, ...(shown ? detailNodes(shown, false) : []))),
+  ]);
+  master.scrollTop = masterScrollTop;
+  if (shown) practiceAction(shown);
 }
 
 /* ---------- Einstieg ---------- */
@@ -192,6 +234,7 @@ function renderDetail(sub: Subtype): void {
 export function renderLernen(openId: string | null, guide = false): void {
   const sub = openId && Object.hasOwn(SUBTYPES, openId) ? SUBTYPES[openId] : undefined;
   if (sub && guide && hasGuided(sub.id) && renderGuide(sub)) return;
-  if (sub) renderDetail(sub);
+  if (isWide()) renderSplit(sub);
+  else if (sub) renderDetail(sub);
   else renderList();
 }

@@ -45,10 +45,12 @@ function entryRow(e: LeaderboardEntry, week: boolean): HTMLElement {
   });
 }
 
-function boardList(b: Leaderboard, week: boolean): HTMLElement {
+/** Plätze als Liste; mit `limit` nur die ersten – die eigene Zeile steht trotzdem immer da. */
+export function boardList(b: Leaderboard, week: boolean, limit = Infinity): HTMLElement {
   if (b.total === 0) return notice(t('compete.emptyBoard'));
-  const rows: Array<HTMLElement | null> = b.top.map((e) => entryRow(e, week));
-  if (b.me && !b.top.some((e) => e.me)) {
+  const top = b.top.slice(0, limit);
+  const rows: Array<HTMLElement | null> = top.map((e) => entryRow(e, week));
+  if (b.me && !top.some((e) => e.me)) {
     rows.push(h('div', { class: 'compete-gap', 'aria-hidden': 'true' }, '···'), entryRow(b.me, week));
   }
   return list(rows);

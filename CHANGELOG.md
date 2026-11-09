@@ -4,6 +4,17 @@ Alle nennenswerten Änderungen an Mental Math. Format nach [Keep a Changelog](ht
 
 <!-- Automatisch erzeugt mit `npm run changelog` aus src/releases.ts – nicht von Hand bearbeiten. -->
 
+## [2.0.0] - 2026-11-09
+
+### Gemacht fürs iPad
+
+- Neuer Rundgang: Die App zeigt dir selbst, was sie kann. Du findest ihn jederzeit unter Profil → Hilfe & Info. Die Einstellungen sind jetzt in Menüs sortiert, und jede erklärt, was sie macht.
+- Mental Math läuft jetzt als echte iPad-App: hochkant, quer und neben anderen Apps, statt als vergrößerte iPhone-Ansicht.
+- Auf dem iPad nutzt jede Seite den Platz: Seitenleiste statt Tab-Leiste, Kategorien und Modi direkt auf der Startseite, Fortschritt als Dashboard und Lernen mit Liste und Erklärung nebeneinander.
+- Training auf dem iPad: Die Aufgabe steht groß im Blick, das Tastenfeld hat große Tasten. Im Querformat wählst du unter Profil → Eingabe, ob es links, mittig oder rechts steht.
+- Neuer Tab „Wettkampf“: Daily Challenge, Ranglisten, Wettbewerbe und Gruppen sind jetzt auf iPhone und iPad mit einem Tipp erreichbar.
+- Die Daily steht als große Karte ganz oben, danach siehst du dort direkt deinen Platz. Auf dem iPad läuft die Rangliste des Tages gleich darunter mit.
+
 ## [1.17.2] - 2026-11-09
 
 ### Läuft wieder überall

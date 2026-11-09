@@ -7,7 +7,7 @@ import type {
 import type { PersistentAdapter, StorageAdapter } from '../types.ts';
 import type { IdbOptions } from 'offline-sync';
 import { Repository, sumByKey } from '../vendor/storage.ts';
-import { createLegacyStore, getDefaultAdapter, initStorageAdapter, setDefaultAdapter, V3_PREFIX } from './adapters.ts';
+import { createLegacyStore, getDefaultAdapter, initStorageAdapter, MemoryAdapter, setDefaultAdapter, V3_PREFIX } from './adapters.ts';
 import { LEGACY_BACKUP_KEY, LEGACY_KEY, migrateV1 } from './migrate.ts';
 import { createMeta, touch } from './meta.ts';
 import { DEFAULT_PARALLEL_STATS, DEFAULT_SETTINGS, isObj, normalize, normalizeParallel, normalizeSettings } from './schema.ts';
@@ -25,6 +25,32 @@ let initPromise: Promise<void> | null = null;
 const legacy = createLegacyStore();
 let ready = false;
 
+// ---------- Demo-Daten des Rundgangs ----------
+// Solange `demo` gesetzt ist, liest und schreibt die Oberfläche (r()) nur dort, im Speicher. `repo`, Sync, Reset und
+// Änderungsprotokoll bleiben beim echten Repository: Der Rundgang kann echte Daten nicht verändern, auch nicht beim Absturz.
+let demo: Repository | null = null;
+let heldChange = false;
+
+/** Oberfläche auf leere Demo-Daten umstellen (features/tour.ts befüllt sie). */
+export function enterDemoData(): void {
+  if (demo) return;
+  demo = new Repository(new MemoryAdapter());
+  views.clear();
+}
+
+/** Zurück zu den echten Daten; was währenddessen von außen kam, wird jetzt gemeldet. */
+export function exitDemoData(): void {
+  if (!demo) return;
+  demo = null;
+  views.clear();
+  if (heldChange) {
+    heldChange = false;
+    emitDataChange('remote');
+  }
+}
+
+export function isDemoData(): boolean { return demo !== null; }
+
 // ---------- Änderungsmeldungen ----------
 export type ChangeSource = 'local' | 'remote' | 'external';
 const listeners = new Set<(source: ChangeSource) => void>();
@@ -32,6 +58,7 @@ let unbindRepo: () => void = () => {};
 
 /** Meldet eine Datenänderung an alle `onChange`-Hörer (z. B. 'remote' nach einem Pull). */
 export function emitDataChange(source: ChangeSource): void {
+  if (demo) { heldChange = true; return; } // Rundgang: Hörer erfahren es einmal an dessen Ende
   for (const cb of [...listeners]) {
     try {
       cb(source);
@@ -54,8 +81,13 @@ export function onChange(cb: (source: ChangeSource) => void): () => void {
   return () => { listeners.delete(cb); };
 }
 
-/** Repository; führt beim ersten Zugriff (und nach Invalidierung) die Migration von `kopfrechner.v1` aus. */
+/** Datenquelle der Oberfläche: im Rundgang die Demo-Daten, sonst das echte Repository. */
 function r(): Repository {
+  return demo ?? real();
+}
+
+/** Echtes Repository; führt beim ersten Zugriff (und nach Invalidierung) die Migration von `kopfrechner.v1` aus. */
+function real(): Repository {
   if (!ready) {
     ready = true;
     try {
@@ -95,7 +127,7 @@ function isPersistent(a: StorageAdapter): a is PersistentAdapter {
 
 /** Das lebende, migrierte Repository (für die SyncEngine). Nach `initStorage` ist es ein anderes Objekt als davor. */
 export function getRepository(): Repository {
-  return r();
+  return real();
 }
 
 /** Wählt den Adapter (IndexedDB, sonst localStorage) und baut das Repository neu auf; idempotent (gemeinsames Promise). */

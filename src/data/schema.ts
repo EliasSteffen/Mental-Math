@@ -7,7 +7,7 @@ export const DEFAULT_SETTINGS: Settings = {
   sessionLength: 10, dailyGoalMin: 15, theme: 'system', difficulty: 'auto',
   timer: true, sound: false, haptics: true, celebrated: '', keypad: 'auto',
   enabledCategories: null,
-  autoSubmit: false, numpadLayout: 'calculator', estimateMode: false, ghost: true,
+  autoSubmit: false, numpadLayout: 'calculator', keypadSide: 'right', estimateMode: false, ghost: true,
   autoFail: false,
   lang: 'auto',
   lastSeenVersion: '',
@@ -43,6 +43,7 @@ export function isValidSession(x: unknown): x is Session {
 /** Gültige Theme-Einstellungen (Reihenfolge wie im Profil). */
 export const THEME_SETTINGS: readonly ThemeSetting[] = ['system', 'paper', 'night', 'oled', 'aurora', 'neon'];
 const TIMER_DISPLAYS: readonly TimerDisplay[] = ['calm', 'precise', 'off'];
+const KEYPAD_SIDES: ReadonlyArray<Settings['keypadSide']> = ['left', 'center', 'right'];
 
 /** Theme-Migration (E1): 'pastel' → 'paper', 'neon'/'oled' bleiben, Unbekanntes → 'system'. */
 export function normalizeTheme(v: unknown): ThemeSetting {
@@ -70,6 +71,7 @@ export function normalizeSettings(raw: unknown): Settings {
     ...(s as Partial<Settings>),
     theme: normalizeTheme(s.theme ?? DEFAULT_SETTINGS.theme),
     timerDisplay: td ?? (s.timer === false ? 'off' : 'calm'),
+    keypadSide: KEYPAD_SIDES.find((x) => x === s.keypadSide) ?? DEFAULT_SETTINGS.keypadSide,
     breathe: typeof s.breathe === 'boolean' ? s.breathe : DEFAULT_SETTINGS.breathe,
     confetti: typeof s.confetti === 'boolean' ? s.confetti : DEFAULT_SETTINGS.confetti,
     onboardingDone: s.onboardingDone === true,

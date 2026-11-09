@@ -43,7 +43,19 @@ export function accountEnabled(): boolean {
   return Boolean(c.supabaseUrl && c.supabaseKey);
 }
 
-export function getAccountState(): AccountState { return state; }
+/** Rundgang: Konto der Demo-Daten; echte Sitzungswechsel werden bis zum Ende zurückgehalten. */
+let demoState: AccountState | null = null;
+let heldState = false;
+
+export function setDemoAccount(s: AccountState | null): void {
+  demoState = s;
+  if (s === null && heldState) {
+    heldState = false;
+    for (const cb of [...listeners]) cb(state);
+  }
+}
+
+export function getAccountState(): AccountState { return demoState ?? state; }
 
 export function onAccountChange(cb: (s: AccountState) => void): () => void {
   listeners.add(cb);
@@ -52,6 +64,7 @@ export function onAccountChange(cb: (s: AccountState) => void): () => void {
 
 function setState(s: AccountState): void {
   state = s;
+  if (demoState) { heldState = true; return; }
   for (const cb of [...listeners]) cb(s);
 }
 

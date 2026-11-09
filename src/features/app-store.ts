@@ -1,7 +1,7 @@
 // App Store in der iOS-App: Hinweis auf eine neue Version (app-update.ts) und die Bitte um eine Bewertung
 // (review-prompt.ts). Auf der Website ohne Wirkung – dort meldet der Service Worker neue Versionen.
 import { BUILD_INFO } from '../generated/build-info.ts';
-import { getSessions, getSettings, setDeviceSettings } from '../data/storage.ts';
+import { getSessions, getSettings, isDemoData, setDeviceSettings } from '../data/storage.ts';
 import { t } from '../i18n/index.ts';
 import { toast } from '../ui/toast.ts';
 import { fetchStoreVersion, isNative, onAppResume, openStorePage, requestStoreReview } from '../platform/index.ts';
@@ -33,7 +33,7 @@ export function startAppUpdateCheck(): void {
  * zuerst das Ergebnis zu sehen ist; ein Routenwechsel oder die gelieferte Funktion (Aufräumen der View) bricht ab.
  */
 export function maybeAskForReview(round: ReviewRound): () => void {
-  if (!isNative()) return () => {};
+  if (!isNative() || isDemoData()) return () => {};
   let timer: ReturnType<typeof setTimeout> | undefined;
   const cancel = (): void => {
     clearTimeout(timer);

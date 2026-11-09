@@ -1,4 +1,5 @@
-// Wettbewerbe (#/wettbewerbe): gewertete Daily, laufende Wettbewerbe, Ranglisten, Gruppen und der eigene Name.
+// Tab „Wettkampf“ (#/wettbewerbe): gewertete Daily als große Karte, Ranglisten, laufende Wettbewerbe, Gruppen und der
+// eigene Name. Ab 720 px zweispaltig mit den Top-Plätzen von heute direkt auf der Seite.
 // ?join=CODE öffnet „Gruppe beitreten“ mit dem Code (Einladungslink), ?name=1 die Namens-Einstellung.
 import { COUNT_CHOICES, DURATION_DAYS, GROUP_NAME_MAX, normalizeGroupCode, normalizeGroupName } from '../core/challenge.ts';
 import type { ChallengeInfo, GroupInfo, PublicProfile } from '../core/challenge.ts';
@@ -6,27 +7,64 @@ import { LEVEL_NAMES, mixCategories } from '../core/catalog.ts';
 import type { Level } from '../types.ts';
 import { accountEnabled, getAccountState, onAccountChange } from '../features/account.ts';
 import {
-  createCompetition, createGroup, joinGroup, leaveGroup, loadOverview,
+  createCompetition, createGroup, joinGroup, leaveGroup, loadBoard, loadOverview,
 } from '../features/challenge.ts';
 import type { Overview } from '../features/challenge.ts';
+import { fmt, fmtSeconds } from '../core/numbers.ts';
 import { t } from '../i18n/index.ts';
 import { addCleanup, go, rerender } from '../router.ts';
 import { app, h } from '../ui/dom.ts';
-import { button, card, group, largeTitle, list, row, segmented } from '../ui/kit.ts';
+import { button, card, columns, group, icon, largeTitle, list, row, segmented } from '../ui/kit.ts';
 import { confirmDialog } from '../ui/modal.ts';
 import { openSheet } from '../ui/sheet.ts';
 import type { SheetHandle } from '../ui/sheet.ts';
 import { toast } from '../ui/toast.ts';
+import { isTablet } from '../ui/viewport.ts';
 import { publicUrl, shareText } from '../platform/index.ts';
 import { openAccountOnProfile } from './settings.ts';
+import { boardList } from './leaderboard.ts';
 import { challengeTitle, errorText, notice, participantsText, profileForm, stateValue, whenLine } from './compete-ui.ts';
 
-function challengeRow(c: ChallengeInfo, icon: 'calendar' | 'trophy'): HTMLElement {
+/** So viele Plätze zeigt die Vorschau der Tagesrangliste ab 720 px. */
+const PREVIEW_ROWS = 8;
+
+function challengeRow(c: ChallengeInfo): HTMLElement {
   const v = stateValue(c);
   return row({
-    icon, label: challengeTitle(c), sub: [c.groupName, whenLine(c), participantsText(c.participants)].filter(Boolean).join(' · '),
+    icon: 'trophy', label: challengeTitle(c), sub: [c.groupName, whenLine(c), participantsText(c.participants)].filter(Boolean).join(' · '),
     value: v.text, valueTone: v.accent ? 'accent' : 'muted', href: `#/challenge/${c.id}`,
   });
+}
+
+/** Die Daily als große, antippbare Karte: offen mit „Jetzt antreten“, danach Platz und Ergebnis. Nur <span> im Link. */
+function dailyHero(c: ChallengeInfo): HTMLAnchorElement {
+  const done = c.state === 'done' ? c.result : null;
+  const title = done && done.rank !== null ? t('compete.rankOf', { rank: done.rank, total: done.total }) : challengeTitle(c);
+  const facts = done
+    ? [t('compete.correctOf', { correct: done.correct, n: done.n }), t('compete.pointsTime', { points: fmt(done.points), time: fmtSeconds(done.timeMs) })]
+    : [whenLine(c), t('compete.tasksCount', { n: c.count }), participantsText(c.participants)];
+  const open = c.state === 'open';
+  return h('a', { class: 'card hero compete-hero press', href: `#/challenge/${c.id}` },
+    h('span', { class: 'compete-hero-head' },
+      h('span', { class: 'compete-hero-label' }, done ? challengeTitle(c) : t('home.dailyChallenge')),
+      h('span', { class: 'compete-hero-title' }, title),
+      h('span', { class: 'compete-hero-sub' }, facts.join(' · '))),
+    h('span', { class: `btn ${open ? 'primary cta' : 'soft'} is-full compete-hero-go` },
+      open ? icon('play', 20) : null,
+      h('span', { class: 'btn-label' }, t(open ? 'compete.heroCompete' : done ? 'compete.heroResult' : 'compete.heroDetails')),
+      open ? h('span', { class: 'btn-meta' }, `· ${t('compete.oneAttempt')}`) : null));
+}
+
+/** Ranglisten-Einstiege; mit `previewId` (nur angemeldet) ab 720 px zusätzlich die Top-Plätze dieser Challenge. */
+function boardsGroup(previewId: string | null): HTMLElement {
+  const preview = previewId !== null && isTablet() ? h('div', { class: 'compete-preview' }, notice(t('compete.loading'))) : null;
+  if (preview && previewId !== null) {
+    void loadBoard(previewId, null).then((b) => preview.replaceChildren(boardList(b, false, PREVIEW_ROWS)), () => preview.remove());
+  }
+  return group(t('compete.boards'), preview, list([
+    row({ icon: 'trophy', label: t('compete.boardToday'), value: preview ? t('compete.boardAll') : undefined, href: '#/rangliste' }),
+    row({ icon: 'bars', label: t('compete.boardWeek'), href: '#/rangliste?tab=week' }),
+  ]));
 }
 
 let sheet: SheetHandle | null = null;
@@ -207,18 +245,16 @@ export function renderCompete(query: URLSearchParams): void {
   if (st.status !== 'signed-in') {
     const unsub = onAccountChange(() => { if (alive) rerender(); });
     addCleanup(unsub);
-    app.replaceChildren(head,
-      st.status === 'loading'
+    app.replaceChildren(head, columns(
+      [st.status === 'loading'
         ? notice(t('compete.loading'))
         : card([
           h('p', { class: 'compete-text' }, t('compete.needAccount')),
           button({ label: t('compete.createAccount'), kind: 'primary', full: true, cta: false, onClick: openAccountOnProfile }),
-        ]),
-      group(t('compete.boards'), list([
-        row({ icon: 'trophy', label: t('compete.boardToday'), href: '#/rangliste' }),
-        row({ icon: 'bars', label: t('compete.boardWeek'), href: '#/rangliste?tab=week' }),
-      ])),
-      group(t('compete.unrankedTitle'), list([row({ icon: 'calendar', label: t('compete.practiceUnranked'), href: '#/train/daily' })])));
+        ], { hero: true })],
+      [boardsGroup(null),
+        group(t('compete.unrankedTitle'), list([row({ icon: 'calendar', label: t('compete.practiceUnranked'), href: '#/train/daily' })]))],
+    ));
     return;
   }
 
@@ -234,30 +270,27 @@ export function renderCompete(query: URLSearchParams): void {
       icon: 'person', label: g.name, sub: g.members === 1 ? t('compete.groupSubOne', { code: g.code }) : t('compete.groupSub', { n: g.members, code: g.code }), onClick: () => groupSheet(g), chevron: true,
     }));
     const needName = (fn: () => void) => (): void => { if (o.profile) fn(); else nameSheet(null, username, fn); };
-    app.replaceChildren(
-      head,
-      group(t('compete.todayTitle'), list([challengeRow(o.daily, 'calendar')])),
-      group(t('compete.competitions'), comps.length
-        ? list(comps.map((c) => challengeRow(c, 'trophy')))
-        : notice(o.groups.some((g) => g.owner) ? t('compete.noCompetitionsOwner') : t('compete.noCompetitions'))),
-      group(t('compete.boards'), list([
-        row({ icon: 'trophy', label: t('compete.boardToday'), href: '#/rangliste' }),
-        row({ icon: 'bars', label: t('compete.boardWeek'), href: '#/rangliste?tab=week' }),
-      ])),
-      group({ title: t('compete.groups'), meta: o.groups.length ? undefined : t('compete.groupsHint') }, list([
-        ...groupsList,
-        row({ icon: 'person', label: t('compete.createGroup'), onClick: needName(createGroupSheet), chevron: true }),
-        row({ icon: 'key', label: t('compete.joinGroup'), onClick: needName(() => joinSheet('')), chevron: true }),
-      ])),
-      group(t('compete.nameTitle'), list([
-        row({
-          icon: 'person', label: o.profile?.displayName ?? t('compete.noName'),
-          sub: o.profile ? (o.profile.listed ? t('compete.listedOn') : t('compete.listedOff')) : t('compete.noNameSub'),
-          onClick: () => nameSheet(o.profile, username), chevron: true,
-        }),
-      ])),
-      h('p', { class: 'compete-foot' }, t('compete.privacyFoot')),
-    );
+    app.replaceChildren(head, columns(
+      [dailyHero(o.daily), boardsGroup(o.daily.id)],
+      [
+        group(t('compete.competitions'), comps.length
+          ? list(comps.map((c) => challengeRow(c)))
+          : notice(o.groups.some((g) => g.owner) ? t('compete.noCompetitionsOwner') : t('compete.noCompetitions'))),
+        group({ title: t('compete.groups'), meta: o.groups.length ? undefined : t('compete.groupsHint') }, list([
+          ...groupsList,
+          row({ icon: 'person', label: t('compete.createGroup'), onClick: needName(createGroupSheet), chevron: true }),
+          row({ icon: 'key', label: t('compete.joinGroup'), onClick: needName(() => joinSheet('')), chevron: true }),
+        ])),
+        group(t('compete.nameTitle'), list([
+          row({
+            icon: 'person', label: o.profile?.displayName ?? t('compete.noName'),
+            sub: o.profile ? (o.profile.listed ? t('compete.listedOn') : t('compete.listedOff')) : t('compete.noNameSub'),
+            onClick: () => nameSheet(o.profile, username), chevron: true,
+          }),
+        ])),
+        h('p', { class: 'compete-foot' }, t('compete.privacyFoot')),
+      ],
+    ));
 
     const join = normalizeGroupCode(query.get('join') ?? '');
     if (join) needName(() => joinSheet(join))();

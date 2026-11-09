@@ -10,7 +10,7 @@ import { startSync } from './features/sync.ts';
 import { watchPending } from './features/challenge.ts';
 import { maybeShowWhatsNew } from './features/whats-new.ts';
 import { shouldShowOnboarding } from './features/onboarding.ts';
-import { showOnboarding } from './ui/onboarding.ts';
+import { showWelcome } from './ui/onboarding.ts';
 import { openAccountOnProfile } from './views/settings.ts';
 import { startPush } from './platform/reminders.ts';
 import { startAppUpdateCheck } from './features/app-store.ts';
@@ -47,8 +47,18 @@ safely('account-watch', () => watchAccountRestore()); // Offline-Kaltstart: Anme
 safely('challenge', () => watchPending()); // Gewertete Challenge: offene Abgabe senden, sobald angemeldet bzw. wieder online
 safely('sync', startSync);
 safely('push', startPush);
-// Neuinstallation: Einführung, am Ende das Angebot des Einstufungstests
-if (firstRun) safely('onboarding', () => showOnboarding(openAccountOnProfile, () => go('#/einstufung')));
 safely('whats-new', maybeShowWhatsNew);
 safely('app-store', startAppUpdateCheck); // nur iOS: neue Version im App Store
 appReady(); // nur iOS: Oberfläche läuft – bestätigt ein Live-Update, sucht nach neuen
+
+// Erst jetzt: Die Schritte oben müssen noch auf den echten Daten laufen (der Rundgang stellt auf Demo-Daten um)
+const recording = document.querySelector<HTMLMetaElement>('meta[name="mm-record"]')?.content;
+if (recording) {
+  // Store-Video (scripts/record-preview.ts): Sprache aus der Aufnahme, Rundgang startet von selbst
+  const [recordLang, recordMode] = recording.split(' ');
+  setLang(detectLang(recordLang === 'en' ? 'en' : 'de'));
+  void import('./features/tour.ts').then((m) => { m.startTour('store', { record: true, shots: recordMode === 'shots' }); });
+} else if (firstRun) {
+  // Neuinstallation: Begrüßung mit Rundgang, am Ende das Angebot des Einstufungstests
+  safely('onboarding', () => showWelcome(openAccountOnProfile, () => go('#/einstufung')));
+}
