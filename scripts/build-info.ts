@@ -22,13 +22,6 @@ export interface PublicConfig {
 /** API der iOS-App (die Website nutzt relative Pfade); überschreibbar mit PUBLIC_API_ORIGIN */
 export const DEFAULT_API_ORIGIN = 'https://mental-math.elias-steffen.de';
 
-/**
- * API der Vorschau (develop): Beta-Live-Updates der iOS-App sprechen sie an, damit Code und Server zusammenpassen
- * (neue Routen wie /api/challenge gibt es dort früher als in der Produktion). Konto und Passkeys sind dieselben.
- * Überschreibbar mit PUBLIC_PREVIEW_API_ORIGIN.
- */
-export const DEFAULT_PREVIEW_API_ORIGIN = 'https://preview.mental-math.elias-steffen.de';
-
 /** Beta-Manifest (develop → Vorschau); überschreibbar mit PUBLIC_LIVE_UPDATE_BETA_URL */
 export const DEFAULT_LIVE_UPDATE_BETA_URL = 'https://preview.mental-math.elias-steffen.de/ota/manifest.json';
 
@@ -104,8 +97,10 @@ function loadDotEnvIfNeeded(): void {
 }
 
 /**
- * Liest die öffentliche Konfiguration; ungültige Werte werden zu leeren Strings. Vorschau-Builds (DEPLOY_CHANNEL=preview)
- * nutzen die API der Vorschau; das Produktions-Manifest der Live-Updates bleibt immer das der Produktion.
+ * Liest die öffentliche Konfiguration; ungültige Werte werden zu leeren Strings. Die App spricht – auch im Beta-Live-Update
+ * (DEPLOY_CHANNEL=preview) – die API der Produktion an: Deren Tokens akzeptiert Supabase beim Sync. Eine andere API für
+ * Beta-Bundles nur ausdrücklich per PUBLIC_PREVIEW_API_ORIGIN, und nur, wenn dieser Server mit demselben AUTH_JWT_KEY
+ * signiert (sonst „Anmeldung abgelaufen“ beim Sync). Das Produktions-Manifest bleibt immer das der Produktion.
  */
 export function readPublicConfig(channel: BuildChannel = deployChannel(process.env.DEPLOY_CHANNEL)): PublicConfig {
   loadDotEnvIfNeeded();
@@ -114,9 +109,7 @@ export function readPublicConfig(channel: BuildChannel = deployChannel(process.e
   const api: string = (process.env.PUBLIC_API_ORIGIN ?? '').trim();
   const productionOrigin: string = validApiOrigin(api) ? api : DEFAULT_API_ORIGIN;
   const previewApi: string = (process.env.PUBLIC_PREVIEW_API_ORIGIN ?? '').trim();
-  const apiOrigin: string = channel === 'preview'
-    ? (validApiOrigin(previewApi) ? previewApi : DEFAULT_PREVIEW_API_ORIGIN)
-    : productionOrigin;
+  const apiOrigin: string = channel === 'preview' && validApiOrigin(previewApi) ? previewApi : productionOrigin;
   const lu: string = (process.env.PUBLIC_LIVE_UPDATE_URL ?? '').trim();
   const luBeta: string = (process.env.PUBLIC_LIVE_UPDATE_BETA_URL ?? '').trim();
   return {
