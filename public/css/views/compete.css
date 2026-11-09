@@ -1,0 +1,38 @@
+/* Wettbewerbe, Challenge und Rangliste (src/views/compete.ts, challenge.ts, leaderboard.ts). Bausteine aus components.css. */
+@layer views {
+  .compete-text { font-size:var(--text-sm); line-height:1.5; color:var(--muted); }
+  .compete-notice {
+    display:flex; flex-direction:column; align-items:flex-start; gap:var(--space-3);
+    padding:var(--space-4); border:1px dashed var(--border); border-radius:var(--radius-md);
+  }
+  .compete-notice-text { font-size:var(--text-sm); line-height:1.5; color:var(--muted); }
+  .compete-actions { display:flex; flex-wrap:wrap; gap:var(--space-2); }
+  .compete-foot { font-size:var(--text-xs); line-height:1.45; color:var(--muted); }
+  .compete-rank { min-width:0; }
+
+  /* Rangliste: Platz als runde Marke, eigene Zeile hervorgehoben */
+  .compete-rank-no {
+    display:inline-flex; align-items:center; justify-content:center; min-width:32px; height:32px; padding:0 6px;
+    border-radius:var(--radius-pill); background:var(--surface-2); color:var(--text);
+    font-size:var(--text-sm); font-weight:var(--weight-semibold);
+  }
+  .row.is-me { background:var(--accent-soft); }
+  .row.is-me .compete-rank-no { background:var(--accent); color:var(--on-accent, #fff); }
+  .compete-gap { padding:var(--space-1) 0; text-align:center; color:var(--muted); letter-spacing:.2em; }
+
+  /* Blättern zwischen Tagen/Wochen */
+  .compete-nav { display:flex; align-items:center; justify-content:space-between; gap:var(--space-2); min-width:0; }
+  .compete-nav-label { flex:1; min-width:0; text-align:center; font-size:var(--text-sm); font-weight:var(--weight-semibold); }
+  .compete-nav-spacer { flex:none; width:var(--hit-min); }
+  .compete-groups:empty { display:none; }
+  .compete-groups .chip[aria-current="true"] { border-color:var(--accent); background:var(--accent-soft); color:var(--accent-text); }
+
+  /* Einladungscode */
+  .compete-code { text-transform:uppercase; letter-spacing:.18em; font-variant-numeric:tabular-nums; }
+  .compete-code-box {
+    display:flex; flex-direction:column; align-items:center; gap:var(--space-1);
+    padding:var(--space-4); border-radius:var(--radius-md); background:var(--surface-2);
+  }
+  .compete-code-label { font-size:var(--text-xs); color:var(--muted); }
+  .compete-code-value { font-size:var(--text-xl); font-weight:var(--weight-bold); letter-spacing:.2em; }
+}

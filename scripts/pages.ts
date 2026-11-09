@@ -102,7 +102,11 @@ export function helpPage(): string {
       <div class="contact"><strong>Kontakt</strong><span>${esc(CONTACT.name)}</span><span>E-Mail: ${esc(CONTACT.email)}</span></div>
       <h2>Häufige Fragen</h2>
       <h3>Brauche ich ein Konto?</h3>
-      <p>Nein. Alles funktioniert ohne Konto, deine Daten bleiben dann auf dem Gerät. Ein Konto brauchst du nur, wenn du mehrere Geräte synchronisieren willst.</p>
+      <p>Nein. Alles funktioniert ohne Konto, deine Daten bleiben dann auf dem Gerät. Ein Konto brauchst du nur, wenn du mehrere Geräte synchronisieren oder gewertet in Ranglisten und Gruppen spielen willst.</p>
+      <h3>Wie funktioniert die gewertete Daily Challenge?</h3>
+      <p>Mit Konto bekommen alle am selben Tag (Mitternacht deutscher Zeit) dieselben 15 Aufgaben, und du hast genau einen Versuch. Er zählt ab „Start“ – wer abbricht oder die App schließt, hat ihn verbraucht. Danach siehst du deinen Platz in der Rangliste und kannst die Aufgaben ungewertet nachüben. Ohne Konto bleibt die Daily ungewertet.</p>
+      <h3>Wie lade ich Freunde in eine Gruppe ein?</h3>
+      <p>Heute → Wettbewerbe &amp; Ranglisten → Gruppe erstellen, dann in der Gruppe „Einladen“. Andere treten mit dem Link oder dem sechsstelligen Code bei. Wer die Gruppe angelegt hat, kann dort eigene Wettbewerbe starten (1–7 Tage, Kategorie, Anzahl, Stufe).</p>
       <h3>Wie melde ich mich an?</h3>
       <p>Mit einem Passkey (Face ID, Touch ID oder Gerätecode), ohne E-Mail und Passwort: Profil → Anmelden oder Konto erstellen.</p>
       <h3>Ich habe meinen Passkey verloren.</h3>
@@ -122,7 +126,11 @@ export function helpPage(): string {
       <div class="contact"><strong>Contact</strong><span>${esc(CONTACT.name)}</span><span>Email: ${esc(CONTACT.email)}</span></div>
       <h2>FAQ</h2>
       <h3>Do I need an account?</h3>
-      <p>No. Everything works without an account; your data then stays on your device. You only need an account to sync several devices.</p>
+      <p>No. Everything works without an account; your data then stays on your device. You only need an account to sync several devices or to play ranked on leaderboards and in groups.</p>
+      <h3>How does the ranked daily challenge work?</h3>
+      <p>With an account, everyone gets the same 15 tasks on the same day (midnight German time), and you have exactly one attempt. It counts from “Start” – quitting or closing the app uses it up. Afterwards you see your rank on the leaderboard and can practice the tasks unranked. Without an account the daily stays unranked.</p>
+      <h3>How do I invite friends to a group?</h3>
+      <p>Today → Competitions &amp; leaderboards → Create group, then “Invite” in the group. Others join with the link or the six-character code. The person who created the group can start its own competitions there (1–7 days, category, number, level).</p>
       <h3>How do I sign in?</h3>
       <p>With a passkey (Face ID, Touch ID or device passcode) – no email, no password: Profile → Sign in or create account.</p>
       <h3>I lost my passkey.</h3>
@@ -172,6 +180,9 @@ export function privacyPage(): string {
       <p>Die Daten liegen bei Supabase, Inc. in einem Rechenzentrum in der EU. Rechtsgrundlage ist Art. 6 Abs. 1 lit. b DSGVO (Bereitstellung des Kontos, das du anlegst).</p>
       <p>Auf der Website hält ein technisch notwendiges Cookie („mm_rt“, HttpOnly, 30 Tage) deine Anmeldung; es dient keinem anderen Zweck (§ 25 Abs. 2 TDDDG). In der iOS-App liegt dieser Anmeldeschlüssel stattdessen im Schlüsselbund des Geräts.</p>
       <p>Unter Profil → Konto löschen löschst du dein Konto, deine Passkeys und alle synchronisierten Daten auf dem Server. Die Daten auf dem Gerät bleiben, bis du sie dort löschst.</p>
+      <h3>Ranglisten, Wettbewerbe und Gruppen (optional, nur mit Konto)</h3>
+      <p>Spielst du die Daily Challenge oder einen Wettbewerb gewertet, speichern wir zu deinem Konto: Beginn und Ende des Versuchs, deine Antworten mit der Zeit je Aufgabe sowie das Ergebnis (richtige Antworten, Punkte, Gesamtzeit). Für Ranglisten und Gruppen legst du einen öffentlichen Namen fest (3–20 Zeichen, frei wählbar, getrennt von deinem Benutzernamen). In globalen Ranglisten erscheint er nur, wenn du „In globalen Ranglisten zeigen“ einschaltest – sonst stehst du dort als „Anonym“. Mitglieder einer Gruppe, der du beitrittst, sehen deinen Namen und deine Ergebnisse in der Gruppen-Rangliste. Gruppen speichern Name, Einladungscode, wer sie angelegt hat und wer Mitglied ist.</p>
+      <p>Rechtsgrundlage ist Art. 6 Abs. 1 lit. b DSGVO (die gewerteten Funktionen, die du nutzt). Versuche und Wettbewerbe werden rund 13 Monate nach ihrem Ende gelöscht. Den Namen und die Sichtbarkeit änderst du unter Wettbewerbe → Dein Name in Ranglisten; Gruppen verlässt du dort jederzeit. Mit dem Löschen des Kontos verschwinden auch Versuche, Name, Mitgliedschaften und von dir angelegte Gruppen.</p>
 
       <h2>5. Erinnerungen (optional)</h2>
       <p><strong>Website (Web Push):</strong> Wenn du Erinnerungen einschaltest, speichern wir auf dem Server dein Push-Abonnement (die Adresse beim Push-Dienst deines Browsers, z. B. Apple, Google oder Mozilla, mit den zugehörigen Schlüsseln), eine zufällige Geräte-ID, einen Hash-Wert eines Geräte-Geheimnisses, Zeitzone, Sprache, deine Erinnerungs-Einstellungen und einen knappen Lernstand (Serie, ob das Tagesziel erreicht ist, Zahl fälliger Wiederholungen, bis zu drei schwache Aufgabentypen). Zugestellt werden die Mitteilungen über den Push-Dienst des Browser-Herstellers. Rechtsgrundlage ist deine Einwilligung (Art. 6 Abs. 1 lit. a DSGVO), die du durch Ausschalten jederzeit widerrufen kannst; dabei wird das Abonnement auf dem Server gelöscht.</p>
@@ -211,6 +222,9 @@ export function privacyPage(): string {
       <p>The data is stored with Supabase, Inc. in a data centre in the EU. The legal basis is Art. 6(1)(b) GDPR (providing the account you create).</p>
       <p>On the website, a strictly necessary cookie (“mm_rt”, HttpOnly, 30 days) keeps you signed in and serves no other purpose. In the iOS app, this sign-in key is kept in the device keychain instead.</p>
       <p>Profile → Delete account deletes your account, your passkeys and all synced data on the server. Data on your device stays until you delete it there.</p>
+      <h3>Leaderboards, competitions and groups (optional, account only)</h3>
+      <p>When you play the daily challenge or a competition ranked, we store with your account: start and end of the attempt, your answers with the time per task and the result (correct answers, points, total time). For leaderboards and groups you choose a public name (3–20 characters, freely chosen, separate from your username). On global leaderboards it only appears if you turn on “Show on global leaderboards” – otherwise you appear as “Anonymous”. Members of a group you join see your name and your results on the group leaderboard. Groups store their name, invite code, who created them and who is a member.</p>
+      <p>The legal basis is Art. 6(1)(b) GDPR (the ranked features you use). Attempts and competitions are deleted about 13 months after they end. You change your name and visibility under Competitions → Your name on leaderboards and can leave groups there at any time. Deleting your account also removes your attempts, name, memberships and groups you created.</p>
 
       <h2>5. Reminders (optional)</h2>
       <p><strong>Website (web push):</strong> When you turn reminders on, we store on the server your push subscription (the address at your browser’s push service, e.g. Apple, Google or Mozilla, with its keys), a random device ID, a hash of a device secret, time zone, language, your reminder settings and a brief learning status (streak, whether the daily goal is met, number of due reviews, up to three weak task types). Notifications are delivered through the browser vendor’s push service. The legal basis is your consent (Art. 6(1)(a) GDPR), which you can withdraw at any time by turning reminders off; the subscription is then deleted from the server.</p>

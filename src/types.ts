@@ -49,6 +49,10 @@ interface TaskBase {
   weight: number;
   level: Level;
   params: Params;
+  /** Einstieg unter „Leicht“ (adaptive Vorstufe, z. B. 1×1 mit ×2, ×5, ×10) */
+  basic?: boolean;
+  /** Grundlage, die für diesen Typ dazwischen geübt wird (adaptive Vorstufe) */
+  foundationFor?: SubtypeId;
 }
 export interface NumberTask extends TaskBase { kind?: 'number'; expected: number }
 export interface ChoiceTask extends TaskBase { kind: 'choice'; choices: string[]; /** Index der richtigen Option */ expected: number }
@@ -61,7 +65,12 @@ export interface CustomRange {
   bMin?: number; bMax?: number;
 }
 
-export interface GenerateOptions { level?: Level; custom?: CustomRange }
+export interface GenerateOptions {
+  level?: Level;
+  custom?: CustomRange;
+  /** Einstieg unter „Leicht“ – nur Typen mit eigenem Einstieg (src/core/adaptive.ts → HAS_BASIC) */
+  basic?: boolean;
+}
 
 // ---------- Modi ----------
 /** Kategorie-ID | Subtyp-ID | Spezialmodi */
@@ -188,6 +197,8 @@ export interface Settings {
   reviewAskedAt: number;
   /** Einführung gesehen (abgeschlossen oder übersprungen); geräte-lokal */
   onboardingDone: boolean;
+  /** Ergebnis des Einstufungstests (0 = Grundlagen … 6 = Profi) und wann; null = keiner gemacht (src/core/placement.ts) */
+  placement: { theta: number; ts: number } | null;
 }
 
 export interface ReviewItem { box: number; dueAt: number; lastTs: number }

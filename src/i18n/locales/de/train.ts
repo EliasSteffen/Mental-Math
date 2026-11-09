@@ -71,4 +71,7 @@ export const train = {
   copyFail: 'Kopieren nicht möglich',
   notPossible: 'Nicht möglich',
   share: 'Teilen',
+  // Adaptive Schwierigkeit (src/core/adaptive.ts)
+  foundationPill: 'Grundlage für {sub}',
+  levelBasic: 'Einstieg',
 } as const;

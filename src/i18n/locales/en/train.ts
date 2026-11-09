@@ -73,4 +73,7 @@ export const train: Record<keyof typeof De, string> = {
   copyFail: 'Copy not possible',
   notPossible: 'Not possible',
   share: 'Share',
+  // Adaptive difficulty (src/core/adaptive.ts)
+  foundationPill: 'Foundation for {sub}',
+  levelBasic: 'Starter',
 };

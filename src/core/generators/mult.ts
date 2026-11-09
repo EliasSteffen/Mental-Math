@@ -5,7 +5,12 @@ import { task, lv, decHint, placesHint, pctHint, UNIT_VALUE, bigStr } from './he
 import type { Gen } from './helpers.ts';
 
 export const multGen: Record<string, Gen> = {
-  'mult.2x1': (rng: Rng, L: Level): Task => {
+  'mult.2x1': (rng: Rng, L: Level, o): Task => {
+    // Einstieg: kleine Zahlen und kleine Faktoren (z. B. 14 × 3), ohne Übertrag-Fallen
+    if (o?.basic) {
+      const a = randInt(11, 25, rng), b = pick([2, 3, 4, 5], rng);
+      return task('mult.2x1', { params: { a, b }, prompt: `${fmt(a)} × ${fmt(b)}`, expected: a * b });
+    }
     for (;;) {
       const a = randInt(lv(L, 12, 12, 111), lv(L, 49, 99, 399), rng), b = randInt(lv(L, 3, 3, 6), lv(L, 6, 9, 9), rng);
       if (L === 3 && a % 10 === 0) continue;

@@ -19,4 +19,9 @@ export const onboarding = {
   progressText: 'Deine Statistik, deine Schwächen und fällige Wiederholungen auf einen Blick.',
   profileTitle: 'Profil',
   profileText: 'Erinnerungen, Darstellung und – wenn du willst – ein Konto mit Passkey, um zwischen deinen Geräten zu synchronisieren.',
+  // Einstufungstest als letzter Schritt
+  placementTitle: 'Wo stehst du?',
+  placementText: 'Ein kurzer Einstufungstest – bis zu 10 Aufgaben, ca. 2 Minuten – stellt die Schwierigkeit für dich ein. Du kannst ihn auch später unter Profil → Training machen.',
+  placementStart: 'Test starten',
+  later: 'Später',
 } as const;

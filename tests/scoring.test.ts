@@ -158,15 +158,16 @@ test('untimed: timeFactor 1, speed ignoriert', () => {
   assert.equal(skill([att({ untimed: true }), att({ untimed: true }), att({ untimed: true })]).speed, 0);
 });
 
-test('levelFor', () => {
+test('levelFor: Auto folgt der Treppe (3 sichere Treffer hoch, 2 Fehler unter 4 runter), feste Stufe bleibt', () => {
   const mk = (n: number, ok: boolean) => Array(n).fill(0).map(() => att({ correct: ok, timeMs: 5000 }));
   assert.equal(levelFor('pct.of', [], 'auto'), 1);
   assert.equal(levelFor('pct.of', mk(2, true), 'auto'), 1);
-  assert.equal(levelFor('pct.of', mk(5, false), 'auto'), 1);
-  assert.equal(levelFor('pct.of', mk(5, true), 'auto'), 3);
-  assert.equal(levelFor('pct.of', [...mk(3, true), ...mk(2, false)], 'auto'), 2);
-  assert.equal(levelFor('pct.of', mk(5, true).map((a) => ({ ...a, subtype: 'x' })), 'auto'), 1);
+  assert.equal(levelFor('pct.of', mk(3, true), 'auto'), 2);
+  assert.equal(levelFor('pct.of', mk(6, true), 'auto'), 3);
+  assert.equal(levelFor('pct.of', mk(5, false), 'auto'), 1); // Vorstufe zählt als „Leicht“
+  assert.equal(levelFor('pct.of', [...mk(3, true), ...mk(2, false)], 'auto'), 1);
+  assert.equal(levelFor('pct.of', mk(6, true).map((a) => ({ ...a, subtype: 'x' })), 'auto'), 1);
   assert.equal(levelFor('pct.of', mk(5, false), 3), 3);
-  assert.equal(levelFor('pct.of', mk(5, true), '1'), 1);
-  assert.equal(levelFor('pct.of', mk(5, true)), 3);
+  assert.equal(levelFor('pct.of', mk(6, true), '1'), 1);
+  assert.equal(levelFor('pct.of', mk(6, true)), 3);
 });

@@ -9,11 +9,11 @@ import { toast } from '../ui/toast.ts';
 import { confirmDialog, openModal } from '../ui/modal.ts';
 import { openChangelog, fmtIsoDate } from '../features/whats-new.ts';
 import { BUILD_INFO } from '../generated/build-info.ts';
-import { detectLang, setLang, t } from '../i18n/index.ts';
+import { detectLang, setLang, t, locale } from '../i18n/index.ts';
 import { CATEGORIES } from '../core/catalog.ts';
 import { fmt } from '../core/numbers.ts';
 import { app, h, appendChildren, type Child } from '../ui/dom.ts';
-import { rerender, addCleanup } from '../router.ts';
+import { rerender, addCleanup, go } from '../router.ts';
 import { button, group, icon, largeTitle, list, row, segmented, setButtonLabel, stepper, switchRow, type SwitchControl } from '../ui/kit.ts';
 import { openSheet, type SheetHandle } from '../ui/sheet.ts';
 import type { PasskeyInfo, RecoveryStatus } from '../vendor/auth.ts';
@@ -82,6 +82,7 @@ function trainingGroup(s: Settings): HTMLElement {
     label: t('settings.difficulty'),
     options: [['auto', t('settings.diffAuto')], ['1', t('settings.diffEasy')], ['2', t('settings.diffMedium')], ['3', t('settings.diffHard')]],
     value: s.difficulty === 'auto' ? 'auto' : (String(s.difficulty) as DiffValue),
+    help: t('settings.diffHelp'),
     onChange: (v) => save({ difficulty: v === 'auto' ? 'auto' : (Number(v) as Level) }),
   });
 
@@ -113,8 +114,17 @@ function trainingGroup(s: Settings): HTMLElement {
     onChange: (n) => save({ dailyGoalMin: n }),
   });
 
+  // Einstufungstest: Startstufe neu bestimmen (stellt die Schwierigkeit auf „Auto“)
+  const placed = s.placement;
+  const placement = row({
+    icon: 'target', label: t('settings.placement'), href: '#/einstufung',
+    sub: placed
+      ? t('settings.placementDone', { name: t(`placement.theta${placed.theta}`), date: new Date(placed.ts).toLocaleDateString(locale()) })
+      : t('settings.placementNone'),
+  });
+
   return profGroup(t('settings.training'), list([
-    diff.el, len.el, timer.el, goal,
+    diff.el, placement, len.el, timer.el, goal,
     switchRow({ label: t('settings.breathe'), help: t('settings.breatheHelp'), checked: s.breathe, onChange: (v) => save({ breathe: v }) }).el,
     switchRow({ label: t('settings.confetti'), help: t('settings.confettiHelp'), checked: s.confetti, onChange: (v) => save({ confetti: v }) }).el,
   ]));
@@ -272,7 +282,7 @@ function aboutGroup(): HTMLElement {
     icon: 'info', label: t('settings.news'), value: BUILD_INFO.version, chevron: true, onClick: () => openChangelog(),
   });
   const intro = row({
-    icon: 'bulb', label: t('onboarding.replay'), chevron: true, onClick: () => showOnboarding(openAccountOnProfile),
+    icon: 'bulb', label: t('onboarding.replay'), chevron: true, onClick: () => showOnboarding(openAccountOnProfile, () => go('#/einstufung')),
     attrs: { 'aria-haspopup': 'dialog' },
   });
   // „Version 1.10.0“; das Wort entfällt unter 360 px (profile.css)
@@ -889,7 +899,10 @@ function accountCard(): HTMLElement {
     if (key === lastKey) return;
     lastKey = key;
     sync = syncRow();
-    box.replaceChildren(...[accountHead(st), sync].filter((x): x is HTMLElement => x !== null));
+    const compete = st.status === 'signed-in'
+      ? row({ icon: 'trophy', label: t('compete.title'), sub: t('compete.subtitle'), href: '#/wettbewerbe' })
+      : null;
+    box.replaceChildren(...[accountHead(st), sync, compete].filter((x): x is HTMLElement => x !== null));
   };
   draw();
   addCleanup(acct.onAccountChange(draw));

@@ -5,6 +5,7 @@ import type {
 import { SUBTYPES, CATEGORIES, activeCategories } from './catalog.ts';
 import { t } from '../i18n/index.ts';
 import { unitFactor } from './numbers.ts';
+import { adaptiveStep } from './adaptive.ts';
 
 const clamp = (x: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, x));
 const mean = (xs: number[]): number => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0);
@@ -88,13 +89,14 @@ export function skill(attempts: Attempt[] | null | undefined, window = 25): Skil
   };
 }
 
-// Schwierigkeit für einen Subtyp: setting 'auto' | 1 | 2 | 3
+/**
+ * Schwierigkeit für einen Subtyp: setting 'auto' | 1 | 2 | 3. „Auto“ folgt der Treppe aus src/core/adaptive.ts
+ * (3 sichere Treffer → höher, 2 Fehler unter den letzten 4 → tiefer); die Vorstufe „Grundlagen“ zählt hier als 1.
+ */
 export function levelFor(subtypeId: SubtypeId, attempts: Attempt[] | null | undefined, setting: DifficultySetting | string | number = 'auto'): Level {
   const n = Number(setting);
   if (n === 1 || n === 2 || n === 3) return n;
-  const sk = skill((attempts || []).filter((a) => a.subtype === subtypeId));
-  if (sk.score === null || sk.score < 60) return 1;
-  return sk.score >= 85 ? 3 : 2;
+  return Math.max(1, adaptiveStep(subtypeId, attempts)) as Level;
 }
 
 function groupBy(attempts: Attempt[] | null | undefined, key: 'category' | 'subtype'): Record<string, Attempt[]> {

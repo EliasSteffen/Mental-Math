@@ -17,8 +17,10 @@ const EXIT_MS = 220;
 export type OnboardingEnd = 'done' | 'skip';
 
 export interface OnboardingOptions {
-  /** Zusatzknopf im letzten Schritt (Konto); läuft nach dem Schließen. Ohne = kein Knopf. */
+  /** Zusatzknopf im Schritt „Profil“ (Konto); läuft nach dem Schließen. Ohne = kein Knopf. */
   account?: { label: string; icon?: IconName; onClick: () => void } | null;
+  /** Einstufungstest als letzter Schritt („Test starten“ / „Später“); läuft nach dem Schließen. Ohne = Schritt entfällt. */
+  placement?: { onStart: () => void } | null;
   /** Läuft genau einmal: 'done' = „Los geht’s“ bzw. Konto, 'skip' = Überspringen, Esc, Zurück-Geste */
   onClose?: (end: OnboardingEnd) => void;
 }
@@ -27,9 +29,9 @@ let uid = 0;
 let active: { close(end: OnboardingEnd): void } | null = null;
 
 /** Inhalt eines Schritts (`extra`: Konto-Knopf im letzten Schritt); ohne `ids` als Platzhalter für die Höhe. */
-function panelContent(step: OnboardingStep, index: number, extra: Node | null, ids?: { title: string; text: string }): Node[] {
+function panelContent(step: OnboardingStep, index: number, total: number, extra: Node | null, ids?: { title: string; text: string }): Node[] {
   return [
-    h('span', { class: 'sr-only' }, t('onboarding.stepOf', { n: index + 1, total: ONBOARDING_STEPS.length })),
+    h('span', { class: 'sr-only' }, t('onboarding.stepOf', { n: index + 1, total })),
     h('span', { class: 'onboard-icon', 'aria-hidden': 'true' }, icon(step.icon, 32)),
     h('h2', { class: 'onboard-title', id: ids?.title }, t(step.titleKey)),
     h('p', { class: 'onboard-text', id: ids?.text }, t(step.textKey)),
@@ -42,8 +44,12 @@ export function openOnboarding(o: OnboardingOptions = {}): { close(): void } {
   if (active) return { close: () => active?.close('skip') };
   const id = `onboard-${++uid}`;
   const ids = { title: `${id}-t`, text: `${id}-d` };
-  const steps = ONBOARDING_STEPS;
+  const steps = o.placement ? ONBOARDING_STEPS : ONBOARDING_STEPS.filter((s) => s.id !== 'placement');
   const lastIndex = steps.length - 1;
+  const placement = o.placement ?? null;
+  const accountIndex = steps.findIndex((s) => s.id === 'profile');
+  /** Letzter Schritt ist das Angebot des Einstufungstests: „Test starten“ statt „Los geht’s“, „Später“ statt „Überspringen“ */
+  const offersTest = placement !== null && steps[lastIndex]?.id === 'placement';
   const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
   let index = 0;
   let state: 'open' | 'closing' | 'closed' = 'open';
@@ -64,9 +70,9 @@ export function openOnboarding(o: OnboardingOptions = {}): { close(): void } {
   // Grid-Feld alle Schritte unsichtbar, damit die Höhe der des längsten entspricht
   const live = h('div', { class: 'onboard-panel is-live', 'aria-live': 'polite', 'aria-atomic': 'true' });
   const ghosts = steps.map((s, i) => {
-    const extra = i === lastIndex && acct ? accountButton() : null;
+    const extra = i === accountIndex && acct ? accountButton() : null;
     extra?.setAttribute('tabindex', '-1');
-    return h('div', { class: 'onboard-panel is-ghost', 'aria-hidden': 'true' }, ...panelContent(s, i, extra));
+    return h('div', { class: 'onboard-panel is-ghost', 'aria-hidden': 'true' }, ...panelContent(s, i, steps.length, extra));
   });
   const stage = h('div', { class: 'onboard-stage' }, ...ghosts, live);
 
@@ -74,7 +80,10 @@ export function openOnboarding(o: OnboardingOptions = {}): { close(): void } {
   const backBtn = button({ label: t('onboarding.back'), kind: 'quiet', icon: 'chevron-left', onClick: () => show(index - 1) });
   const nextBtn = button({ label: t('onboarding.next'), kind: 'primary', cta: false, onClick: () => {
     if (index < lastIndex) show(index + 1);
-    else close('done');
+    else {
+      if (offersTest && placement) after = placement.onStart;
+      close('done');
+    }
   } });
   const dots = h('div', { class: 'onboard-dots', 'aria-hidden': 'true' }, ...steps.map(() => h('span', { class: 'onboard-dot' })));
 
@@ -91,7 +100,7 @@ export function openOnboarding(o: OnboardingOptions = {}): { close(): void } {
     index = i;
     const step = steps[i];
     if (!step) return;
-    live.replaceChildren(...panelContent(step, i, i === lastIndex ? accountBtn : null, ids));
+    live.replaceChildren(...panelContent(step, i, steps.length, i === accountIndex ? accountBtn : null, ids));
     live.classList.remove('is-fwd', 'is-back');
     if (dir !== 0) {
       void live.offsetWidth; // Animation neu starten
@@ -99,8 +108,11 @@ export function openOnboarding(o: OnboardingOptions = {}): { close(): void } {
     }
     dots.querySelectorAll('.onboard-dot').forEach((d, k) => d.classList.toggle('is-active', k === i));
     backBtn.hidden = i === 0;
-    skipBtn.hidden = i === lastIndex;
-    setButtonLabel(nextBtn, t(i === lastIndex ? 'onboarding.done' : 'onboarding.next'));
+    const last = i === lastIndex;
+    // Beim Test-Angebot bleibt oben „Später“ (schließt ohne Test); sonst entfällt „Überspringen“ am Ende
+    skipBtn.hidden = last && !offersTest;
+    setButtonLabel(skipBtn, t(last && offersTest ? 'onboarding.later' : 'onboarding.skip'));
+    setButtonLabel(nextBtn, t(last ? (offersTest ? 'onboarding.placementStart' : 'onboarding.done') : 'onboarding.next'));
     // Fokus auf einem nun versteckten Knopf (Zurück auf Schritt 1, Überspringen am Ende) → Weiter
     const focused = document.activeElement;
     if (!(focused instanceof HTMLElement) || !el.contains(focused) || focused.closest('[hidden]')) nextBtn.focus({ preventScroll: true });
@@ -171,14 +183,16 @@ export function openOnboarding(o: OnboardingOptions = {}): { close(): void } {
 /**
  * Einführung zeigen und als gesehen merken – beim Abschließen wie beim Überspringen (geräte-lokal).
  * `onAccount` öffnet das Konto (Profil + Konto-Sheet); ohne Konto-Funktion entfällt der Knopf.
+ * `onPlacement` startet den Einstufungstest (letzter Schritt); ohne entfällt der Schritt.
  */
-export function showOnboarding(onAccount?: () => void): void {
+export function showOnboarding(onAccount?: () => void, onPlacement?: () => void): void {
   const st = getAccountState();
   const account = onAccount && accountEnabled() && st.status !== 'disabled'
     ? { label: t(st.status === 'signed-out' ? 'onboarding.createAccount' : 'onboarding.openAccount'), onClick: onAccount }
     : null;
   openOnboarding({
     account,
+    placement: onPlacement ? { onStart: onPlacement } : null,
     onClose: () => { if (!getSettings().onboardingDone) setSettings({ onboardingDone: true }); },
   });
 }
