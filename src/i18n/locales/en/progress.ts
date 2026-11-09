@@ -1,6 +1,6 @@
-import type { analyse as De } from '../de/analyse.ts';
+import type { analyse as De } from '../de/progress.ts';
 
-// Namespace 'analyse' (English) – muss exakt dieselben Schlüssel wie de/analyse.ts haben
+// Namespace 'analyse' (English) – muss exakt dieselben Schlüssel wie de/progress.ts haben
 export const analyse: Record<keyof typeof De, string> = {
   title: 'Progress',
   sub: 'Last 7 days',

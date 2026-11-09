@@ -27,12 +27,14 @@
     title: 'Mental Math startet nicht',
     text: 'Die App hat sich nicht aufgebaut. Deine Daten sind sicher. Meist hilft es, den App-Cache zu leeren.',
     none: 'Kein Fehler aufgezeichnet.',
+    blocker: 'Ein Teil der App wurde nicht geladen. Nutzt du einen Werbe- oder Tracking-Blocker? Dann schalte ihn für diese Seite aus und lade neu.',
     reload: 'Neu laden',
     reset: 'App-Cache leeren und neu laden'
   } : {
     title: 'Mental Math did not start',
     text: 'The app did not build its page. Your data is safe. Clearing the app cache usually helps.',
     none: 'No error recorded.',
+    blocker: 'Part of the app did not load. Are you using an ad or tracking blocker? Then turn it off for this site and reload.',
     reload: 'Reload',
     reset: 'Clear app cache and reload'
   };
@@ -70,6 +72,8 @@
     box.setAttribute('role', 'alert');
     box.appendChild(el('h1', 'crash-title', T.title));
     box.appendChild(el('p', 'crash-text', T.text));
+    // Datei nicht geladen: oft blockiert ein Inhaltsblocker ein einzelnes Modul (dann scheitert der ganze Modulgraph)
+    if (errors.some(function (x) { return x.indexOf('Laden fehlgeschlagen') === 0; })) box.appendChild(el('p', 'crash-text', T.blocker));
     box.appendChild(el('pre', 'crash-report', (errors.length ? errors.join('\n\n') : T.none) + '\n' + navigator.userAgent));
     var reload = el('button', 'btn primary is-full press');
     reload.type = 'button';

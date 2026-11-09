@@ -9,7 +9,7 @@ import { onChange } from '../data/storage.ts';
 import { currentReminderState } from '../features/reminder-input.ts';
 import { getLang, onLangChange } from '../i18n/index.ts';
 import { loadNative } from './native.ts';
-import type { EnableResult, PushConfig, PushSupport, TestResult } from './web-push.ts';
+import type { EnableResult, PushConfig, PushSupport, TestResult } from './web-reminders.ts';
 
 const KEY = 'mm:v3:reminders.local';
 /** Zwei Wochen vorausplanen; wer so lange nicht öffnet, bekommt danach keine Erinnerungen mehr */
@@ -129,7 +129,7 @@ function replanSoon(ms: number): void {
   timer = setTimeout(() => { timer = null; void replan(); }, ms);
 }
 
-/* ---------- Öffentliche API (wie web-push.ts) ---------- */
+/* ---------- Öffentliche API (wie web-reminders.ts) ---------- */
 
 export function pushSupport(): PushSupport {
   return 'ok';
