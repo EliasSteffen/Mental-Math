@@ -4,6 +4,13 @@ Alle nennenswerten Änderungen an Mental Math. Format nach [Keep a Changelog](ht
 
 <!-- Automatisch erzeugt mit `npm run changelog` aus src/releases.ts – nicht von Hand bearbeiten. -->
 
+## [1.17.1] - 2026-11-09
+
+### Updates, die man nicht übersieht
+
+- Eine neue Version meldet sich jetzt mit einer großen Karte statt einer kleinen Pille: mit Fortschritt beim Laden und einem Knopf, der so groß ist wie „Jetzt üben“.
+- Behoben: In der Beta-App stand dauerhaft „Anmeldung abgelaufen“, und Änderungen wurden nicht mehr zwischen den Geräten abgeglichen.
+
 ## [1.17.0] - 2026-11-08
 
 ### Ranglisten & Wettbewerbe
