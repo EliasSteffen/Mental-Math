@@ -1,10 +1,14 @@
 // Namespace 'compete' (Deutsch): gewertete Daily, Wettbewerbe, Ranglisten, Gruppen – Zugriff über t('compete.key')
 export const compete = {
-  title: 'Wettbewerbe',
+  title: 'Wettkampf',
   subtitle: 'Daily, Ranglisten und Gruppen',
   loading: 'Wird geladen …',
   retry: 'Erneut versuchen',
-  backToHub: 'Wettbewerbe',
+  backToHub: 'Wettkampf',
+  heroCompete: 'Jetzt antreten',
+  heroResult: 'Ergebnis ansehen',
+  heroDetails: 'Details',
+  boardAll: 'Alle anzeigen',
   offline: 'Gerade offline',
   noAccountBuild: 'Ranglisten und Wettbewerbe gibt es nur mit Konto – in dieser Version ist kein Konto verfügbar.',
   needAccount: 'Gewertet wird mit Konto: Alle bekommen dieselben Aufgaben, jede Person hat genau einen Versuch, und dein Ergebnis landet in der Rangliste. Ein Konto legst du in Sekunden mit einem Passkey an – ohne E-Mail.',

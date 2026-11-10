@@ -33,6 +33,7 @@ export const common: Record<keyof typeof De, string> = {
   mainNav: 'Main navigation',
   tabToday: 'Today',
   tabLearn: 'Learn',
+  tabCompete: 'Compete',
   tabProgress: 'Progress',
   tabProfile: 'Profile',
   // Themes

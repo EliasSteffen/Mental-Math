@@ -50,6 +50,9 @@
   .row-value.is-accent { color:var(--accent-text); font-weight:var(--weight-semibold); }
   .row-chevron { display:flex; flex:none; color:var(--muted); }
   .row.is-danger, .row.is-danger .row-icon { color:var(--bad); }
+  /* Geöffneter Eintrag im Master-Detail */
+  .row[aria-current="true"] { background:var(--accent-soft); }
+  .row[aria-current="true"] .row-label { color:var(--accent-text); font-weight:var(--weight-semibold); }
 
   /* Ergebniszeile: Status-Punkt (8 px), Aufgabe, deine/richtige Antwort */
   .row.is-result { min-height:64px; padding-block:10px; }
@@ -118,8 +121,8 @@
     scrollbar-width:none;
   }
   .chips::-webkit-scrollbar { display:none; }
-  /* Ab 768 px umbrechen statt horizontal scrollen (genug Breite für alle Chips) */
-  @media (min-width: 768px) {
+  /* Ab 720 px umbrechen statt horizontal scrollen (genug Breite für alle Chips) */
+  @media (min-width: 720px) {
     .chips.is-wrap { flex-wrap:wrap; overflow-x:visible; margin-inline:0; padding-inline:0; }
   }
   .chip {
@@ -375,6 +378,17 @@
   /* Kleine Bildschirme: kompakter, damit das Antwortfeld über dem Dock sichtbar bleibt */
   @media (max-height: 640px) {
     .numpad { grid-auto-rows:46px; gap:6px; }
+  }
+  /* iPad: große Tasten, auch zum Tippen im Halten */
+  @media (min-width: 720px) and (min-height: 641px) {
+    .numpad { grid-auto-rows:68px; gap:var(--space-3); }
+    .numpad-key { font-size:32px; }
+    .numpad-key.is-zeros { font-size:24px; }
+    .numpad-check { font-size:var(--text-lg); }
+  }
+  /* iPad quer mit Tastenfeld unter der Aufgabe: flachere Tasten, damit die Aufgabe genug Höhe behält */
+  @media (min-width: 1024px) and (min-height: 641px) and (max-height: 900px) and (pointer: coarse) {
+    body[data-keypad-side="center"] .numpad { grid-auto-rows:56px; gap:var(--space-2); }
   }
 
   /* ---------- Balkenliste (genau ein Muster, Fix T1) ---------- */

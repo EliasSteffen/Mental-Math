@@ -250,6 +250,8 @@ export async function liveUpdateReady(): Promise<void> {
     save(after);
     if (before.trial && !after.trial) log('Probelauf bestanden', before.trial.version, before.trial.id);
   }
+  // Aufnahme des Store-Videos (scripts/record-preview.ts): kein neues Bundle mitten in der Aufnahme
+  if (document.querySelector('meta[name="mm-record"]')) return;
   // Bei jedem Start prüfen (Kaltstarts sind selten, Fehlerbehebungen sollen schnell ankommen), bei Rückkehr gedrosselt
   setTimeout(() => { void check(true); }, FIRST_CHECK_DELAY_MS);
   onNativeResume(() => { void check(false); });

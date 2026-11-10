@@ -119,6 +119,16 @@ function syncStatusBar(m: NativeModule): void {
   void m.StatusBar.setStyle({ style: scheme === 'light' ? m.Style.Light : m.Style.Dark }).catch(() => undefined);
 }
 
+/** Ab dieser Scroll-Position (px) liegt Inhalt unter der Statusleiste. */
+const SCROLLED_PX = 8;
+
+/** Schleier hinter der Statusleiste nur, solange Inhalt darunter liegt (html.is-scrolled, base.css). */
+function trackScrolled(): void {
+  const sync = (): void => { document.documentElement.classList.toggle('is-scrolled', window.scrollY > SCROLLED_PX); };
+  window.addEventListener('scroll', sync, { passive: true });
+  sync();
+}
+
 /** Erinnerung angetippt: Hash-Route aus extra.url ('/#/train/review') öffnen. */
 function openRoute(extra: unknown): void {
   const url = (extra as { url?: unknown } | null)?.url;
@@ -143,6 +153,7 @@ export function startNative(): void {
   document.querySelector('meta[name="viewport"]')?.setAttribute(
     'content', 'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover');
   document.addEventListener('click', onLinkClick, true);
+  trackScrolled();
   void loadNative().then((m) => {
     syncStatusBar(m);
     new MutationObserver(() => syncStatusBar(m)).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });

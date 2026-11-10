@@ -5,7 +5,7 @@
 import { h } from './dom.ts';
 import { button, icon, setButtonLabel, type IconName } from './kit.ts';
 import { lockScroll } from './scroll-lock.ts';
-import { trackModal } from './modal.ts';
+import { openModal, trackModal } from './modal.ts';
 import { t } from '../i18n/index.ts';
 import { ONBOARDING_STEPS, stepForKey, swipeStep, type OnboardingStep } from '../features/onboarding.ts';
 import { getSettings, setSettings } from '../data/storage.ts';
@@ -178,6 +178,52 @@ export function openOnboarding(o: OnboardingOptions = {}): { close(): void } {
 
   active = { close };
   return { close: () => close('skip') };
+}
+
+/** Nach dem Rundgang: Einstufungstest, Konto oder direkt loslegen (läuft nach dem Schließen, auf den echten Daten). */
+function showTourEnd(onAccount?: () => void, onPlacement?: () => void): void {
+  let next: (() => void) | null = null;
+  const st = getAccountState();
+  const offerAccount = onAccount && accountEnabled() && st.status !== 'disabled' && st.status !== 'signed-in';
+  openModal({
+    title: t('tour.endTitle'),
+    body: t('tour.endText'),
+    actions: [
+      { label: t('tour.endLater'), primary: !onPlacement },
+      ...(offerAccount ? [{ label: t('onboarding.createAccount'), onClick: () => { next = onAccount; } }] : []),
+      ...(onPlacement ? [{ label: t('onboarding.placementStart'), primary: true, onClick: () => { next = onPlacement; } }] : []),
+    ],
+    onClose: () => { next?.(); },
+  });
+}
+
+/**
+ * Erster Start: Begrüßung mit dem Angebot des Rundgangs. Als gesehen gilt sie erst nach dem Rundgang (dann wieder auf den
+ * echten Daten). Scheitert der Rundgang, übernimmt die Einführung als Dialog.
+ */
+export function showWelcome(onAccount?: () => void, onPlacement?: () => void): void {
+  const remember = (): void => { if (!getSettings().onboardingDone) setSettings({ onboardingDone: true }); };
+  let start = false;
+  openModal({
+    title: t('tour.welcomeTitle'),
+    body: t('tour.welcomeText'),
+    actions: [
+      { label: t('tour.welcomeLater') },
+      { label: t('tour.welcomeStart'), primary: true, onClick: () => { start = true; } },
+    ],
+    onClose: () => {
+      if (!start) { remember(); return; }
+      void import('../features/tour.ts').then((m) => {
+        m.startTour('intro', {
+          onEnd: (end) => {
+            remember();
+            if (end === 'done') showTourEnd(onAccount, onPlacement);
+            else if (end === 'error') showOnboarding(onAccount, onPlacement);
+          },
+        });
+      });
+    },
+  });
 }
 
 /**

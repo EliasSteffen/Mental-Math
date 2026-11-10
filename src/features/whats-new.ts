@@ -39,11 +39,19 @@ function body(releases: Release[]): HTMLElement {
 function openWhatsNew(seen: string, onClose?: () => void): void {
   const list: Release[] = releasesSince(seen).slice(0, MAX_SHOWN);
   if (list.length === 0) { openChangelog(); onClose?.(); return; }
+  const tour = list.find((r) => r.tour)?.tour;
+  let wantsTour = false;
   openModal({
     title: t('release.whatsNew', { version: BUILD_INFO.version }),
     body: body(list),
-    actions: [{ label: t('release.letsGo'), primary: true }],
-    onClose,
+    actions: tour
+      ? [{ label: t('release.later') }, { label: t('release.showMe'), primary: true, onClick: () => { wantsTour = true; } }]
+      : [{ label: t('release.letsGo'), primary: true }],
+    // Erst nach dem Schließen: onClose merkt sich die Version noch in den echten Daten
+    onClose: () => {
+      onClose?.();
+      if (tour && wantsTour) void import('./tour.ts').then((m) => { m.startTour(tour); });
+    },
   });
 }
 

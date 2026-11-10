@@ -20,8 +20,6 @@ export const home = {
   // Heute: Kacheln (kurz)
   dailyRankedShort: 'gewertet · 1 Versuch',
   dailySub: 'für alle gleich',
-  competeShort: 'Wettbewerbe',
-  competeTileSub: 'Ranglisten & Gruppen',
   mixedShort: 'Gemischt',
   mixedSub: 'alle Kategorien',
   categoriesSub: 'gezielt üben',

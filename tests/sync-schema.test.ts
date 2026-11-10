@@ -36,7 +36,7 @@ test('settings: LWW, geräte-lokale Schlüssel bleiben, updatedAt des Gewinners'
   assert.equal(spec?.updatedAt?.(local), 100);
   assert.equal(spec?.updatedAt?.({}), null);
   assert.deepEqual([...DEVICE_LOCAL_SETTINGS], [
-    'keypad', 'lastSeenVersion',
+    'keypad', 'keypadSide', 'lastSeenVersion',
     'lastStoreCheck', 'updateNotifiedVersion', 'updateNotifiedAt', 'reviewAskedVersion', 'reviewAskedAt',
     'onboardingDone',
   ]);

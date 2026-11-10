@@ -19,8 +19,6 @@ export const home: Record<keyof typeof De, string> = {
   // Today: tiles (short)
   dailyRankedShort: 'ranked · 1 attempt',
   dailySub: 'same for everyone',
-  competeShort: 'Competitions',
-  competeTileSub: 'Leaderboards & groups',
   mixedShort: 'Mixed',
   mixedSub: 'all categories',
   categoriesSub: 'practice one',

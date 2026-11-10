@@ -84,7 +84,11 @@ export function numpad({ input, onSubmit, layout = 'calculator', submitLabel = t
     onmousedown: (e: Event) => e.preventDefault(),
     onclick: run,
   }, label);
-  const d = (n: string): HTMLButtonElement => key(n, 'num', () => digit(n));
+  const d = (n: string): HTMLButtonElement => {
+    const el = key(n, 'num', () => digit(n));
+    el.dataset['key'] = n; // Ziel für den Rundgang
+    return el;
+  };
 
   const submit = key(submitLabel, 'numpad-check cta', () => onSubmit());
   const sync = (): void => { submit.disabled = input.disabled || input.value.trim() === ''; };

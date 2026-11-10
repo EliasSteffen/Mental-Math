@@ -1,8 +1,8 @@
-// Profil (Ruhiger Fokus): eine gruppierte Seite statt Tabs – Konto, Training, Erinnerungen, Während der Runde, Eingabe,
-// Darstellung & Feedback, Daten, Über & Hilfe (E2–E5, neu sortiert in 1.17). Eingaben kommen aus dem Kit, aktualisieren sich lokal und speichern sofort: kein Toast (E21),
-// kein rerender() (Fix A11). Konto-Verwaltung und Kategorien liegen in modalen Sheets.
+// Profil (Ruhiger Fokus): Hauptseite mit Konto und Menü (je Bereich eine Zeile mit dem aktuellen Stand), die Bereiche als
+// Unterseiten (#/profil/:bereich), ab 1024 px Liste und Bereich nebeneinander. Eingaben kommen aus dem Kit, aktualisieren
+// sich lokal und speichern sofort: kein Toast (E21), kein rerender() (Fix A11). Konto-Verwaltung und Kategorien liegen in modalen Sheets.
 import type { CategoryId, Level, Settings, ThemeSetting, TimerDisplay } from '../types.ts';
-import { getSettings, setSettings, resetAll, exportJSON, getAttempts, getSessions, getProfile } from '../data/storage.ts';
+import { getSettings, setSettings, resetAll, exportJSON, getAttempts, getSessions, getProfile, onChange } from '../data/storage.ts';
 import { importJSON } from '../data/transfer.ts';
 import { applyTheme, THEMES, themeLabel } from '../ui/theme.ts';
 import { toast } from '../ui/toast.ts';
@@ -14,15 +14,17 @@ import { CATEGORIES } from '../core/catalog.ts';
 import { fmt } from '../core/numbers.ts';
 import { app, h, appendChildren, type Child } from '../ui/dom.ts';
 import { rerender, addCleanup, go } from '../router.ts';
-import { button, group, icon, largeTitle, list, row, segmented, setButtonLabel, stepper, switchRow, type SwitchControl } from '../ui/kit.ts';
+import { backLink, button, group, icon, largeTitle, list, row, segmented, setButtonLabel, stepper, switchRow, type IconName, type SwitchControl } from '../ui/kit.ts';
 import { openSheet, type SheetHandle } from '../ui/sheet.ts';
 import type { PasskeyInfo, RecoveryStatus } from '../vendor/auth.ts';
 import * as acct from '../features/account.ts';
 import { getSyncStatus, logoutAndForgetDevice, onSyncStatus, syncNow, syncStatusEntries, wipeCloudData } from '../features/sync.ts';
 import { remindersGroup } from './settings-reminders.ts';
+import { isPushEnabled, pushConfig } from '../platform/reminders.ts';
 import { APP_STORE_URL, isNative, liveUpdateBeta, openStorePage, publicUrl, saveFile, setLiveUpdateBeta } from '../platform/index.ts';
-import { showOnboarding } from '../ui/onboarding.ts';
+import { REPLAY_CHAPTERS } from '../features/tour-scripts.ts';
 import { TAB_HREF } from '../ui/shell.ts';
+import { isTablet, isWide } from '../ui/viewport.ts';
 
 const NAME_MIN = 2;
 /** Wartezeit nach dem Routenwechsel zum Profil, bis das Konto-Sheet aufgeht (Tab-Überblendung 200 ms). */
@@ -30,18 +32,11 @@ const ROUTE_SETTLE_MS = 240;
 const NAME_MAX = 32;
 const SOURCE_URL = 'https://github.com/EliasSteffen/Mental-Math';
 
-/** Alte Tabs (`?tab=`) → Gruppe, zu der beim Öffnen gescrollt wird (E6). */
-type TabAnchor = 'general' | 'gameplay' | 'data' | 'about';
-
 let uid = 0;
 const nextId = (prefix: string): string => `prof-${prefix}-${++uid}`;
 
 /** Speichert sofort und still (E21). */
 const save = (partial: Partial<Settings>): void => { setSettings(partial); };
-
-function reducedMotion(): boolean {
-  return typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
-}
 
 /** Ungefähre Größe der gespeicherten Daten in KB – gemessen am Export (die Daten liegen in IndexedDB, nicht mehr in localStorage). */
 function storageKB(): number {
@@ -63,10 +58,9 @@ function swap(old: HTMLElement, fresh: HTMLElement): HTMLElement {
   return fresh;
 }
 
-function profGroup(title: string, ...children: Child[]): HTMLElement {
-  const el = group(title, ...children);
-  el.classList.add('prof-group');
-  return el;
+/** Inhalt eines Bereichs; die Überschrift steht als Seitentitel darüber. */
+function profGroup(...children: Child[]): HTMLElement {
+  return group(null, ...children);
 }
 
 /* ---------- Training: was und wie viel ---------- */
@@ -88,7 +82,7 @@ function categoriesRow(s: Settings): HTMLElement {
   const catValue = (): string => (enabled.length >= all.length
     ? t('settings.catsAll') : t('settings.catsSome', { n: enabled.length, total: all.length }));
   const cats = row({
-    icon: 'grid', label: t('settings.categories'), value: catValue(), chevron: true, onClick: () => openCategories(),
+    icon: 'grid', label: t('settings.categories'), sub: t('settings.categoriesHelp'), value: catValue(), chevron: true, onClick: () => openCategories(),
     attrs: { 'aria-haspopup': 'dialog' },
   });
   const setEnabled = (ids: CategoryId[]): void => {
@@ -155,7 +149,7 @@ function trainingGroup(s: Settings): HTMLElement {
   });
 
   const goal = stepper({
-    label: t('settings.dailyGoal'), value: s.dailyGoalMin, min: 5, max: 60, step: 5,
+    label: t('settings.dailyGoal'), value: s.dailyGoalMin, min: 5, max: 60, step: 5, help: t('settings.dailyGoalHelp'),
     format: (n) => t('settings.minutes', { n }),
     onChange: (n) => save({ dailyGoalMin: n }),
   });
@@ -165,13 +159,13 @@ function trainingGroup(s: Settings): HTMLElement {
   if (!lengths.includes(s.sessionLength)) lengths.push(s.sessionLength);
   lengths.sort((a, b) => a - b);
   const len = segmented<string>({
-    label: t('settings.roundLength'), inline: true, even: true, numeric: true,
+    label: t('settings.roundLength'), help: t('settings.roundLengthHelp'), inline: true, even: true, numeric: true,
     options: lengths.map((n) => [String(n), String(n)] as const),
     value: String(s.sessionLength),
     onChange: (v) => save({ sessionLength: Number(v) }),
   });
 
-  return profGroup(t('settings.training'), list([diff.el, placement, goal, len.el, categoriesRow(s)]));
+  return profGroup(list([diff.el, placement, goal, len.el, categoriesRow(s)]));
 }
 
 /* ---------- Während der Runde: Zeit, Abgabe, Hilfen ---------- */
@@ -201,7 +195,7 @@ function roundGroup(s: Settings): HTMLElement {
     autoFail.setHelp(autoFailHelp(v));
   };
 
-  return profGroup(t('settings.inRound'), list([
+  return profGroup(list([
     timer.el,
     switchRow({ label: t('settings.timer'), help: t('settings.timerHint'), checked: s.timer, onChange: onTimer }).el,
     autoFail.el,
@@ -222,12 +216,22 @@ function inputGroup(s: Settings): HTMLElement {
     onChange: (v) => save({ keypad: v }),
   });
   const pad = segmented<Settings['numpadLayout']>({
-    label: t('settings.numpadLayout'), inline: true, even: true,
+    label: t('settings.numpadLayout'), help: t('settings.numpadLayoutHelp'), inline: true, even: true,
     options: [['calculator', t('settings.numpadCalculator')], ['phone', t('settings.numpadPhone')]],
     value: s.numpadLayout,
     onChange: (v) => save({ numpadLayout: v }),
   });
-  return profGroup(t('settings.input'), list([keypad.el, pad.el]));
+  // Nur auf dem iPad: Auf dem Telefon sitzt das Tastenfeld immer unten
+  const side = isTablet()
+    ? segmented<Settings['keypadSide']>({
+      label: t('settings.keypadSide'), help: t('settings.keypadSideHelp'),
+      options: [['left', t('settings.keypadLeft')], ['center', t('settings.keypadCenter')], ['right', t('settings.keypadRight')]],
+      value: s.keypadSide,
+      onChange: (v) => save({ keypadSide: v }),
+    }).el
+    : null;
+  side?.setAttribute('data-prof', 'keypad-side');
+  return profGroup(list([keypad.el, pad.el, side]));
 }
 
 /* ---------- Darstellung & Feedback ---------- */
@@ -244,14 +248,14 @@ function appearanceGroup(s: Settings): HTMLElement {
   const setTheme = (v: ThemeSetting): void => { theme = v; save({ theme: v }); applyTheme(v); };
 
   const themeSeg = segmented<ThemePick>({
-    label: t('settings.theme'),
+    label: t('settings.theme'), help: t('settings.themeHelp'),
     options: THEME_PICKS.map((v) => [v, themeLabel(v)] as const),
     value: pick(theme),
     onChange: (v) => { setTheme(v); paintOled(); },
   });
   /** Nur bei Nacht/System sichtbar bzw. solange OLED aktiv ist; an → 'oled', aus → 'night'. */
   const oled = switchRow({
-    label: t('settings.oled'), checked: theme === 'oled',
+    label: t('settings.oled'), help: t('settings.oledHelp'), checked: theme === 'oled',
     onChange: (on) => {
       setTheme(on ? 'oled' : 'night');
       themeSeg.set(pick(theme)); // System + OLED → Segment zeigt Nacht
@@ -264,7 +268,7 @@ function appearanceGroup(s: Settings): HTMLElement {
   paintOled();
 
   const lang = segmented<Settings['lang']>({
-    label: t('settings.language'),
+    label: t('settings.language'), help: t('settings.languageHelp'),
     options: [['auto', t('settings.langAuto')], ['de', t('settings.langDe')], ['en', t('settings.langEn')]],
     value: s.lang,
     onChange: (v) => {
@@ -275,8 +279,9 @@ function appearanceGroup(s: Settings): HTMLElement {
     },
   });
   lang.el.setAttribute('data-prof', 'lang');
+  themeSeg.el.setAttribute('data-prof', 'theme');
 
-  return profGroup(t('settings.appearanceFeedback'), list([
+  return profGroup(list([
     themeSeg.el, oled.el, lang.el,
     switchRow({ label: t('settings.haptics'), help: t(isNative() ? 'settings.hapticsHelpApp' : 'settings.hapticsHelp'), checked: s.haptics, onChange: (v) => save({ haptics: v }) }).el,
     switchRow({ label: t('settings.sound'), help: t('settings.soundHelp'), checked: s.sound, onChange: (v) => save({ sound: v }) }).el,
@@ -353,7 +358,7 @@ function dataGroup(live: HTMLElement): HTMLElement {
   };
 
   const usage = `${t('settings.storedCount', { attempts: fmt(getAttempts().length), sessions: fmt(getSessions().length) })} · ${t('settings.storageUsed', { kb: fmt(storageKB()) })}`;
-  return profGroup(t('settings.data'),
+  return profGroup(
     list([
       exportRow,
       row({ icon: 'upload', label: t('settings.importLabel'), onClick: () => fileInput.click() }),
@@ -365,13 +370,31 @@ function dataGroup(live: HTMLElement): HTMLElement {
 
 /* ---------- Über ---------- */
 
+/** Rundgang ganz oder kapitelweise; startet erst nach dem Schließen des Sheets. */
+function openTourList(): void {
+  let chosen: { chapter?: string } | null = null;
+  const pick = (choice: { chapter?: string }): void => { chosen = choice; sheet.close(); };
+  const sheet = openSheet({
+    title: t('tour.replay'),
+    children: [
+      list([row({ icon: 'play', label: t('tour.replayAll'), sub: t('tour.replaySub'), onClick: () => pick({}), chevron: true })]),
+      h('h3', { class: 'prof-subhead' }, t('tour.replayChapters')),
+      list(REPLAY_CHAPTERS.map((c) => row({ label: t(c.title), onClick: () => pick({ chapter: c.id }), chevron: true }))),
+    ],
+    onClose: () => {
+      const choice = chosen;
+      if (choice) void import('../features/tour.ts').then((m) => { m.startTour('intro', choice); });
+    },
+  });
+}
+
 function aboutGroup(): HTMLElement {
   const profile = getProfile();
   const news = row({
     icon: 'info', label: t('settings.news'), value: BUILD_INFO.version, chevron: true, onClick: () => openChangelog(),
   });
   const intro = row({
-    icon: 'bulb', label: t('onboarding.replay'), chevron: true, onClick: () => showOnboarding(openAccountOnProfile, () => go('#/einstufung')),
+    icon: 'bulb', label: t('tour.replay'), sub: t('tour.replaySub'), chevron: true, onClick: openTourList,
     attrs: { 'aria-haspopup': 'dialog' },
   });
   // „Version 1.10.0“; das Wort entfällt unter 360 px (profile.css)
@@ -399,7 +422,7 @@ function aboutGroup(): HTMLElement {
   });
   const meta = (label: string, value: string, title?: string): HTMLElement =>
     h('div', null, h('dt', null, label), h('dd', { class: 'num', title }, value));
-  return profGroup(t('settings.aboutHelp'),
+  return profGroup(
     list([help, intro, news, store, beta.el, privacy, source]),
     h('dl', { class: 'prof-meta' },
       meta(t('settings.build'), [BUILD_INFO.build, fmtIsoDate(BUILD_INFO.date), BUILD_INFO.channel === 'preview' ? t('settings.channelPreview') : '']
@@ -899,10 +922,7 @@ function accountCard(): HTMLElement {
     if (key === lastKey) return;
     lastKey = key;
     sync = syncRow();
-    const compete = st.status === 'signed-in'
-      ? row({ icon: 'trophy', label: t('compete.title'), sub: t('compete.subtitle'), href: '#/wettbewerbe' })
-      : null;
-    box.replaceChildren(...[accountHead(st), sync, compete].filter((x): x is HTMLElement => x !== null));
+    box.replaceChildren(...[accountHead(st), sync].filter((x): x is HTMLElement => x !== null));
   };
   draw();
   addCleanup(acct.onAccountChange(draw));
@@ -910,48 +930,121 @@ function accountCard(): HTMLElement {
   return h('section', { 'aria-label': t('account.title') }, box);
 }
 
-/* ---------- Seite ---------- */
+/* ---------- Bereiche und Seite ---------- */
 
-/** Für welche Adresse zuletzt zur Gruppe gescrollt wurde (Neuzeichnen, z. B. Sprachwechsel, scrollt nicht erneut). */
-let anchoredHash: string | null = null;
+const DIFF_LABEL = { auto: 'settings.diffAuto', 1: 'settings.diffEasy', 2: 'settings.diffMedium', 3: 'settings.diffHard' } as const;
+const TIMER_LABEL = { calm: 'settings.timerCalm', precise: 'settings.timerPrecise', off: 'settings.timerOff' } as const;
+const KEYPAD_LABEL = { auto: 'settings.keypadAuto', on: 'settings.keypadOn', off: 'settings.keypadOff' } as const;
+const LAYOUT_LABEL = { calculator: 'settings.numpadCalculator', phone: 'settings.numpadPhone' } as const;
+const LANG_LABEL = { auto: 'settings.langAuto', de: 'settings.langDe', en: 'settings.langEn' } as const;
 
-/** Altes `?tab=` → zur passenden Gruppe scrollen (nach der Scroll-Wiederherstellung des Routers). */
-function scrollToAnchor(groups: Readonly<Record<TabAnchor, HTMLElement>>): void {
-  const hash = location.hash;
-  const tab = new URLSearchParams(hash.split('?')[1] ?? '').get('tab');
-  const target = tab !== null && Object.hasOwn(groups, tab) ? groups[tab as TabAnchor] : null;
-  if (!target) { anchoredHash = null; return; }
-  addCleanup(() => { if (location.hash !== hash) anchoredHash = null; });
-  if (anchoredHash === hash) return;
-  anchoredHash = hash;
-  requestAnimationFrame(() => requestAnimationFrame(() => {
-    if (target.isConnected) target.scrollIntoView({ block: 'start', behavior: reducedMotion() ? 'auto' : 'smooth' });
-  }));
+interface Section {
+  id: string;
+  icon: IconName;
+  title: `settings.${string}`;
+  intro: `settings.${string}`;
+  /** Aktueller Stand in einer Zeile (Menü) */
+  summary(s: Settings): string;
+  /** `live`: unsichtbare Statusmeldung der Seite */
+  body(s: Settings, live: HTMLElement): Child[];
 }
 
-export function renderSettings(): void {
+/** Reihenfolge nach Häufigkeit; die Adressen `#/profil/:id` nutzen auch die alten `?tab=`-Links (router.ts). */
+const SECTIONS: readonly Section[] = [
+  {
+    id: 'training', icon: 'target', title: 'settings.training', intro: 'settings.introTraining',
+    summary: (s) => [t(DIFF_LABEL[s.difficulty]), t('settings.minutes', { n: s.dailyGoalMin }), t('settings.summaryTasks', { n: s.sessionLength })].join(' · '),
+    body: (s) => [trainingGroup(s)],
+  },
+  {
+    id: 'runde', icon: 'play', title: 'settings.inRound', intro: 'settings.introRound',
+    summary: (s) => [t('settings.timerDisplay'), t(TIMER_LABEL[s.timerDisplay])].join(': '),
+    body: (s) => [roundGroup(s)],
+  },
+  {
+    id: 'eingabe', icon: 'grid', title: 'settings.input', intro: 'settings.introInput',
+    summary: (s) => [t(KEYPAD_LABEL[s.keypad]), t(LAYOUT_LABEL[s.numpadLayout])].join(' · '),
+    body: (s) => [inputGroup(s)],
+  },
+  {
+    id: 'erinnerungen', icon: 'bell', title: 'settings.reminders', intro: 'settings.introReminders',
+    summary: () => t(isPushEnabled() ? 'settings.summaryOn' : 'settings.summaryOff'),
+    body: () => [remindersGroup()],
+  },
+  {
+    id: 'darstellung', icon: 'sun', title: 'settings.appearanceFeedback', intro: 'settings.introAppearance',
+    summary: (s) => [themeLabel(s.theme), t(LANG_LABEL[s.lang])].join(' · '),
+    body: (s) => [appearanceGroup(s)],
+  },
+  {
+    id: 'daten', icon: 'download', title: 'settings.data', intro: 'settings.introData',
+    summary: () => t('settings.storedCount', { attempts: fmt(getAttempts().length), sessions: fmt(getSessions().length) }),
+    body: (_s, live) => [dataGroup(live)],
+  },
+  {
+    id: 'hilfe', icon: 'info', title: 'settings.aboutHelp', intro: 'settings.introHelp',
+    summary: () => `${t('settings.version')} ${BUILD_INFO.version}`,
+    body: () => [aboutGroup()],
+  },
+];
+
+/** Menü der Bereiche; `paint` zieht den Stand nach, wenn nebeneinander im Bereich etwas geändert wird. */
+function sectionMenu(s: Settings, active: Section | null): { el: HTMLElement; paint(): void } {
+  const rows = SECTIONS.map((sec) => ({
+    sec,
+    el: row({
+      icon: sec.icon, label: t(sec.title), sub: sec.summary(s), href: `#/profil/${sec.id}`,
+      attrs: sec === active ? { 'aria-current': 'true' } : undefined,
+    }),
+  }));
+  // Erinnerungen gibt es nur, wenn das Gerät bzw. der Server sie anbietet (Website ohne Push: keine Zeile)
+  const reminders = rows.find((r) => r.sec.id === 'erinnerungen')?.el;
+  if (reminders) {
+    reminders.hidden = true;
+    void pushConfig().then((cfg) => { reminders.hidden = !cfg.enabled; });
+  }
+  return {
+    el: h('nav', { 'aria-label': t('settings.title') }, list(rows.map((r) => r.el))),
+    paint: () => {
+      const now = getSettings();
+      for (const { sec, el } of rows) {
+        const sub = el.querySelector('.row-sub');
+        if (sub) sub.textContent = sec.summary(now);
+      }
+    },
+  };
+}
+
+function sectionNodes(sec: Section, s: Settings, live: HTMLElement, back: boolean): Child[] {
+  return [
+    back ? backLink({ label: t('settings.title'), href: TAB_HREF.profile }) : null,
+    h('div', { class: 'prof-head' }, largeTitle(t(sec.title)), h('p', { class: 'prof-intro' }, t(sec.intro))),
+    sec.body(s, live),
+    live,
+  ];
+}
+
+/** Hauptseite, Bereich oder ab 1024 px beides nebeneinander. Kein Floating CTA (der Router setzt setPrimaryAction(null)). */
+export function renderSettings(sectionId: string | null): void {
   const s = getSettings();
   const live = h('p', { class: 'sr-only', role: 'status' });
-  // Alte Links mit ?tab= scrollen zur passenden Gruppe (E6)
-  const groups: Record<TabAnchor, HTMLElement> = {
-    gameplay: trainingGroup(s),
-    general: appearanceGroup(s),
-    data: dataGroup(live),
-    about: aboutGroup(),
-  };
-  // Kein Floating CTA auf Profil (der Router setzt setPrimaryAction(null)). Reihenfolge nach Häufigkeit:
-  // Konto, Training, Erinnerungen, Während der Runde, Eingabe, Darstellung & Feedback, Daten, Über & Hilfe
-  appendChildren(app, [
-    largeTitle(t('settings.title')),
-    accountCard(),
-    groups.gameplay,
-    remindersGroup(),
-    roundGroup(s),
-    inputGroup(s),
-    groups.general,
-    groups.data,
-    groups.about,
-    live,
-  ]);
-  scrollToAnchor(groups);
+  const section = SECTIONS.find((x) => x.id === sectionId) ?? null;
+
+  if (isWide()) {
+    const shown = section ?? SECTIONS[0] ?? null;
+    if (!shown) return;
+    const menu = sectionMenu(s, shown);
+    addCleanup(onChange(() => menu.paint()));
+    appendChildren(app, [
+      h('div', { class: 'split' },
+        h('div', { class: 'split-master' }, largeTitle(t('settings.title')), accountCard(), menu.el),
+        h('div', { class: 'split-detail' }, sectionNodes(shown, s, live, false))),
+    ]);
+    return;
+  }
+  if (section) {
+    appendChildren(app, sectionNodes(section, s, live, true));
+    return;
+  }
+  appendChildren(app, [largeTitle(t('settings.title')), accountCard(), sectionMenu(s, null).el]);
 }

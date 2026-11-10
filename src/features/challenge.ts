@@ -42,7 +42,21 @@ export function rankedAvailable(): boolean {
   return accountEnabled() && getAccountState().status === 'signed-in';
 }
 
+/** Rundgang: Antworten kommen aus Beispieldaten, der lokale Stand liegt nur im Speicher; kein Netz, nichts Echtes wird berührt. */
+let demoResponse: ((path: string) => unknown) | null = null;
+const demoStore = new Map<string, string>();
+
+export function setDemoChallenge(respond: ((path: string) => unknown) | null): void {
+  demoResponse = respond;
+  demoStore.clear();
+}
+
 async function request<T>(method: 'GET' | 'POST', path: string, body?: unknown, o: { auth?: boolean } = {}): Promise<T> {
+  if (demoResponse) {
+    const answer = demoResponse(path);
+    if (answer === null || answer === undefined) throw new ChallengeError('network');
+    return answer as T;
+  }
   const headers: Record<string, string> = {};
   if (o.auth !== false) {
     const token = await accessToken();
@@ -76,7 +90,7 @@ async function request<T>(method: 'GET' | 'POST', path: string, body?: unknown, 
 
 function readJson<T>(key: string): T | null {
   try {
-    const raw = globalThis.localStorage.getItem(key);
+    const raw = demoResponse ? demoStore.get(key) : globalThis.localStorage.getItem(key);
     return raw ? (JSON.parse(raw) as T) : null;
   } catch {
     return null;
@@ -84,6 +98,11 @@ function readJson<T>(key: string): T | null {
 }
 
 function writeJson(key: string, value: unknown): void {
+  if (demoResponse) {
+    if (value === null) demoStore.delete(key);
+    else demoStore.set(key, JSON.stringify(value));
+    return;
+  }
   try {
     if (value === null) globalThis.localStorage.removeItem(key);
     else globalThis.localStorage.setItem(key, JSON.stringify(value));

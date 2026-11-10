@@ -126,6 +126,10 @@ Kommt nach dem iOS-Build noch ein Commit dazu, lädt `ios.yml` einen neuen Build
 
 **Hotfix:** Branch `hotfix/<name>` von `release`, Patch-Version erhöhen, pushen (lädt zu TestFlight hoch), PR nach `release`, mergen und danach `release` in `develop` mergen. **Notfall** ohne iOS-Build: *Actions → Deploy → Run workflow* auf `release` mit „ohne iOS-Build desselben Codes deployen“.
 
+#### App-Store-Videos
+
+`npm run preview:record` (optional `-- de` oder `-- en`) nimmt den Rundgang im Simulator auf und erzeugt unter `marketing/app-store/preview/` die Vorschauvideos nach Apples Vorgaben sowie die iPad-Screenshots. Braucht Xcode und ffmpeg. Nach Änderungen an der Oberfläche oder den Texten des Rundgangs (`src/features/tour-scripts.ts`) neu aufnehmen.
+
 #### Ohne GitHub Actions (lokal)
 
 Ist das Actions-Kontingent aufgebraucht, laufen dieselben Schritte auf dem eigenen Mac ([`scripts/local-release.ts`](scripts/local-release.ts)). Jeder Befehl prüft vorher, wie CI: richtiger Branch, keine ungespeicherten Änderungen, Stand gepusht, `typecheck` und `test` grün.

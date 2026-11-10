@@ -5,7 +5,7 @@ import { keepKeys, lwwByKey, lwwDoc, maxByKey } from '../vendor/storage.ts';
 
 /** Einstellungen, die pro Gerät gelten und nie hochgeladen bzw. überschrieben werden. */
 export const DEVICE_LOCAL_SETTINGS: readonly string[] = [
-  'keypad', 'lastSeenVersion',
+  'keypad', 'keypadSide', 'lastSeenVersion',
   'lastStoreCheck', 'updateNotifiedVersion', 'updateNotifiedAt', 'reviewAskedVersion', 'reviewAskedAt',
   'onboardingDone',
 ];

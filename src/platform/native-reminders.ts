@@ -5,7 +5,7 @@ import type { ReminderKind, ReminderPrefs } from '../core/reminders.ts';
 import { planLocal } from '../core/reminder-plan.ts';
 import type { PlannedReminder } from '../core/reminder-plan.ts';
 import { composeMessage } from '../core/reminder-messages.ts';
-import { onChange } from '../data/storage.ts';
+import { isDemoData, onChange } from '../data/storage.ts';
 import { currentReminderState } from '../features/reminder-input.ts';
 import { getLang, onLangChange } from '../i18n/index.ts';
 import { loadNative } from './native.ts';
@@ -83,6 +83,7 @@ function refreshPermission(): Promise<void> {
 
 /** Ausstehende Erinnerungen ersetzen. Was vom alten Plan schon fällig war, gilt als zugestellt (Abstands-Regeln). */
 async function replanNow(): Promise<void> {
+  if (isDemoData()) return; // Rundgang: Erinnerungen nur aus echten Daten
   const m = await loadNative();
   const now = Date.now();
   const old = read();

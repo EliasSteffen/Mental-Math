@@ -169,6 +169,8 @@ export interface Settings {
   // v5
   autoSubmit: boolean;
   numpadLayout: 'calculator' | 'phone';
+  /** iPad quer: Tastenfeld links oder rechts neben der Aufgabe, oder mittig darunter */
+  keypadSide: 'left' | 'center' | 'right';
   estimateMode: boolean;
   ghost: boolean;
   // v7
@@ -355,6 +357,8 @@ export interface Release {
   date: string;             // YYYY-MM-DD
   title: ReleaseNote;
   highlights: ReleaseNote[];
+  /** Kurzer Rundgang zu den neuen Funktionen („Zeig’s mir“ im Neuigkeiten-Fenster) */
+  tour?: import('./core/tour.ts').TourId;
 }
 /** Produktion (mental-math.elias-steffen.de, App Store) oder Vorschau (Pull Requests, develop) */
 export type BuildChannel = 'production' | 'preview';

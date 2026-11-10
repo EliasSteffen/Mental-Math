@@ -3,7 +3,7 @@
 // Ohne Konto: Das Gerät erzeugt id + Geheimnis (localStorage); der Server speichert nur den Hash des Geheimnisses.
 import { DEFAULT_REMINDER_PREFS, parsePrefs } from '../core/reminders.ts';
 import type { ReminderPrefs, ReminderState } from '../core/reminders.ts';
-import { onChange } from '../data/storage.ts';
+import { isDemoData, onChange } from '../data/storage.ts';
 import { currentReminderState } from '../features/reminder-input.ts';
 import { getLang, onLangChange } from '../i18n/index.ts';
 
@@ -243,6 +243,7 @@ export async function sendTestPush(): Promise<TestResult> {
 
 /** Lernstand melden, wenn er sich geändert hat (oder `REFRESH_MS` vergangen sind). */
 async function reportState(o: { keepalive?: boolean; refresh?: boolean } = {}): Promise<void> {
+  if (isDemoData()) return; // Rundgang: dem Push-Server nur echte Daten melden
   const local = readLocal();
   if (!local?.enabled) return;
   const state = currentReminderState();

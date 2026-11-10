@@ -60,8 +60,7 @@ function timeControl(minutes: number, onChange: (minutes: number) => void): HTML
 
 export function remindersGroup(): HTMLElement {
   const body = h('div', { class: 'prof-remind' });
-  const el = group(t('settings.reminders'), body);
-  el.classList.add('prof-group');
+  const el = group(null, body);
   el.hidden = true; // erst sichtbar, wenn der Server Push anbietet
   const status = h('p', { class: 'prof-note', role: 'status' });
 

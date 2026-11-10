@@ -204,6 +204,24 @@
     .train-breathe-circle { width:min(200px, 60vw); }
   }
 
+  /* ---------- iPad: die Aufgabe füllt die Bühne, Antwortfeld und Auswahl in Fingergröße ---------- */
+  @media (min-width: 720px) and (min-height: 641px) {
+    .train-stage { gap:var(--space-5); }
+    .train-cat { font-size:var(--text-md); }
+    .train-q { font-size:var(--text-display); }
+    .train-q.is-long { max-width:34ch; font-size:var(--text-xl); line-height:1.3; }
+    .train-hint, .train-tip { font-size:var(--text-md); }
+    .train-tip { max-width:440px; }
+    .train-field { flex-basis:340px; height:88px; padding:0 var(--space-5); border-radius:var(--radius-lg); font-size:48px; }
+    .train-field.is-long { font-size:36px; }
+    .train-field.is-longer { font-size:28px; }
+    .train-unit { font-size:var(--text-lg); }
+    .train-correction-value { font-size:48px; }
+    .train-choice { min-height:88px; font-size:24px; }
+    .train-breathe-circle { width:min(360px, 50vw); }
+    .train-result-title { font-size:56px; }
+  }
+
   /* Reduced Motion: statischer Kreis, „Einatmen …“ steht still (Start nach 3 s, breathe.ts) */
   @media (prefers-reduced-motion: reduce) {
     .train-breathe-ring { animation:none; transform:scale(.8); }
