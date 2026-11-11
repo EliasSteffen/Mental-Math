@@ -15,6 +15,7 @@ import { openAccountOnProfile } from './views/settings.ts';
 import { startPush } from './platform/reminders.ts';
 import { startAppUpdateCheck } from './features/app-store.ts';
 import { watchKeyboardInset } from './ui/keyboard-inset.ts';
+import { watchTextScale } from './ui/text-scale.ts';
 
 // iOS-App: vorgemerktes Live-Update anwenden, bevor etwas gezeichnet wird (docs/PLAN-live-updates.md). Lädt die WebView
 // nicht binnen 5 s neu, geht es mit dem laufenden Bundle weiter.
@@ -37,6 +38,7 @@ const safely = (label: string, fn: () => unknown): void => {
 };
 
 safely('theme', () => initTheme(getSettings().theme));
+safely('text-scale', () => { watchTextScale(); }); // v9 G: Systemschrift → --type-scale, vor dem ersten Rendern
 safely('keyboard', () => { watchKeyboardInset(); }); // Sheets und Dialoge über der Bildschirmtastatur (iOS)
 safely('activity', startActivityTracker);
 safely('platform', startPlatform);

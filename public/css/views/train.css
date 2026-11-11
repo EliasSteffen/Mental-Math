@@ -58,8 +58,8 @@
     transition:border-color var(--dur-state) var(--ease-out), background-color var(--dur-state) var(--ease-out),
       box-shadow var(--dur-state) var(--ease-out);
   }
-  .train-field.is-long { font-size:24px; }
-  .train-field.is-longer { font-size:20px; }
+  .train-field.is-long { font-size:calc(24px * var(--type-scale-cap, 1)); }
+  .train-field.is-longer { font-size:calc(20px * var(--type-scale-cap, 1)); }
   .train-field.is-good { border-color:var(--good); background:var(--good-soft); box-shadow:var(--glow-good); }
   .train-field.is-bad { border-color:var(--bad); background:var(--bad-soft); }
   .train-field.is-skip { border-color:var(--border); color:var(--muted); }
@@ -91,7 +91,7 @@
   .train-error:empty { display:none; }
   .train-correction { display:flex; flex-wrap:wrap; align-items:baseline; justify-content:center; gap:var(--space-2); }
   .train-correction-label { font-size:var(--text-sm); color:var(--muted); }
-  .train-correction-value { font-size:32px; font-weight:var(--weight-semibold); overflow-wrap:anywhere; }
+  .train-correction-value { font-size:calc(32px * var(--type-scale-cap, 1)); font-weight:var(--weight-semibold); overflow-wrap:anywhere; }
 
   /* ---------- Dock: Hilfe / Weiß nicht, Tastenfeld bzw. Auswahl ---------- */
   .train-dock-row { display:flex; align-items:center; justify-content:space-between; gap:var(--space-2); min-height:var(--hit-min); }
@@ -180,7 +180,7 @@
   }
   .train-breathe-words { position:relative; width:220px; height:32px; text-align:center; }
   .train-breathe-in, .train-breathe-out {
-    position:absolute; inset:0; font-size:24px; font-weight:var(--weight-semibold); line-height:32px;
+    position:absolute; inset:0; font-size:calc(24px * var(--type-scale-cap, 1)); font-weight:var(--weight-semibold); line-height:32px;
   }
   .train-breathe-in { animation:train-inhale 8s linear both; }
   .train-breathe-out { animation:train-exhale 8s linear both; }
@@ -197,7 +197,7 @@
   /* ---------- Kleine Bildschirme: Tastenfeld und Bühne kompakter, damit das Antwortfeld sichtbar bleibt ---------- */
   @media (max-height: 640px) {
     .train-stage { gap:10px; padding-top:var(--space-3); padding-bottom:var(--space-3); }
-    .train-q { font-size:clamp(32px, 10vw, 40px); }
+    .train-q { font-size:calc(clamp(32px, 10vw, 40px) * var(--type-scale-cap, 1)); }
     .train-field { height:56px; }
     .train-choice { min-height:56px; }
     .train-breathe { gap:var(--space-5); }
@@ -212,14 +212,14 @@
     .train-q.is-long { max-width:34ch; font-size:var(--text-xl); line-height:1.3; }
     .train-hint, .train-tip { font-size:var(--text-md); }
     .train-tip { max-width:440px; }
-    .train-field { flex-basis:340px; height:88px; padding:0 var(--space-5); border-radius:var(--radius-lg); font-size:48px; }
-    .train-field.is-long { font-size:36px; }
-    .train-field.is-longer { font-size:28px; }
+    .train-field { flex-basis:340px; height:88px; padding:0 var(--space-5); border-radius:var(--radius-lg); font-size:calc(48px * var(--type-scale-cap, 1)); }
+    .train-field.is-long { font-size:calc(36px * var(--type-scale-cap, 1)); }
+    .train-field.is-longer { font-size:calc(28px * var(--type-scale-cap, 1)); }
     .train-unit { font-size:var(--text-lg); }
-    .train-correction-value { font-size:48px; }
-    .train-choice { min-height:88px; font-size:24px; }
+    .train-correction-value { font-size:calc(48px * var(--type-scale-cap, 1)); }
+    .train-choice { min-height:88px; font-size:calc(24px * var(--type-scale-cap, 1)); }
     .train-breathe-circle { width:min(360px, 50vw); }
-    .train-result-title { font-size:56px; }
+    .train-result-title { font-size:calc(56px * var(--type-scale-cap, 1)); }
   }
 
   /* Reduced Motion: statischer Kreis, „Einatmen …“ steht still (Start nach 3 s, breathe.ts) */
