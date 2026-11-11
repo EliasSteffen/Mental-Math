@@ -30,6 +30,8 @@ const TAB_KEY = 'mm.achievementsTab';
 /** Champion-Status (Paket K): standardmäßig aus dem Zwischenspeicher von league-sync. */
 let championProvider: () => ChampionInfo | null = championInfo;
 export function setChampionProvider(fn: () => ChampionInfo | null): void { championProvider = fn; }
+/** v9 H: aktueller Champion-Status (Spielerkarte im Profil); null, solange Paket K nichts liefert. */
+export function championInfo(): ChampionInfo | null { return championProvider(); }
 
 function loadTab(): AchievementTab {
   try {

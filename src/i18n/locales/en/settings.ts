@@ -191,4 +191,17 @@ export const settings: Record<keyof typeof De, string> = {
   // v9 A
   autoAdvance: 'Continue automatically after a correct answer',
   autoAdvanceHint: 'After a correct answer the next task follows on its own. After a mistake the solution stays until you tap.',
+  // v9 H: player card
+  cardTitle: 'Player card',
+  cardLevel: 'Level {n}',
+  cardXp: '{into} / {needed} XP',
+  cardXpAria: 'Progress to the next level',
+  cardStreak: 'Streak (current / best)',
+  cardFreezes: 'Freezes',
+  cardBadges: 'Badges',
+  cardCards: 'Trick cards',
+  cardSolved: 'Tasks solved',
+  cardRounds: 'Rounds',
+  cardAccuracy: 'Accuracy',
+  cardBestDaily: 'Best Daily',
 };

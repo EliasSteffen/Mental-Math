@@ -1,6 +1,7 @@
 // Profil (Ruhiger Fokus): Hauptseite mit Konto und Menü (je Bereich eine Zeile mit dem aktuellen Stand), die Bereiche als
 // Unterseiten (#/profil/:bereich), ab 1024 px Liste und Bereich nebeneinander. Eingaben kommen aus dem Kit, aktualisieren
 // sich lokal und speichern sofort: kein Toast (E21), kein rerender() (Fix A11). Konto-Verwaltung und Kategorien liegen in modalen Sheets.
+import { playerCard } from './profile-card.ts'; // v9 H
 import type { CategoryId, Level, Settings, ThemeSetting, TimerDisplay } from '../types.ts';
 import { getSettings, setSettings, resetAll, exportJSON, getAttempts, getSessions, getProfile, onChange } from '../data/storage.ts';
 import { importJSON } from '../data/transfer.ts';
@@ -1058,7 +1059,7 @@ export function renderSettings(sectionId: string | null): void {
     addCleanup(onChange(() => menu.paint()));
     appendChildren(app, [
       h('div', { class: 'split' },
-        h('div', { class: 'split-master' }, largeTitle(t('settings.title')), accountCard(), menu.el),
+        h('div', { class: 'split-master' }, largeTitle(t('settings.title')), playerCard(), accountCard(), menu.el),
         h('div', { class: 'split-detail' }, sectionNodes(shown, s, live, false))),
     ]);
     return;
@@ -1067,5 +1068,5 @@ export function renderSettings(sectionId: string | null): void {
     appendChildren(app, sectionNodes(section, s, live, true));
     return;
   }
-  appendChildren(app, [largeTitle(t('settings.title')), accountCard(), sectionMenu(s, null).el]);
+  appendChildren(app, [largeTitle(t('settings.title')), playerCard(), accountCard(), sectionMenu(s, null).el]);
 }
