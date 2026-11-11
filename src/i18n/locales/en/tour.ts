@@ -30,7 +30,7 @@ export const tour: Record<keyof typeof De, string> = {
   chIpad: 'On iPad',
   start: 'Mental math for case interviews. Let me show you how it works. Everything here is sample data.',
   todayHero: 'Every day the app suggests what will help you most right now.',
-  todayStatus: 'Here you see your daily goal and how long your streak has been running.',
+  todayStatus: 'Here you see how many rounds you have played today and how long your streak has been running.',
   todayTiles: 'The daily challenge is the same for everyone. “Mixed” covers all topics.',
   todayMore: 'Or choose for yourself: single categories, chain calculation, estimating or your own number ranges.',
   taskQuestion: 'This is a task: large, calm and without rush.',

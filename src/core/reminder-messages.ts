@@ -32,6 +32,11 @@ const TEXT = {
     dailyReview: 'Dazu warten {reviews} auf Wiederholung.',
     streakTitle: '🔥 {streak} in Folge',
     streakDaily: 'Heute {left} Minuten, dann hält deine Serie.',
+    // v9 B: Runden (wenn der Stand `goalRounds` meldet)
+    dailyBodyR: ['{goal} Runden heute halten dich in Form.', 'Eine kurze Runde – dein Kopf wird es dir danken.', 'Die Tages-Challenge wartet: 15 Aufgaben, gleich für alle.'],
+    dailyLeftR: (n: number): string => (n === 1 ? 'Noch 1 Runde bis zu deinem Tagesziel.' : `Noch ${n} Runden bis zu deinem Tagesziel.`),
+    streakDailyR: 'Eine kurze Runde heute, dann hält deine Serie.',
+    streakBodyR: 'Eine Runde reicht – sonst reißt deine Serie um Mitternacht.',
     streakBody: 'Trainiere heute noch {left} Minuten, sonst reißt deine Serie um Mitternacht.',
     reviewTitle: 'Wiederholung fällig',
     reviewBody: '{reviews} von früheren Fehlern sind dran. Dauert nur ein paar Minuten.',
@@ -48,6 +53,10 @@ const TEXT = {
     dailyReview: 'Plus {reviews} waiting for review.',
     streakTitle: '🔥 {streak} in a row',
     streakDaily: '{left} minutes today keep your streak alive.',
+    dailyBodyR: ['{goal} rounds today keep you sharp.', 'A short round – your brain will thank you.', 'Today’s challenge is waiting: 15 tasks, the same for everyone.'],
+    dailyLeftR: (n: number): string => (n === 1 ? '1 more round to reach your daily goal.' : `${n} more rounds to reach your daily goal.`),
+    streakDailyR: 'One short round today keeps your streak alive.',
+    streakBodyR: 'One round is enough – or your streak ends at midnight.',
     streakBody: 'Train {left} more minutes today, or your streak ends at midnight.',
     reviewTitle: 'Review due',
     reviewBody: '{reviews} from earlier mistakes are up. Takes just a few minutes.',
@@ -104,24 +113,32 @@ export function composeMessage(kind: MessageKind, c: MessageContext): PushMessag
   const s = c.state;
   const goal = s?.goalMin ?? 15;
   const left = Math.max(1, goal - (s && s.day === today ? s.todayMin : 0));
+  // v9 B: meldet der Stand Runden, gelten Runden-Texte; sonst (ältere Clients) die Minuten-Texte
+  const rounds = s !== null && s.goalRounds !== undefined;
+  const goalR = s?.goalRounds ?? 3;
+  const todayR = s && s.day === today ? (s.todayRounds ?? 0) : 0;
   const tag = 'mm-reminder';
   switch (kind) {
     case 'daily': {
       const streak = streakAtRisk(s, today);
       const reviews = reviewsDueAt(s, c.now);
       if (streak >= 2) {
-        return { title: fill(T.streakTitle, { streak: T.days(streak) }), body: fill(T.streakDaily, { left }), url: '/#/', tag };
+        const body = rounds ? T.streakDailyR : fill(T.streakDaily, { left });
+        return { title: fill(T.streakTitle, { streak: T.days(streak) }), body, url: '/#/', tag };
       }
-      const started = s !== null && s.day === today && s.todayMin > 0;
+      const started = s !== null && s.day === today && (rounds ? todayR > 0 : s.todayMin > 0);
       const variant = Math.floor(c.now / 86_400_000) % T.dailyBody.length;
-      const base = started ? fill(T.dailyLeft, { left }) : fill(T.dailyBody[variant] ?? T.dailyBody[0], { goal });
+      const bodies = rounds ? T.dailyBodyR : T.dailyBody;
+      const base = started
+        ? (rounds ? T.dailyLeftR(Math.max(1, goalR - todayR)) : fill(T.dailyLeft, { left }))
+        : fill(bodies[variant] ?? bodies[0], { goal: rounds ? goalR : goal });
       const body = reviews > 0 ? `${base} ${fill(T.dailyReview, { reviews: T.types(reviews) })}` : base;
       const url = reviews > 0 ? '/#/train/review' : !started && variant === 2 ? '/#/train/daily' : '/#/';
       return { title: T.dailyTitle, body, url, tag };
     }
     case 'streak': {
       const streak = Math.max(1, streakAtRisk(s, today));
-      return { title: fill(T.streakTitle, { streak: T.days(streak) }), body: fill(T.streakBody, { left }), url: '/#/', tag };
+      return { title: fill(T.streakTitle, { streak: T.days(streak) }), body: rounds ? T.streakBodyR : fill(T.streakBody, { left }), url: '/#/', tag };
     }
     case 'review': {
       const reviews = Math.max(1, reviewsDueAt(s, c.now));
@@ -130,7 +147,7 @@ export function composeMessage(kind: MessageKind, c: MessageContext): PushMessag
     case 'tip': {
       const id = pickTipSubtype(s, c.now);
       const method = id ? getMethod(id, c.lang) : null;
-      if (!id || !method) return { title: T.dailyTitle, body: fill(T.dailyBody[0], { goal }), url: '/#/', tag };
+      if (!id || !method) return { title: T.dailyTitle, body: fill((rounds ? T.dailyBodyR : T.dailyBody)[0], { goal: rounds ? goalR : goal }), url: '/#/', tag };
       return { title: clip(fill(T.tipTitle, { name: subtypeName(id, c.lang) }), 60), body: clip(method.trick, 180), url: `/#/lernen/${id}`, tag };
     }
     case 'test':

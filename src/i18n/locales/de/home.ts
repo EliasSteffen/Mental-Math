@@ -47,4 +47,12 @@ export const home = {
   categories: 'Kategorien',
   ctaPractice: 'Jetzt üben',
   ctaMinutes: 'ca. {n} min',
+  // v9 C
+  caseTitle: 'Mini-Case',
+  caseSub: 'Ein Fall, mehrere Rechenschritte',
+  // v9 H
+  exampleLabel: 'Zum Beispiel',
+  exampleNames: 'In dieser Runde',
+  goalDotsAria: '{done} von {goal} Runden heute',
+  goalDotsAriaOne: '{done} von {goal} Runde heute',
 } as const;

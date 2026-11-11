@@ -81,4 +81,12 @@ export const common = {
   crashCopied: 'Fehlerbericht kopiert',
   crashReset: 'App-Cache leeren und neu laden',
   crashResetHelp: 'Lädt die App frisch vom Server. Trainingsdaten und Konto bleiben erhalten.',
+  // v9 B: Tagesziel in Runden, Serie, Freeze
+  roundsOfGoal: '{done} / {goal} Runden',
+  roundsOfGoalOne: '{done} / {goal} Runde',
+  streakRun: '{n} in Folge',
+  freezeAria: '{n} Serien-Freezes',
+  freezeOneAria: '{n} Serien-Freeze',
+  startHint: 'Starte heute deine Serie',
+  goalReached: 'Tagesziel erreicht',
 } as const;

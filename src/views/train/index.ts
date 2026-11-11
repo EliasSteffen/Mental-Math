@@ -10,7 +10,7 @@ import { planTask } from '../../core/adaptive.ts';
 import { getMethod } from '../../core/methods.ts';
 import { renderExhibit } from '../../ui/exhibit.ts';
 import { modeName } from '../../core/modes.ts';
-import { getAttempts, getSessions, getSettings, addAttempt, getReviews, setReviews } from '../../data/storage.ts';
+import { getAttempts, getSessions, getSettings, addAttempt, getReviews, setReviews, isDemoData } from '../../data/storage.ts';
 import { dailyTasks } from '../../core/daily.ts';
 import { dayKey, personalBest, ghostProgress } from '../../core/progress.ts';
 import { recordResult, dueReviews } from '../../core/review.ts';
@@ -27,8 +27,11 @@ import { createTimer, type TaskTimer } from './timer.ts';
 import { createAnswer } from './answer.ts';
 import { buildFeedback, choiceOutcome, createHelp } from './feedback.ts';
 import { diagnose } from './diagnosis.ts';
+import { AUTO_ADVANCE_MS, shouldAutoAdvance } from '../../core/auto-advance.ts';
 import { showBreathe } from './breathe.ts';
 import { showResult } from './result.ts';
+import { duelTasks, type DuelBase } from '../../core/duel-link.ts'; // v9 I
+import { loadDuel, type DuelOpponent } from '../../features/duel.ts'; // v9 I
 import { t } from '../../i18n/index.ts';
 
 export interface TrainResult { task: Task; given: number | null; ev: Evaluation; timeMs: number }
@@ -49,6 +52,8 @@ export interface TrainCtx {
   dailyKey: string | null;
   /** Gewertete Runde (Daily mit einem Versuch, Wettbewerb); sonst null */
   ranked: RankedRound | null;
+  /** Herausforderung (v9 I): Aufgabensatz und – wenn ein Freund schon gespielt hat – sein Ergebnis */
+  duel?: { base: DuelBase; them: DuelOpponent | null };
   stop(): void;
 }
 
@@ -113,6 +118,46 @@ function shortcutBlocked(e: KeyboardEvent): boolean {
   return e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey || isSheetOpen() || isModalOpen();
 }
 
+/**
+ * Auto-Weiter (v9 A): nach AUTO_ADVANCE_MS `advance()`. Abbruch bei jeder Interaktion außerhalb von „Weiter“
+ * (Lösungsweg, Methode, KI); Pause, solange die Seite verborgen ist. Liefert die Abbruchfunktion.
+ */
+function startAutoAdvance(nextBtn: HTMLElement, root: HTMLElement, advance: () => void): () => void {
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  const clear = (): void => { if (timer !== null) { clearTimeout(timer); timer = null; } };
+  const arm = (): void => {
+    clear();
+    nextBtn.classList.remove('is-auto');
+    if (document.hidden) return;
+    nextBtn.style.setProperty('--auto-ms', `${AUTO_ADVANCE_MS}ms`);
+    // Animation neu starten
+    void nextBtn.offsetWidth;
+    nextBtn.classList.add('is-auto');
+    timer = setTimeout(() => { cancel(); advance(); }, AUTO_ADVANCE_MS);
+  };
+  const onInteract = (e: Event): void => {
+    if (e instanceof KeyboardEvent && (e.key === 'Shift' || e.key === 'Control' || e.key === 'Meta' || e.key === 'Alt')) return;
+    const el = e.target;
+    if (el instanceof Node && nextBtn.contains(el)) return;
+    cancel();
+  };
+  const onVisibility = (): void => {
+    if (document.hidden) { clear(); nextBtn.classList.remove('is-auto'); } else arm();
+  };
+  function cancel(): void {
+    clear();
+    nextBtn.classList.remove('is-auto');
+    root.removeEventListener('pointerdown', onInteract, true);
+    root.removeEventListener('keydown', onInteract, true);
+    document.removeEventListener('visibilitychange', onVisibility);
+  }
+  root.addEventListener('pointerdown', onInteract, true);
+  root.addEventListener('keydown', onInteract, true);
+  document.addEventListener('visibilitychange', onVisibility);
+  arm();
+  return cancel;
+}
+
 export function renderTrain(modeIn: Mode, { n: nOverride = null, intro: introIn = false, estimate = false, custom = null, ranked = null, placement = null }: TrainOptions = {}): void {
   const settings = getSettings();
   // Strenge Bedingungen (gewertet oder Einstufung): Zeit immer, keine Hilfe, kein Auto-Prüfen, kein Schätzen
@@ -127,16 +172,20 @@ export function renderTrain(modeIn: Mode, { n: nOverride = null, intro: introIn 
 
   // Feste Aufgabenlisten (Gewertet / Daily / Retry); Custom wird pro Aufgabe generiert
   let fixedTasks: Task[] | null = null;
+  let duelCtx: { base: DuelBase; them: DuelOpponent | null } | null = null; // v9 I
   if (ranked) fixedTasks = ranked.tasks;
   else if (mode === 'daily') fixedTasks = dailyTasks(today);
   else if (mode === 'retry') {
     fixedTasks = loadRetryTasks();
     if (!fixedTasks) { mode = 'all'; notice = t('train.noRetry'); }
+  } else if (mode === 'duel') {
+    const d = loadDuel(); // v9 I
+    if (d) { fixedTasks = duelTasks(d.base); duelCtx = d; } else { mode = 'all'; notice = t('duel.none'); }
   } else if (mode === 'custom' && !custom) {
     mode = 'all';
     notice = t('train.noRange');
   }
-  const fixedMode = strict || mode === 'daily' || mode === 'retry' || mode === 'custom';
+  const fixedMode = strict || mode === 'daily' || mode === 'retry' || mode === 'custom' || mode === 'duel';
   const sessionLength = placement ? placement.max : fixedTasks ? fixedTasks.length : mode === 'daily' ? 15 : nOverride || settings.sessionLength || 10;
   const est = !strict && (estimate || settings.estimateMode === true) && !fixedMode;
   // Einstufung: nächste Aufgabe ergibt sich aus den bisherigen Antworten
@@ -172,12 +221,15 @@ export function renderTrain(modeIn: Mode, { n: nOverride = null, intro: introIn 
   let onKey: ((e: KeyboardEvent) => void) | null = null;
   let autoFailTimer: ReturnType<typeof setInterval> | null = null;
   let breatheStop: (() => void) | null = null;
+  // v9 A: Auto-Weiter nach richtiger Antwort (Abbruch/Aufräumen)
+  let autoCancel: (() => void) | null = null;
 
   const stop = (): void => {
     if (timer) { timer.stop(); timer = null; }
     if (autoFailTimer !== null) { clearInterval(autoFailTimer); autoFailTimer = null; }
     if (onKey) { document.removeEventListener('keydown', onKey); onKey = null; }
     if (breatheStop) { breatheStop(); breatheStop = null; }
+    if (autoCancel) { autoCancel(); autoCancel = null; }
   };
   // Gewertet: Verlässt die Runde die Ansicht auf anderem Weg (Zurück, Link), gilt sie als abgebrochen – die Outbox
   // gibt sie beim nächsten Laden ab. Nach dem Ergebnis ist das ein No-op.
@@ -191,6 +243,7 @@ export function renderTrain(modeIn: Mode, { n: nOverride = null, intro: introIn 
     restart: ranked ? `#/challenge/${ranked.id}` : mode === 'custom' ? location.hash : `#/train/${mode}`,
     dailyKey: !ranked && mode === 'daily' ? today : null,
     ranked,
+    ...(duelCtx ? { duel: duelCtx } : {}), // v9 I
     stop,
   };
 
@@ -381,6 +434,10 @@ export function renderTrain(modeIn: Mode, { n: nOverride = null, intro: introIn 
       }
       revealBottom();
       nextBtn.focus({ preventScroll: true });
+      // v9 A: Auto-Weiter; nicht im Rundgang/in der Demo (die Skripte tippen „Weiter“ selbst)
+      if (shouldAutoAdvance({ enabled: settings.autoAdvance && !isDemoData(), correct: ev.correct, timedOut })) {
+        autoCancel = startAutoAdvance(nextBtn, root, advance);
+      }
     }
 
     setKeyHandler((e) => {
@@ -439,7 +496,7 @@ export function renderTrain(modeIn: Mode, { n: nOverride = null, intro: introIn 
   const begin = (): void => { if (intro) showIntro(); else showTask(); };
 
   // Atempause (E19): nicht bei Daily, Wiederholung der Fehler und kurzen Review-Runden
-  const breathe = !strict && settings.breathe === true && mode !== 'daily' && mode !== 'retry' && !(mode === 'review' && sessionLength < 3);
+  const breathe = !strict && settings.breathe === true && mode !== 'daily' && mode !== 'retry' && mode !== 'duel' && !(mode === 'review' && sessionLength < 3);
   if (breathe) {
     const withIntro = intro && Boolean(SUBTYPES[mode] && getMethod(mode));
     const tasks = sessionLength === 1 ? t('train.tasksOne') : t('train.tasksMany', { n: sessionLength });

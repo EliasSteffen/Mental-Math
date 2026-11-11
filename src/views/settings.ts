@@ -1,6 +1,7 @@
 // Profil (Ruhiger Fokus): Hauptseite mit Konto und Menü (je Bereich eine Zeile mit dem aktuellen Stand), die Bereiche als
 // Unterseiten (#/profil/:bereich), ab 1024 px Liste und Bereich nebeneinander. Eingaben kommen aus dem Kit, aktualisieren
 // sich lokal und speichern sofort: kein Toast (E21), kein rerender() (Fix A11). Konto-Verwaltung und Kategorien liegen in modalen Sheets.
+import { playerCard } from './profile-card.ts'; // v9 H
 import type { CategoryId, Level, Settings, ThemeSetting, TimerDisplay } from '../types.ts';
 import { getSettings, setSettings, resetAll, exportJSON, getAttempts, getSessions, getProfile, onChange } from '../data/storage.ts';
 import { importJSON } from '../data/transfer.ts';
@@ -9,9 +10,10 @@ import { toast } from '../ui/toast.ts';
 import { confirmDialog, openModal } from '../ui/modal.ts';
 import { openChangelog, fmtIsoDate } from '../features/whats-new.ts';
 import { BUILD_INFO } from '../generated/build-info.ts';
-import { detectLang, setLang, t, locale } from '../i18n/index.ts';
+import { detectLang, getLang, setLang, t, locale } from '../i18n/index.ts';
 import { CATEGORIES } from '../core/catalog.ts';
 import { fmt } from '../core/numbers.ts';
+import { deviceKind, feedbackMailto, type FeedbackKind } from '../core/feedback.ts';
 import { app, h, appendChildren, type Child } from '../ui/dom.ts';
 import { rerender, addCleanup, go } from '../router.ts';
 import { backLink, button, group, icon, largeTitle, list, row, segmented, setButtonLabel, stepper, switchRow, type IconName, type SwitchControl } from '../ui/kit.ts';
@@ -21,7 +23,7 @@ import * as acct from '../features/account.ts';
 import { getSyncStatus, logoutAndForgetDevice, onSyncStatus, syncNow, syncStatusEntries, wipeCloudData } from '../features/sync.ts';
 import { remindersGroup } from './settings-reminders.ts';
 import { isPushEnabled, pushConfig } from '../platform/reminders.ts';
-import { APP_STORE_URL, isNative, liveUpdateBeta, openStorePage, publicUrl, saveFile, setLiveUpdateBeta } from '../platform/index.ts';
+import { APP_STORE_URL, isNative, liveUpdateBeta, openMailto, openStorePage, publicUrl, saveFile, setLiveUpdateBeta } from '../platform/index.ts';
 import { REPLAY_CHAPTERS } from '../features/tour-scripts.ts';
 import { TAB_HREF } from '../ui/shell.ts';
 import { isTablet, isWide } from '../ui/viewport.ts';
@@ -37,6 +39,14 @@ const nextId = (prefix: string): string => `prof-${prefix}-${++uid}`;
 
 /** Speichert sofort und still (E21). */
 const save = (partial: Partial<Settings>): void => { setSettings(partial); };
+
+/** v9 F: „1 Aufgabe“ / „11 Aufgaben“ (Einzahl nur bei genau 1) */
+const countTasks = (n: number): string => (n === 1 ? t('settings.taskCountOne') : t('settings.taskCountMany', { n: fmt(n) }));
+/** v9 F: „1 Runde“ / „11 Runden“ */
+const countRounds = (n: number): string => (n === 1 ? t('settings.roundCountOne') : t('settings.roundCountMany', { n: fmt(n) }));
+/** v9 F: „11 Aufgaben · 1 Runde“ für die Daten-Zusammenfassung */
+const storedSummary = (): string =>
+  t('settings.storedCount', { tasks: countTasks(getAttempts().length), rounds: countRounds(getSessions().length) });
 
 /** Ungefähre Größe der gespeicherten Daten in KB – gemessen am Export (die Daten liegen in IndexedDB, nicht mehr in localStorage). */
 function storageKB(): number {
@@ -149,9 +159,9 @@ function trainingGroup(s: Settings): HTMLElement {
   });
 
   const goal = stepper({
-    label: t('settings.dailyGoal'), value: s.dailyGoalMin, min: 5, max: 60, step: 5, help: t('settings.dailyGoalHelp'),
-    format: (n) => t('settings.minutes', { n }),
-    onChange: (n) => save({ dailyGoalMin: n }),
+    label: t('settings.dailyGoal'), value: s.dailyGoalRounds, min: 1, max: 10, step: 1, help: t('settings.dailyGoalHelp'),
+    format: (n) => t(n === 1 ? 'settings.roundsNOne' : 'settings.roundsN', { n }), // v9 B: Runden statt Minuten
+    onChange: (n) => save({ dailyGoalRounds: n }),
   });
 
   // Alte Werte (z. B. 30) bleiben wählbar, bis man umstellt
@@ -200,6 +210,7 @@ function roundGroup(s: Settings): HTMLElement {
     switchRow({ label: t('settings.timer'), help: t('settings.timerHint'), checked: s.timer, onChange: onTimer }).el,
     autoFail.el,
     switchRow({ label: t('settings.autoSubmit'), help: t('settings.autoSubmitHint'), checked: s.autoSubmit, onChange: (v) => save({ autoSubmit: v }) }).el,
+    switchRow({ label: t('settings.autoAdvance'), help: t('settings.autoAdvanceHint'), checked: s.autoAdvance, onChange: (v) => save({ autoAdvance: v }) }).el, // v9 A
     switchRow({ label: t('settings.estimate'), help: t('settings.estimateHint'), checked: s.estimateMode, onChange: (v) => save({ estimateMode: v }) }).el,
     switchRow({ label: t('settings.ghost'), help: t('settings.ghostHint'), checked: s.ghost, onChange: (v) => save({ ghost: v }) }).el,
     switchRow({ label: t('settings.breathe'), help: t('settings.breatheHelp'), checked: s.breathe, onChange: (v) => save({ breathe: v }) }).el,
@@ -332,9 +343,11 @@ function dataGroup(live: HTMLElement): HTMLElement {
     if (!res.ok) { toast(res.error, { kind: 'error' }); return; }
     applyTheme(getSettings().theme);
     setLang(detectLang(getSettings().lang));
-    const counts = { attempts: res.attempts, sessions: res.sessions, skipped: res.skipped };
-    if (res.skipped > 0) toast(t('settings.importDoneSkipped', counts), { kind: 'info', durationMs: 6000 });
-    else toast(t('settings.importDone', counts), { kind: 'success' });
+    const counts = { tasks: countTasks(res.attempts), rounds: countRounds(res.sessions) };
+    if (res.skipped > 0) {
+      const skipped = res.skipped === 1 ? t('settings.skippedOne') : t('settings.skippedMany', { n: fmt(res.skipped) });
+      toast(t('settings.importDoneSkipped', { ...counts, skipped }), { kind: 'info', durationMs: 6000 });
+    } else toast(t('settings.importDone', counts), { kind: 'success' });
     rerender({ keepScroll: true }); // alle Einstellungen können sich geändert haben
   }
 
@@ -357,7 +370,7 @@ function dataGroup(live: HTMLElement): HTMLElement {
     });
   };
 
-  const usage = `${t('settings.storedCount', { attempts: fmt(getAttempts().length), sessions: fmt(getSessions().length) })} · ${t('settings.storageUsed', { kb: fmt(storageKB()) })}`;
+  const usage = `${storedSummary()} · ${t('settings.storageUsed', { kb: fmt(storageKB()) })}`;
   return profGroup(
     list([
       exportRow,
@@ -404,6 +417,15 @@ function aboutGroup(): HTMLElement {
   const source = row({ icon: 'link', label: t('settings.sourceCode'), value: 'GitHub', href: SOURCE_URL, target: '_blank' });
   // Öffentliche Seiten (scripts/pages.ts); absolut, damit die iOS-App sie im In-App-Browser öffnet
   const help = row({ icon: 'chat', label: t('settings.help'), href: `${publicUrl()}hilfe`, target: '_blank' });
+  // v9 F: Feedback-Mail mit App-Version, Build, Plattform, Sprache und Gerätetyp – keine Trainings- oder Kontodaten
+  const mail = (kind: FeedbackKind): void => {
+    openMailto(feedbackMailto(kind, {
+      version: BUILD_INFO.version, build: BUILD_INFO.build, platform: isNative() ? 'iOS' : 'Web',
+      lang: getLang(), device: deviceKind(window.innerWidth),
+    }));
+  };
+  const feedback = row({ icon: 'chat', label: t('settings.feedbackSend'), chevron: true, onClick: () => mail('feedback') });
+  const bug = row({ icon: 'info', label: t('settings.reportBug'), chevron: true, onClick: () => mail('bug') });
   const privacy = row({ icon: 'key', label: t('settings.privacy'), href: `${publicUrl()}datenschutz`, target: '_blank' });
   // App bewerten (App Store) bzw. auf der Website der Weg zur iOS-App
   const store = isNative()
@@ -423,7 +445,7 @@ function aboutGroup(): HTMLElement {
   const meta = (label: string, value: string, title?: string): HTMLElement =>
     h('div', null, h('dt', null, label), h('dd', { class: 'num', title }, value));
   return profGroup(
-    list([help, intro, news, store, beta.el, privacy, source]),
+    list([help, feedback, bug, intro, news, store, beta.el, privacy, source]),
     h('dl', { class: 'prof-meta' },
       meta(t('settings.build'), [BUILD_INFO.build, fmtIsoDate(BUILD_INFO.date), BUILD_INFO.channel === 'preview' ? t('settings.channelPreview') : '']
         .filter(Boolean).join(' · ')),
@@ -953,7 +975,7 @@ interface Section {
 const SECTIONS: readonly Section[] = [
   {
     id: 'training', icon: 'target', title: 'settings.training', intro: 'settings.introTraining',
-    summary: (s) => [t(DIFF_LABEL[s.difficulty]), t('settings.minutes', { n: s.dailyGoalMin }), t('settings.summaryTasks', { n: s.sessionLength })].join(' · '),
+    summary: (s) => [t(DIFF_LABEL[s.difficulty]), t(s.dailyGoalRounds === 1 ? 'settings.roundsNOne' : 'settings.roundsN', { n: s.dailyGoalRounds }), t('settings.summaryTasks', { n: s.sessionLength })].join(' · '),
     body: (s) => [trainingGroup(s)],
   },
   {
@@ -978,7 +1000,7 @@ const SECTIONS: readonly Section[] = [
   },
   {
     id: 'daten', icon: 'download', title: 'settings.data', intro: 'settings.introData',
-    summary: () => t('settings.storedCount', { attempts: fmt(getAttempts().length), sessions: fmt(getSessions().length) }),
+    summary: storedSummary,
     body: (_s, live) => [dataGroup(live)],
   },
   {
@@ -1037,7 +1059,7 @@ export function renderSettings(sectionId: string | null): void {
     addCleanup(onChange(() => menu.paint()));
     appendChildren(app, [
       h('div', { class: 'split' },
-        h('div', { class: 'split-master' }, largeTitle(t('settings.title')), accountCard(), menu.el),
+        h('div', { class: 'split-master' }, largeTitle(t('settings.title')), playerCard(), accountCard(), menu.el),
         h('div', { class: 'split-detail' }, sectionNodes(shown, s, live, false))),
     ]);
     return;
@@ -1046,5 +1068,5 @@ export function renderSettings(sectionId: string | null): void {
     appendChildren(app, sectionNodes(section, s, live, true));
     return;
   }
-  appendChildren(app, [largeTitle(t('settings.title')), accountCard(), sectionMenu(s, null).el]);
+  appendChildren(app, [largeTitle(t('settings.title')), playerCard(), accountCard(), sectionMenu(s, null).el]);
 }

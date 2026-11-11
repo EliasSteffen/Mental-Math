@@ -15,6 +15,10 @@ export const DEFAULT_SETTINGS: Settings = {
   lastStoreCheck: 0, updateNotifiedVersion: '', updateNotifiedAt: 0, reviewAskedVersion: '', reviewAskedAt: 0,
   onboardingDone: false,
   placement: null,
+  dailyGoalRounds: 3, // v9 B
+  autoAdvance: true, // v9 A
+  duelName: '', // v9 I
+  league: null, badges: {}, cards: {}, // v9 J
 };
 
 export const DEFAULT_PARALLEL_STATS: ParallelStats = { nextStart: 2, bestChains: 0, bestCorrectStreak: 0, rounds: 0 };
@@ -58,6 +62,38 @@ export function normalizePlacement(v: unknown): Settings['placement'] {
   return typeof theta === 'number' && Number.isInteger(theta) && theta >= 0 && theta <= 6 && isNum(ts) ? { theta, ts } : null;
 }
 
+const isInt = (v: unknown, lo: number, hi: number): v is number => typeof v === 'number' && Number.isInteger(v) && v >= lo && v <= hi;
+
+/** Liga (v9 J): Stufe und Peak ganze Zahlen 0–15, Peak ≥ Stufe; sonst null. */
+export function normalizeLeague(v: unknown): Settings['league'] {
+  if (!isObj(v)) return null;
+  const { tier, peak, ts } = v;
+  if (!isInt(tier, 0, 15) || !isInt(peak, 0, 15) || !isNum(ts)) return null;
+  return { tier, peak: Math.max(tier, peak), ts };
+}
+
+/** Orden (v9 J): höchstens 64 Einträge, Stufe 1–3, Zeitpunkt endlich; Unbrauchbares fällt weg. */
+export function normalizeBadges(v: unknown): Settings['badges'] {
+  const out: Settings['badges'] = {};
+  if (!isObj(v)) return out;
+  for (const [id, b] of Object.entries(v).slice(0, 64)) {
+    if (id.length === 0 || id.length > 32 || !isObj(b) || !isInt(b.tier, 1, 3) || !isNum(b.ts)) continue;
+    out[id] = { tier: b.tier as 1 | 2 | 3, ts: b.ts };
+  }
+  return out;
+}
+
+/** Trick-Karten (v9 J): höchstens 200 Einträge, Zeitpunkt endlich. */
+export function normalizeCards(v: unknown): Settings['cards'] {
+  const out: Settings['cards'] = {};
+  if (!isObj(v)) return out;
+  for (const [id, ts] of Object.entries(v).slice(0, 200)) {
+    if (id.length === 0 || id.length > 48 || !isNum(ts)) continue;
+    out[id] = ts;
+  }
+  return out;
+}
+
 /**
  * Beliebige gespeicherte/importierte/synchronisierte Einstellungen → gültige Settings.
  * Fehlende Felder kommen aus den Defaults; Theme wird migriert; fehlende `timerDisplay` folgt dem alten
@@ -76,6 +112,12 @@ export function normalizeSettings(raw: unknown): Settings {
     confetti: typeof s.confetti === 'boolean' ? s.confetti : DEFAULT_SETTINGS.confetti,
     onboardingDone: s.onboardingDone === true,
     placement: normalizePlacement(s.placement),
+    // v9 B: ganze Zahl 1–10
+    dailyGoalRounds: typeof s.dailyGoalRounds === 'number' && Number.isInteger(s.dailyGoalRounds) && s.dailyGoalRounds >= 1 && s.dailyGoalRounds <= 10
+      ? s.dailyGoalRounds : DEFAULT_SETTINGS.dailyGoalRounds,
+    autoAdvance: typeof s.autoAdvance === 'boolean' ? s.autoAdvance : DEFAULT_SETTINGS.autoAdvance, // v9 A
+    duelName: typeof s.duelName === 'string' ? Array.from(s.duelName.replace(/[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u2028-\u202e\u2060-\u206f\ufeff]/g, ' ').trim()).slice(0, 24).join('') : '', // v9 I: ≤ 24 Zeichen, ohne Steuerzeichen
+    league: normalizeLeague(s.league), badges: normalizeBadges(s.badges), cards: normalizeCards(s.cards), // v9 J
   };
 }
 

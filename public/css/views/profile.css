@@ -157,4 +157,22 @@
   @media (prefers-reduced-motion: reduce) {
     .prof-msg, .prof-confirm { animation:fade-in 150ms linear both; }
   }
+
+  /* ---------- v9 H: Spielerkarte ---------- */
+  .pcard { display:flex; flex-direction:column; gap:var(--space-3); min-width:0; text-decoration:none; color:var(--text); -webkit-tap-highlight-color:transparent; }
+  .pcard:focus-visible { outline:3px solid color-mix(in srgb, var(--accent) 45%, transparent); outline-offset:2px; }
+  .pcard-top { display:flex; align-items:center; gap:var(--space-3); min-width:0; }
+  .pcard-top > .league-emblem { flex:none; }
+  .pcard-id { flex:1; min-width:0; display:flex; flex-direction:column; gap:2px; }
+  .pcard-name { font-size:var(--text-xs); line-height:1.3; color:var(--muted); overflow-wrap:anywhere; }
+  .pcard-league { font-size:var(--text-lg); font-weight:var(--weight-bold); line-height:1.2; overflow-wrap:anywhere; }
+  .pcard-level { font-size:var(--text-sm); color:var(--muted); }
+  .pcard-chevron { display:flex; flex:none; color:var(--muted); }
+  .pcard-xp { display:flex; flex-direction:column; gap:var(--space-1); }
+  .pcard-xp-line { font-size:var(--text-xs); color:var(--muted); }
+  .pcard-stats { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:var(--space-3) var(--space-4); margin:0; }
+  .pcard-stat { display:flex; flex-direction:column; gap:2px; min-width:0; margin:0; }
+  .pcard-stat-label { font-size:var(--text-xs); line-height:1.3; color:var(--muted); margin:0; }
+  .pcard-stat-value { font-size:var(--text-md); font-weight:var(--weight-semibold); line-height:1.2; margin:0; }
+  .pcard-stat-sub { font-weight:var(--weight-regular); color:var(--muted); }
 }

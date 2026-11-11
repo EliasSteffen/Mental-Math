@@ -5,9 +5,10 @@
 import { CATEGORIES, SUBTYPES, activeCategories } from '../core/catalog.ts';
 import { categoryStats } from '../core/scoring.ts';
 import { dueReviews } from '../core/review.ts';
-import { dayKey, recommendation, streakInfo } from '../core/progress.ts';
+import { dayKey, recommendation } from '../core/progress.ts';
+import { habitInfo } from '../core/habit.ts'; // v9 B
 import { fmtSeconds } from '../core/numbers.ts';
-import { getActivity, getAttempts, getDailyResults, getReviews, getSettings } from '../data/storage.ts';
+import { getActivity, getAttempts, getDailyResults, getReviews, getSessions, getSettings } from '../data/storage.ts';
 import { app, appendChildren, h } from '../ui/dom.ts';
 import { icon, largeTitle, list, masteryMark, masteryOf, row, statusLine, type IconName } from '../ui/kit.ts';
 import { openSheet, type SheetHandle } from '../ui/sheet.ts';
@@ -17,7 +18,8 @@ import { accountEnabled, onAccountChange } from '../features/account.ts';
 import { cachedResult, pendingAttempt, rankedAvailable } from '../features/challenge.ts';
 import { locale, t } from '../i18n/index.ts';
 import type { Recommendation } from '../types.ts';
-import { dateLine, daypart, heroPlan, timeGap, type HeroPlan, type TimeGap } from './home-data.ts';
+import { dateLine, daypart, goalDots, heroExample, heroPlan, timeGap, type HeroExample, type HeroPlan, type TimeGap } from './home-data.ts';
+import { levelFor } from '../core/scoring.ts'; // v9 H
 
 const GREETING = { morning: 'home.greetMorning', day: 'home.greetDay', evening: 'home.greetEvening' } as const;
 
@@ -45,12 +47,29 @@ function timeBar(gap: TimeGap): HTMLElement {
       labelled(t('home.timeYours'), fmtSeconds(gap.medianMs))));
 }
 
+/** v9 H: Beispielaufgabe in großen Zahlen oder Typnamen der Runde; füllt die Leerfläche der Karte. */
+function exampleBlock(ex: HeroExample | null): HTMLElement | null {
+  if (!ex) return null;
+  return h('span', { class: 'today-example' },
+    h('span', { class: 'today-example-label' }, ex.kind === 'task' ? t('home.exampleLabel') : t('home.exampleNames')),
+    ex.kind === 'task'
+      ? h('span', { class: 'today-example-task num' }, ex.prompt)
+      : h('span', { class: 'today-example-names' }, ...ex.names.map((n) => h('span', { class: 'today-example-name' }, n))));
+}
+
+/** v9 H: Tagesziel als Punkte (●●○), Beschriftung für Screenreader. */
+function goalDotsEl(dots: { filled: number; total: number }, done: number, goal: number): HTMLElement {
+  return h('span', {
+    class: 'today-goal', role: 'img', 'aria-label': t(goal === 1 ? 'home.goalDotsAriaOne' : 'home.goalDotsAria', { done, goal }),
+  }, ...Array.from({ length: dots.total }, (_, i) => h('span', { class: `today-goal-dot${i < dots.filled ? ' is-on' : ''}`, 'aria-hidden': 'true' })));
+}
+
 /**
  * Empfehlung als eine große, antippbare Karte (Link auf den Plan): Titel („Kategorie · Subtyp“), Ablauf, darunter der
  * Zeit-Balken (E9) oder der Grund, unten „Jetzt üben · ca. N min“. Beim Erststart begrüßt sie statt „Noch nie geübt“.
  * Nur <span> im Link (keine verschachtelten Bedienelemente).
  */
-function hero(rec: Recommendation, plan: HeroPlan, gap: TimeGap | null, fresh: boolean): HTMLAnchorElement {
+function hero(rec: Recommendation, plan: HeroPlan, gap: TimeGap | null, fresh: boolean, example: HTMLElement | null, goal: HTMLElement): HTMLAnchorElement {
   const sub = rec.subtype ? SUBTYPES[rec.subtype] : undefined;
   const catName = sub ? CATEGORIES.find((c) => c.id === sub.category)?.name : undefined;
   // Geschützte Bindestriche: „2-stellig × 1-stellig“ bricht nicht mitten im Wort um
@@ -61,9 +80,10 @@ function hero(rec: Recommendation, plan: HeroPlan, gap: TimeGap | null, fresh: b
   const reason = fresh && rec.kind === 'new' ? t('home.firstReason') : rec.reason;
   return h('a', { class: 'card hero today-hero press', href: plan.href },
     h('span', { class: 'today-hero-head' },
-      h('span', { class: 'today-hero-label' }, t('home.recLabel')),
+      h('span', { class: 'today-hero-top' }, h('span', { class: 'today-hero-label' }, t('home.recLabel')), goal), // v9 H
       h('span', { class: 'today-hero-title' }, title),
       h('span', { class: 'today-hero-sub' }, planText)),
+    example, // v9 H
     gap ? timeBar(gap) : h('span', { class: 'today-insight' }, h('span', { class: 'today-insight-text is-quiet' }, reason)),
     h('span', { class: 'btn primary cta is-full today-hero-go' },
       icon('play', 20),
@@ -110,8 +130,7 @@ export function renderHome(): void {
   const attempts = getAttempts();
   const reviews = getReviews();
   const settings = getSettings();
-  const goalMin = settings.dailyGoalMin || 15;
-  const st = streakInfo(getActivity(), goalMin * 60000, now);
+  const habit = habitInfo({ sessions: getSessions(), activity: getActivity(), goalRounds: settings.dailyGoalRounds, now }); // v9 B
   const rec = recommendation(attempts, reviews, now, { enabledCategories: settings.enabledCategories });
   const plan = heroPlan(rec, {
     sessionLength: settings.sessionLength || 10,
@@ -119,6 +138,13 @@ export function renderHome(): void {
     enabledCategories: settings.enabledCategories,
   });
   const fresh = attempts.length === 0;
+  // v9 H: tagesstabiles Beispiel und Tagesziel-Punkte
+  const example = exampleBlock(
+    heroExample(rec, {
+      dayKey: dayKey(now), level: rec.subtype ? levelFor(rec.subtype, attempts, settings.difficulty) : 2,
+      reviewSubtypes: dueReviews(reviews, now).map((r) => r.subtype), enabledCategories: settings.enabledCategories,
+    }));
+  const goal = goalDotsEl(goalDots(habit.todayRounds, habit.goalRounds), habit.todayRounds, habit.goalRounds);
   const gap = timeGap(attempts, rec.subtype);
   const stats = categoryStats(attempts);
   const daily = getDailyResults()[dayKey(now)];
@@ -152,6 +178,7 @@ export function renderHome(): void {
   addCleanup(close);
   const modeRow = (label: string, sub: string, href: string): HTMLElement => row({ label, sub, href, onClick: close });
   const openModes = (): void => open(t('home.moreModes'), [
+    modeRow(t('home.caseTitle'), t('home.caseSub'), '#/case'), // v9 C
     modeRow(t('home.chainTitle'), t('home.chainSub'), '#/chain'),
     modeRow(t('home.parallelTitle'), t('home.parallelSub'), '#/parallel'),
     modeRow(t('home.estimateTitle'), t('home.estimateSub'), '#/train/all?est=1'),
@@ -178,6 +205,7 @@ export function renderHome(): void {
       sub: t('lernen.skill', { n: stats[c.id]?.score ?? '–' }), href: `#/train/${c.id}`,
     }))),
     tileSection(t('home.moreModes'), [
+      tile({ icon: 'target', label: t('home.caseTitle'), sub: t('home.caseSub'), href: '#/case' }), // v9 C
       tile({ icon: 'link', label: t('home.chainTitle'), sub: t('home.chainSub'), href: '#/chain' }),
       tile({ icon: 'bars', label: t('home.parallelTitle'), sub: t('home.parallelSub'), href: '#/parallel' }),
       tile({ icon: 'target', label: t('home.estimateTitle'), sub: t('home.estimateSub'), href: '#/train/all?est=1' }),
@@ -192,9 +220,9 @@ export function renderHome(): void {
   appendChildren(app, [
     h('div', { class: 'today-head' },
       largeTitle(t(GREETING[daypart(new Date(now).getHours())]), dateLine(now, locale())),
-      statusLine({ todayMin: Math.floor(st.todayMs / 60000), goalMin, streak: st.current })),
+      statusLine({ todayRounds: habit.todayRounds, goalRounds: habit.goalRounds, streak: habit.streak, freezes: habit.freezes, startHint: true })),
     h('div', { class: 'today-main' },
-      hero(rec, plan, gap, fresh),
+      hero(rec, plan, gap, fresh, example, goal),
       h('nav', { class: `today-tiles${tiles.length % 2 ? ' is-odd' : ''}`, 'aria-label': t('home.otherTitle') }, ...tiles)),
     more,
   ]);

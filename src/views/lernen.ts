@@ -15,12 +15,15 @@ import { app, appendChildren, h, type Child } from '../ui/dom.ts';
 import {
   backLink, button, card, fold, group, insight, largeTitle, list, masteryMark, masteryOf, row, searchField, type Mastery,
 } from '../ui/kit.ts';
+import { masteryCounts, type MasteryCounts } from '../core/mastery.ts';
 import { setPrimaryAction } from '../ui/shell.ts';
 import { isWide } from '../ui/viewport.ts';
 import { t } from '../i18n/index.ts';
 import { pitfallList, safeSteps, stepsList } from '../ui/widgets.ts';
 import { matchesSearch, normalizeSearch, pickNext } from './lernen-search.ts';
 import { hasGuided } from '../core/solutions/guided.ts';
+import { CARD_IDS, CARD_UNLOCK_SCORE, cardRarity } from '../core/cards.ts'; // v9 J
+import { cardMini, openCardSheet, rarityLabel } from '../ui/collectibles.ts'; // v9 J
 import { PRACTICE_N, guideHref, practiceHref, renderGuide, resetGuide } from './lernen-guide.ts';
 
 const MASTERY_RANK: Readonly<Record<Mastery, number>> = { empty: 0, half: 1, full: 2 };
@@ -29,6 +32,29 @@ const MASTERY_RANK: Readonly<Record<Mastery, number>> = { empty: 0, half: 1, ful
 let lastQuery = '';
 
 const subtypesOf = (categoryId: string): Subtype[] => Object.values(SUBTYPES).filter((s) => s.category === categoryId);
+
+const NO_COUNTS: MasteryCounts = { full: 0, half: 0, empty: 0, total: 0 };
+
+/** Gestapelter Balken: sicher (--good), in Arbeit (--accent), offen (neutral). Anteile über --n (Anzahl). */
+function stackBar(c: MasteryCounts, cls: string, label?: string): HTMLElement {
+  const seg = (kind: 'full' | 'half' | 'empty', n: number): HTMLElement => {
+    const el = h('span', { class: `learn-stack-seg is-${kind}` });
+    el.style.setProperty('--n', String(n));
+    return el;
+  };
+  const a11y = label ? { role: 'img', 'aria-label': label } : { 'aria-hidden': 'true' };
+  return h('span', { class: `learn-stack ${cls}`, ...a11y }, seg('full', c.full), seg('half', c.half), seg('empty', c.empty));
+}
+
+/** Lernkarte oben in der Liste: Meisterung gesamt und Balken (Weiterlernen steht schon als Primärbutton); ohne Aufgabentypen keine Karte. */
+function summaryCard(c: MasteryCounts): HTMLElement | null {
+  if (!c.total) return null;
+  const counts = { full: c.full, half: c.half, empty: c.empty, total: c.total };
+  return card([
+    h('p', { class: 'learn-card-count' }, t('lernen.cardCount', counts)),
+    stackBar(c, 'learn-card-bar', t('lernen.cardBarAria', counts)),
+  ], { title: t('lernen.cardTitle'), class: 'learn-summary' });
+}
 
 /* ---------- Liste ---------- */
 
@@ -42,18 +68,25 @@ interface ListParts {
   next: Subtype | null;
 }
 
+let catSeq = 0;
+
 function listParts(): ListParts {
   const attempts = getAttempts();
   const subStats = subtypeStats(attempts);
   const catStats = categoryStats(attempts);
-  const cats = activeCategories(getSettings().enabledCategories);
+  const cats = activeCategories(getSettings().enabledCategories)
+    .map((c) => ({ c, subs: subtypesOf(c.id) }))
+    .filter((g) => g.subs.length);
+
+  // Meisterung vorab zählen: Lernkarte und Kategorie-Balken brauchen die Summen vor dem Aufbau der Zeilen
+  const levels = cats.flatMap(({ c, subs }) => subs.map((s) => ({ category: c.id, sub: s, mastery: masteryOf(subStats[s.id]?.score) })));
+  const counts = masteryCounts(levels);
 
   const sections: Section[] = [];
   const rowsById = new Map<string, HTMLElement>();
   const order: Array<{ sub: Subtype; mastery: Mastery }> = [];
-  for (const c of cats) {
-    const subs = subtypesOf(c.id);
-    if (!subs.length) continue;
+  for (const { c, subs } of cats) {
+    const catCounts = counts.categories[c.id] ?? NO_COUNTS;
     const entries = subs.map((s): Entry => {
       const mastery = masteryOf(subStats[s.id]?.score);
       order.push({ sub: s, mastery });
@@ -65,11 +98,22 @@ function listParts(): ListParts {
       return { el, hay: normalizeSearch([s.name, s.tip, trick, c.name].join(' ')) };
     });
     const score = catStats[c.id]?.score;
-    const rows = list(entries.map((e) => e.el));
-    const el = group({ title: c.name, meta: t('lernen.skill', { n: typeof score === 'number' ? score : '–' }) }, rows);
-    el.classList.add('learn-group');
+    // Kopf wie group(), zusätzlich mit Balken und „3/6 sicher“ unter dem Titel
+    const headId = `learn-cat-${++catSeq}`;
+    const el = h('section', { class: 'group learn-group', 'aria-labelledby': headId },
+      h('div', { class: 'group-head' },
+        h('h2', { class: 'group-title', id: headId }, c.name),
+        h('p', { class: 'group-meta' }, t('lernen.skill', { n: typeof score === 'number' ? score : '–' }))),
+      h('div', { class: 'learn-cat-progress' },
+        stackBar(catCounts, 'learn-cat-bar'),
+        h('p', { class: 'learn-cat-count' }, t('lernen.categorySolid', { full: catCounts.full, total: catCounts.total }))),
+      list(entries.map((e) => e.el)));
     sections.push({ el, entries });
   }
+
+  // Weiterlernen: erster Subtyp mit der niedrigsten Meisterung (Kategorienreihenfolge; ohne Daten der erste)
+  const next = pickNext(order, (o) => MASTERY_RANK[o.mastery])?.sub ?? null;
+  const summary = summaryCard(counts.overall);
 
   // Ruhiger Leer-Hinweis; role=status liest ihn vor, sobald er erscheint
   const empty = h('p', { class: 'learn-empty', role: 'status' });
@@ -77,6 +121,8 @@ function listParts(): ListParts {
   function apply(query: string): void {
     lastQuery = query;
     const q = normalizeSearch(query);
+    // Die Lernkarte gilt dem Gesamtbild und verschwindet bei einer Suche
+    if (summary) summary.hidden = q !== '';
     let shown = 0;
     for (const s of sections) {
       let any = false;
@@ -100,13 +146,13 @@ function listParts(): ListParts {
   return {
     nodes: [
       largeTitle(t('lernen.title'), t('lernen.subtitle')),
+      summary,
       search,
       h('div', { class: 'learn-groups' }, sections.map((s) => s.el)),
       empty,
     ],
     rows: rowsById,
-    // Kategorienreihenfolge; ohne Daten der erste
-    next: pickNext(order, (o) => MASTERY_RANK[o.mastery])?.sub ?? null,
+    next,
   };
 }
 
@@ -127,6 +173,17 @@ function statusLine(sub: Subtype, score: number | null | undefined, count: numbe
   parts.push(t('lernen.goal', { time: fmtSeconds(sub.targetMs) }), t('lernen.level', { level: LEVEL_NAMES[lvl] }));
   const m = masteryOf(score);
   return h('p', { class: 'learn-status' }, masteryMark(m), h('span', null, parts.join(' · ')));
+}
+
+/** Trick-Karte des Typs (v9 J): freigeschaltet oder Skill-Stand; Tipp öffnet die Karte. */
+function cardEntry(sub: Subtype, score: number | null | undefined): HTMLElement | null {
+  if (!CARD_IDS.includes(sub.id)) return null;
+  const unlocked = Object.hasOwn(getSettings().cards, sub.id) || (score ?? 0) >= CARD_UNLOCK_SCORE;
+  return group(null, list([row({
+    leading: cardMini(sub.id),
+    label: unlocked ? t('rewards.learnCardOpen') : t('rewards.learnCardLocked', { score: score ?? 0, needed: CARD_UNLOCK_SCORE }),
+    sub: rarityLabel(cardRarity(sub.id)), onClick: () => openCardSheet(sub.id), chevron: true,
+  })]));
 }
 
 /** Einstieg in den geführten Lernmodus (nur für Typen mit strukturierten Schritten); startet immer frisch. */
@@ -192,6 +249,7 @@ function detailNodes(sub: Subtype, back: boolean): Child[] {
   return [
     back ? backLink({ label: t('lernen.title'), href: '#/lernen', ariaLabel: t('lernen.back') }) : null,
     h('div', { class: 'learn-head' }, largeTitle(sub.name, cat?.name), statusLine(sub, score, count, lvl)),
+    cardEntry(sub, score), // v9 J
     hasGuided(sub.id) ? guideEntry(sub.id) : null,
     m?.idea ? group(t('lernen.idea'), card([h('p', { class: 'method-text' }, m.idea)])) : null,
     m?.steps?.length ? group(t('lernen.approach'), card([stepsList(m.steps)])) : null,

@@ -4,6 +4,17 @@ Alle nennenswerten Änderungen an Mental Math. Format nach [Keep a Changelog](ht
 
 <!-- Automatisch erzeugt mit `npm run changelog` aus src/releases.ts – nicht von Hand bearbeiten. -->
 
+## [2.1.0] - 2026-11-11
+
+### Ligen, Orden & Mini-Cases
+
+- Neu: Ligen von Bronze bis Meister. Deine Liga folgt deinem Können über alle Aufgabentypen, und die besten 10 Meister werden Champion. Dazu 22 Orden in Bronze, Silber und Gold und eine Trick-Karte für jeden Aufgabentyp, den du sicher beherrschst – alles unter Fortschritt → Erfolge.
+- Neu: Mini-Case. Ein Fall wie im Interview mit vier Rechenschritten, die aufeinander aufbauen, und am Ende eine Entscheidung. Acht Fälle von Marktgröße über Break-even bis zum Exhibit.
+- Mehr Tempo, mehr Rückmeldung: Nach einer richtigen Antwort geht es von selbst weiter (abschaltbar unter Profil → Während der Runde). Das Ergebnis zeigt deine Bestzeit, den Vergleich mit der letzten Runde, wie sich dein Skill verändert hat und wie weit es bis zum nächsten Level ist.
+- Das Tagesziel zählt Runden statt Minuten. Eine Runde am Tag hält deine Serie, und für jede Woche am Stück bekommst du einen Freeze, der einen verpassten Tag überbrückt.
+- Freund herausfordern: Spiel eine Runde und schick den Link. Dein Freund bekommt dieselben Aufgaben und sieht, wer gewonnen hat – auch mit der Daily und ganz ohne Konto.
+- Außerdem: Spielerkarte im Profil, eine Lernkarte im Lernen-Tab, eine Beispielaufgabe in der Empfehlung, Schrift in der Textgröße deines iPhones, eine deutlich schneller startende Website und „Feedback senden“ unter Profil → Hilfe & Info.
+
 ## [2.0.0] - 2026-11-09
 
 ### Gemacht fürs iPad

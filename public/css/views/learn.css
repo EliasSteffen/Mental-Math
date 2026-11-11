@@ -27,6 +27,32 @@
   .learn-master .row-sub { display:none; }
   .learn-master .row.has-sub { min-height:48px; }
 
+  /* ---------- Gestapelter Balken (Lernkarte, Kategorie): sicher · in Arbeit · offen ----------
+     Anteile über --n (Anzahl); der offene Rest ist die neutrale Spur. */
+  .learn-stack {
+    display:flex; height:6px; border-radius:var(--radius-pill); background:var(--surface-2); overflow:hidden;
+  }
+  .learn-stack-seg { flex:var(--n, 0) 0 0; min-width:0; }
+  .learn-stack-seg.is-full { background:var(--good); }
+  .learn-stack-seg.is-half { background:var(--accent); }
+
+  /* ---------- Lernkarte oben in der Liste ---------- */
+  .learn-summary { gap:var(--space-3); }
+  .learn-card-count {
+    margin:0; font-size:var(--text-md); font-weight:var(--weight-semibold); line-height:1.35;
+    font-variant-numeric:tabular-nums; overflow-wrap:anywhere;
+  }
+  .learn-card-bar { display:flex; height:8px; }
+  .learn-summary > :last-child { align-self:flex-start; margin-left:calc(-1 * var(--space-1)); }
+
+  /* ---------- Kategorie-Kopf: Balken und „3/6 sicher“ unter dem Titel ---------- */
+  .learn-cat-progress { display:flex; align-items:center; gap:var(--space-3); min-width:0; }
+  .learn-cat-bar { flex:1; min-width:0; }
+  .learn-cat-count {
+    flex:none; margin:0; font-size:var(--text-xs); color:var(--muted);
+    font-family:var(--font-num); font-variant-numeric:tabular-nums;
+  }
+
   /* ---------- Detail: Titel und dezente Statuszeile (der Zurück-Link steht davor) ---------- */
   .learn-head { display:flex; flex-direction:column; gap:var(--space-2); min-width:0; }
   /* Punkt bleibt neben der ersten Zeile, auch wenn der Text bei 320 px umbricht */
@@ -74,7 +100,7 @@
   .guide-stage-num {
     display:flex; flex:none; align-items:center; justify-content:center; width:20px; height:20px;
     border-radius:var(--radius-pill); background:color-mix(in srgb, var(--text) 8%, transparent);
-    font-family:var(--font-num); font-size:12px; line-height:1;
+    font-family:var(--font-num); font-size:calc(12px * var(--type-scale, 1)); line-height:1;
   }
   .guide-stage-btn[aria-current="step"] .guide-stage-num { background:var(--accent); color:var(--on-accent); }
   .guide-stage-btn.is-done .guide-stage-num { background:var(--good-soft); color:var(--good); }

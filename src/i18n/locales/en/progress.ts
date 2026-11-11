@@ -82,4 +82,12 @@ export const analyse: Record<keyof typeof De, string> = {
   trend: 'Trend',
   heatmapAria: 'Activity over the last weeks',
   minutes: '{n} min',
+  // v9 B
+  weekGoalRounds: 'Goal {n} rounds / day',
+  weekGoalRoundsOne: 'Goal {n} round / day',
+  weekAriaRounds: 'Rounds per day: {days}',
+  roundsOne: '{n} round',
+  roundsMany: '{n} rounds',
+  activityFreeze: '{n} freeze',
+  activityFreezes: '{n} freezes',
 };

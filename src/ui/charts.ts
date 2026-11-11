@@ -61,6 +61,8 @@ const ICON_SET = {
   pause: [['path', 'M9 5v14M15 5v14']],
   bell: [['path', 'M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 1.5h-15z'], ['path', 'M10 20.5a2.2 2.2 0 0 0 4 0']],
   gear: [c(12, 12, 3), ['path', 'M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z']],
+  snowflake: [['path', 'M12 3v18M4.6 7.5l14.8 9M4.6 16.5l14.8-9M9.5 4.5L12 6.5l2.5-2M9.5 19.5l2.5-2 2.5 2']],
+  moon: [['path', 'M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5Z']], // v9 J
   trophy: [['path', 'M8 4h8v6a4 4 0 0 1-8 0z'], ['path', 'M8 6H4v1a4 4 0 0 0 4 4'], ['path', 'M16 6h4v1a4 4 0 0 1-4 4'], ['path', 'M12 14v4'], ['path', 'M8 21h8']],
 } as const satisfies Record<string, readonly IconPart[]>;
 
@@ -183,7 +185,10 @@ export function heatmapGrid(
     } else if (c.date) {
       const [y = 0, m = 1, d = 1] = c.date.split('-').map(Number);
       const day = dateFmt.format(new Date(y, m - 1, d, 12));
-      cell.title = c.ms ? `${day} · ${t('analyse.minutes', { n: Math.round(c.ms / 60000) })}` : day;
+      // v9 B: Runden, sonst (alte Aufrufer) Minuten
+      cell.title = c.rounds !== undefined
+        ? (c.rounds ? `${day} · ${t(c.rounds === 1 ? 'analyse.roundsOne' : 'analyse.roundsMany', { n: c.rounds })}` : day)
+        : c.ms ? `${day} · ${t('analyse.minutes', { n: Math.round(c.ms / 60000) })}` : day;
     }
     root.append(cell);
   }

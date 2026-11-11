@@ -131,6 +131,7 @@ export const core = {
   'mode.custom': 'Eigenes Training',
   'mode.challenge': 'Wettbewerb',
   'mode.placement': 'Einstufung',
+  'mode.duel': 'Duell', // v9 I
   'mode.sub': '{cat} · {sub}',
   'label.nullen': 'Nullen-Fehler',
   'label.ungenau': 'Ungenau',

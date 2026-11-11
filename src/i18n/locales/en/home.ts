@@ -44,4 +44,12 @@ export const home: Record<keyof typeof De, string> = {
   categories: 'Categories',
   ctaPractice: 'Practice now',
   ctaMinutes: 'about {n} min',
+  // v9 C
+  caseTitle: 'Mini case',
+  caseSub: 'One case, several steps',
+  // v9 H
+  exampleLabel: 'For example',
+  exampleNames: 'In this round',
+  goalDotsAria: '{done} of {goal} rounds today',
+  goalDotsAriaOne: '{done} of {goal} round today',
 };

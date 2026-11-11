@@ -28,4 +28,9 @@ export const lernen = {
   aiBusy: 'KI erklärt …',
   aiUnavailable: 'KI gerade nicht erreichbar.',
   openInLearn: 'In Lernen öffnen',
+  // v9 E – Lernkarte und Meisterung je Kategorie
+  cardTitle: 'Deine Lernkarte',
+  cardCount: '{full} von {total} Aufgabentypen sicher · {half} in Arbeit · {empty} offen',
+  cardBarAria: '{full} sicher, {half} in Arbeit, {empty} offen',
+  categorySolid: '{full}/{total} sicher',
 } as const;

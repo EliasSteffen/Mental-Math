@@ -15,7 +15,7 @@ Details: [docs/SPEC.md](docs/SPEC.md)
 - **Lösungsweg mit den Zahlen der Aufgabe** nach jeder Antwort, dazu „Wie geht das?“ als Hilfe vor dem Antworten (halbe Punkte)
 - **Lernbereich** (`#/lernen`): Methode, Vorgehen, Trick und typische Fehler für alle Aufgabentypen, mit Beispiel zum Mitrechnen
 - **Optionale KI-Erklärungen** (Google Gemini, nur auf Knopfdruck) – siehe unten
-- **Tagesziel & Serie** (Minuten pro Tag, einstellbar), Aktivitäts-Heatmap, Level/XP
+- **Tagesziel & Serie** (Tagesziel in Runden, einstellbar; eine Runde am Tag hält die Serie, je 7 Tage gibt es einen automatischen Freeze), Aktivitäts-Heatmap, Level/XP
 - **Schwierigkeitsstufen** Leicht/Mittel/Schwer – fest oder „Auto“: je Aufgabentyp eine Treppe (3 sichere Treffer → schwerer, 2 Fehler unter den letzten 4 → leichter). Unter „Leicht“ übt die App dazwischen die Grundlage, auf der der Typ aufbaut (z. B. 2-stellig × 1-stellig → kleines 1×1), bis hinunter zu einem Einstiegs-1×1 mit ×2, ×5 und ×10 (`src/core/adaptive.ts`)
 - **Einstufungstest** am Ende des Onboardings (und unter Profil → Training): bis zu 10 Aufgaben auf einer Leiter vom kleinen 1×1 bis zu 2-stellig × 2-stellig und Prozent-Veränderungen – bestanden → höher, ein Patzer → zweite Chance, zwei Fehler → tiefer. Das Ergebnis (0–6, in den Einstellungen, synchronisiert) legt die Startstufe jedes Aufgabentyps fest (`src/core/placement.ts`, `startStep`)
 - **Fehler-Wiederholung über Tage** (Leitner-Boxen: 1, 2, 4, 7, 14 Tage) und eine **Tagesempfehlung** auf der Startseite
@@ -39,7 +39,7 @@ npm run dev:ai     # Build + http://localhost:8788 (mit KI-Function; liest GOOGL
 ```
 
 ```bash
-npm run build      # clean (dist/ leeren) → tsc (src → dist/js, sw.ts → dist/sw.js) → copy-static (public/ → dist/) → precache (dist/precache.json)
+npm run build      # clean (dist/ leeren) → tsc (Typprüfung, sw.ts → dist/sw.js) → copy-static (public/ → dist/) → pages → bundle (esbuild: src/app.ts → dist/js/app.js + Lazy-Chunks, CSS → dist/css/app.css; Einzelmodule entfallen) → precache (dist/precache.json)
 npm run clean      # löscht dist/
 npm run typecheck  # tsc über src, server, functions, tests, scripts
 npm test           # Tests (node --test, TypeScript direkt per Type-Stripping)
@@ -213,14 +213,14 @@ Unter *Profil → Erinnerungen* schaltet man Push-Benachrichtigungen pro Gerät 
 
 | Erinnerung | Wann | Entfällt, wenn … |
 |---|---|---|
-| **Täglich** | zur gewählten Uhrzeit an den gewählten Wochentagen | das Tagesziel heute schon erreicht ist (abschaltbar) |
-| **Serie retten** | um 20 Uhr | das Tagesziel erreicht ist oder keine Serie läuft |
+| **Täglich** | zur gewählten Uhrzeit an den gewählten Wochentagen | das Tagesziel (Runden) heute schon erreicht ist (abschaltbar) |
+| **Serie retten** | um 20 Uhr | heute schon eine Runde gespielt wurde oder keine Serie läuft |
 | **Wiederholungen** | sobald Leitner-Wiederholungen fällig sind, zwischen 9 und 20 Uhr, höchstens einmal am Tag | nichts fällig ist |
 | **Lern-Hinweis** | sonntags um 10 Uhr: ein Rechentrick, bevorzugt zu einer Schwäche | – |
 
 Zusätzlich gilt: keine Erinnerung, wenn die App in den letzten 20 Minuten offen war; zwischen zwei Benachrichtigungen liegen mindestens 90 Minuten (außer bei der täglichen). Uhrzeiten gelten in der Zeitzone des Geräts, auch über die Zeitumstellung hinweg.
 
-**So funktioniert es:** Die App abonniert Web Push (VAPID) und meldet Einstellungen, Zeitzone und einen knappen Lernstand (Serie, Tagesziel erreicht, fällige Wiederholungen, bis zu 3 schwache Aufgabentypen) an `/api/push` (`functions/api/push/[[path]].ts` → `server/push.ts`). Ein Supabase-Cron (`pg_cron` + `pg_net`) ruft jede Minute `/api/push/tick` auf; der Server holt die fälligen Abos, entscheidet (`src/core/reminders.ts`), verschlüsselt die Nachricht (RFC 8291, `server/push-crypto.ts`) und schickt sie an den Push-Dienst des Browsers. Der Service Worker zeigt sie an und öffnet beim Antippen die passende Seite. Das Gerät erzeugt eine zufällige ID und ein Geheimnis; gespeichert wird nur dessen SHA-256-Hash. Ausschalten löscht das Abo auf dem Server.
+**So funktioniert es:** Die App abonniert Web Push (VAPID) und meldet Einstellungen, Zeitzone und einen knappen Lernstand (Serie, Runden heute und Tagesziel in Runden, Serie gesichert, aktive Minuten, fällige Wiederholungen, bis zu 3 schwache Aufgabentypen; die Runden-Felder sind optional, damit ältere Clients und Server zusammenpassen) an `/api/push` (`functions/api/push/[[path]].ts` → `server/push.ts`). Ein Supabase-Cron (`pg_cron` + `pg_net`) ruft jede Minute `/api/push/tick` auf; der Server holt die fälligen Abos, entscheidet (`src/core/reminders.ts`), verschlüsselt die Nachricht (RFC 8291, `server/push-crypto.ts`) und schickt sie an den Push-Dienst des Browsers. Der Service Worker zeigt sie an und öffnet beim Antippen die passende Seite. Das Gerät erzeugt eine zufällige ID und ein Geheimnis; gespeichert wird nur dessen SHA-256-Hash. Ausschalten löscht das Abo auf dem Server.
 
 **Einrichten (einmalig):** Voraussetzung ist dasselbe Supabase-Projekt wie für das Konto, also die Pages-Secrets `SUPABASE_URL` und `SUPABASE_SERVICE_ROLE_KEY`. Dann im Supabase-SQL-Editor nacheinander ausführen:
 
@@ -321,6 +321,16 @@ values ('comp-prozente-kw47', 'competition', '{"de":"Prozente-Woche","en":"Perce
 
 **Moderation:** Name ausblenden mit `update public.challenge_profiles set listed = false where lower(display_name) = lower('…');`, einen Versuch aus der Wertung nehmen mit `update public.challenge_attempts set status = 'flagged' where …;`.
 
+## Ligen & Champion
+
+Die Liga (Bronze I … Meister) berechnet jedes Gerät aus dem eigenen Können (Wertung 0–1000 LP, `src/core/league.ts`). Über Meister gibt es **Champion**: nur die besten 10 Konten aller Meister. Dafür meldet die App mit Konto ihre Wertung an `/api/challenge/league` (höchstens alle 10 Minuten, nur bei Änderung, im Hintergrund); die Top-Liste steht im Wettkampf-Tab, „Champion · Platz n“ erscheint im Liga-Emblem unter Erfolge. Ohne Konto oder ohne Netz funktioniert alles wie bisher, nur ohne Champion.
+
+**Einrichten (einmalig):** `sql/007_league.sql` im Supabase-SQL-Editor ausführen, nach `sql/006_challenges.sql` (idempotent, rein hinzufügend, nur `service_role`; legt `public.league_scores`, `league_put` und `league_champions` an). Solange das SQL fehlt, antwortet der Server mit `503 unavailable` und die App blendet Champion aus – Vorschau und Produktion teilen dieselbe Datenbank, das Ausführen betrifft beide, ältere Versionen bemerken es nicht.
+
+**Anzahl der Champions:** Pages-Variable `CHAMPION_COUNT` (optional, Standard `10`, erlaubt 1–1000; Unsinn fällt auf 10 zurück). Eine Änderung braucht nur einen neuen Deploy bzw. das Neuladen der Variable, keinen Code.
+
+**Schutz gegen Manipulation:** Die Wertung kommt vom Gerät und lässt sich nicht beweisen. Deshalb gilt: der Server prüft Bereich und Stufe (`tier` muss zur Wertung passen); höchstens 150 LP Zuwachs pro Berliner Tag gegenüber dem Tagesstart (die erste Meldung zählt ab 0, Bestandsnutzer mit hoher Wertung steigen also über einige Tage ein; Abstieg gilt sofort); Champion zählt nur mit Wertung ≥ 780 (Meister), einer Meldung in den letzten 30 Tagen und mindestens 3 beendeten **gewerteten** Dailys in diesen 30 Tagen (die der Server selbst prüft und bewertet); bei Gleichstand gewinnt, wer die Wertung früher erreicht hat. Namen erscheinen nur bei Zustimmung („Anonym“ sonst, die eigene Zeile zeigt den eigenen Namen). Moderation: `delete from public.league_scores where user_id = '…';` nimmt ein Konto aus der Liste (es meldet sich beim nächsten Mal wieder an; dauerhaft per `update public.challenge_attempts set status = 'flagged' …`, dann fehlen die gewerteten Dailys).
+
 ## Daten
 
 Fortschritt und Statistiken liegen lokal in IndexedDB. Ohne Konto bleibt alles auf dem Gerät, es gibt kein Tracking. Mit Konto (Passkey) werden die Trainingsdaten über Supabase zwischen deinen Geräten synchronisiert. In den Einstellungen lassen sich die Daten als JSON exportieren, importieren oder löschen.
@@ -343,7 +353,7 @@ src/
   features/         ai-client, activity, account, sync, reminder-input
   platform/         Website vs. iOS-App: index (einzige Schnittstelle), web, native (Capacitor),
                     reminders (web-push | native-reminders), native-auth
-  vendor/           esbuild-Einstiege: auth, storage, native (Capacitor-Plugins, nur in der App)
+  vendor/           Einstiege für scripts/bundle.ts: auth, storage, native (Capacitor-Plugins, nur in der App)
   views/            home, lernen, analyse, settings, daily, chain, train/
   router.ts  app.ts
   sw.ts             Service Worker (→ dist/sw.js)

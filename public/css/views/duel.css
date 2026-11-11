@@ -1,0 +1,12 @@
+/* Freund herausfordern (v9 I): Annahme-Seite, Karte im Wettkampf-Tab, Vergleich auf dem Ergebnis. */
+@layer views {
+  .duel-facts { font-size:var(--text-lg); font-weight:var(--weight-bold); line-height:1.3; overflow-wrap:anywhere; }
+  .duel-hint, .duel-card-text { font-size:var(--text-sm); line-height:1.5; color:var(--muted); }
+  .duel-actions { display:flex; flex-direction:column; gap:var(--space-2); margin-top:var(--space-4); }
+  .duel-card-title { font-size:var(--text-md); font-weight:var(--weight-bold); line-height:1.3; }
+  .duel-card-facts { font-size:var(--text-sm); color:var(--muted); }
+  .duel-card-controls { display:flex; flex-direction:column; gap:var(--space-2); }
+  .duel-result .insight-text { white-space:pre-line; }
+  /* eigene Zeile in den Ergebnis-Aktionen (zu lange Beschriftung für halbe Breite) */
+  .train-result-actions > .btn.duel-wide { flex-basis:100%; }
+}

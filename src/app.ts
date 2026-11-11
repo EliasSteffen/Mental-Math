@@ -15,6 +15,9 @@ import { openAccountOnProfile } from './views/settings.ts';
 import { startPush } from './platform/reminders.ts';
 import { startAppUpdateCheck } from './features/app-store.ts';
 import { watchKeyboardInset } from './ui/keyboard-inset.ts';
+import { watchTextScale } from './ui/text-scale.ts';
+import { startProgressRewards } from './features/rewards.ts'; // v9 J
+import { startLeagueSync } from './features/league-sync.ts'; // v9 K
 
 // iOS-App: vorgemerktes Live-Update anwenden, bevor etwas gezeichnet wird (docs/PLAN-live-updates.md). Lädt die WebView
 // nicht binnen 5 s neu, geht es mit dem laufenden Bundle weiter.
@@ -26,10 +29,10 @@ await initStorage();
 setPlacement(getSettings().placement?.theta ?? null);
 onChange(() => setPlacement(getSettings().placement?.theta ?? null));
 
-// Einführung nur bei Neuinstallation – vor maybeShowWhatsNew() entscheiden, das dabei lastSeenVersion setzt.
-// Beide schließen sich aus: „Was ist neu?“ bleibt bei Neuinstallationen stumm (merkt sich nur die Version).
-const { onboardingDone, lastSeenVersion } = getSettings();
-const firstRun = shouldShowOnboarding({ onboardingDone, lastSeenVersion, attempts: getAttempts().length });
+// Einführung, bis der Nutzer im Dialog gewählt hat (onboardingDone) – unabhängig von „Was ist neu?“. Bei Neuinstallationen
+// bleibt maybeShowWhatsNew() stumm (merkt sich nur die Version).
+const { onboardingDone } = getSettings();
+const firstRun = shouldShowOnboarding({ onboardingDone, attempts: getAttempts().length });
 
 /** Startschritt ausführen; ein Fehler darf die übrigen Schritte nicht verhindern (sonst bleibt die Seite leer). */
 const safely = (label: string, fn: () => unknown): void => {
@@ -37,6 +40,7 @@ const safely = (label: string, fn: () => unknown): void => {
 };
 
 safely('theme', () => initTheme(getSettings().theme));
+safely('text-scale', () => { watchTextScale(); }); // v9 G: Systemschrift → --type-scale, vor dem ersten Rendern
 safely('keyboard', () => { watchKeyboardInset(); }); // Sheets und Dialoge über der Bildschirmtastatur (iOS)
 safely('activity', startActivityTracker);
 safely('platform', startPlatform);
@@ -48,6 +52,8 @@ safely('challenge', () => watchPending()); // Gewertete Challenge: offene Abgabe
 safely('sync', startSync);
 safely('push', startPush);
 safely('whats-new', maybeShowWhatsNew);
+safely('rewards', startProgressRewards); // v9 J: Liga, Orden, Karten still nachholen (Bestandsnutzer: einmal Hinweis)
+safely('league', () => startLeagueSync()); // v9 K: Liga-Wertung melden, Champion-Status holen (nur mit Konto, im Hintergrund)
 safely('app-store', startAppUpdateCheck); // nur iOS: neue Version im App Store
 appReady(); // nur iOS: Oberfläche läuft – bestätigt ein Live-Update, sucht nach neuen
 

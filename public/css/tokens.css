@@ -111,11 +111,16 @@
     --font-num:ui-rounded,"SF Pro Rounded",system-ui,-apple-system,sans-serif;
     --font-mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
 
-    --text-xs:13px; --text-sm:15px; --text-md:17px; --text-lg:20px;
-    --text-xl:clamp(24px, 7vw, 30px);
-    --text-num:clamp(28px, 8vw, 36px);
-    --text-display:clamp(40px, 12vw, 72px);
-    --text-tab:12px; /* einzige Ausnahme unter 13 px */
+    /* Textgröße folgt der Systemeinstellung (src/ui/text-scale.ts setzt --type-scale auf <html>, 0,9–1,5; ohne JS 1).
+       Fließtext skaliert voll, große Zahlen und Tab-Labels höchstens 1,2× (--type-scale-cap). */
+    --type-scale:1;
+    --type-scale-cap:min(var(--type-scale, 1), 1.2);
+    --text-xs:calc(13px * var(--type-scale, 1)); --text-sm:calc(15px * var(--type-scale, 1));
+    --text-md:calc(17px * var(--type-scale, 1)); --text-lg:calc(20px * var(--type-scale, 1));
+    --text-xl:calc(clamp(24px, 7vw, 30px) * var(--type-scale-cap, 1));
+    --text-num:calc(clamp(28px, 8vw, 36px) * var(--type-scale-cap, 1));
+    --text-display:calc(clamp(40px, 12vw, 72px) * var(--type-scale-cap, 1));
+    --text-tab:calc(12px * var(--type-scale-cap, 1)); /* einzige Ausnahme unter 13 px */
     --weight-regular:400; --weight-semibold:600; --weight-bold:700;
 
     --space-1:4px; --space-2:8px; --space-3:12px; --space-4:16px;
@@ -133,8 +138,29 @@
     --gutter:16px;
     --tabbar-h:64px;
     --tabbar-bottom:max(16px, env(safe-area-inset-bottom, 0px));
-    --sidebar-w:84px; /* „Fortschritt“ passt ungekürzt (12 px, auch halbfett) */
+    --sidebar-w:calc(84px * var(--type-scale-cap, 1)); /* „Fortschritt“ passt ungekürzt (12 px, auch halbfett) */
     --content-max:640px;
     --focus-max:480px;
+  }
+}
+
+@layer tokens {
+  /* ---------- Ligen und Seltenheit (v9 J): je Theme ≥ 3:1 zu Fläche und Hintergrund ---------- */
+  :root {
+    --league-bronze:#9C5B25; --league-silver:#6B7684; --league-gold:#9A7000; --league-platinum:#2B7F91;
+    --league-diamond:#2F6FCB; --league-master:#7E45BD; --league-champion:#BE3455;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme]) {
+      --league-bronze:#D9935A; --league-silver:#B4BDC9; --league-gold:#E3B341; --league-platinum:#5CC3D6;
+      --league-diamond:#6FA3F0; --league-master:#B98AF0; --league-champion:#F0708D;
+    }
+  }
+  :root[data-theme="night"], :root[data-theme="oled"], :root[data-theme="aurora"], :root[data-theme="neon"] {
+    --league-bronze:#D9935A; --league-silver:#B4BDC9; --league-gold:#E3B341; --league-platinum:#5CC3D6;
+    --league-diamond:#6FA3F0; --league-master:#B98AF0; --league-champion:#F0708D;
+  }
+  :root {
+    --rarity-common:var(--muted); --rarity-rare:var(--league-diamond); --rarity-epic:var(--league-master);
   }
 }
