@@ -22,6 +22,8 @@ import type { PasskeyInfo, RecoveryStatus } from '../vendor/auth.ts';
 import * as acct from '../features/account.ts';
 import { getSyncStatus, logoutAndForgetDevice, onSyncStatus, syncNow, syncStatusEntries, wipeCloudData } from '../features/sync.ts';
 import { remindersGroup } from './settings-reminders.ts';
+import { themePicker, type ThemePick } from './theme-picker.ts'; // v10 P
+import { effectiveTheme } from '../core/shop.ts'; // v10 P
 import { isPushEnabled, pushConfig } from '../platform/reminders.ts';
 import { APP_STORE_URL, isNative, liveUpdateBeta, openMailto, openStorePage, publicUrl, saveFile, setLiveUpdateBeta, unlockBetaUpdates } from '../platform/index.ts';
 import { REPLAY_CHAPTERS } from '../features/tour-scripts.ts';
@@ -250,21 +252,18 @@ function inputGroup(s: Settings): HTMLElement {
 
 /* ---------- Darstellung & Feedback ---------- */
 
-type ThemePick = Exclude<ThemeSetting, 'oled'>;
-
 /** Segment ohne OLED (E2): OLED ist der Switch „Reines Schwarz“ unter dem Segment. */
 const THEME_PICKS: readonly ThemePick[] = THEMES.map((x) => x.value).filter((v): v is ThemePick => v !== 'oled');
 
 function appearanceGroup(s: Settings): HTMLElement {
-  let theme: ThemeSetting = s.theme;
+  let theme: ThemeSetting = effectiveTheme(s.theme, s.purchases); // v10 P: nicht gekauftes Theme → System
   const pick = (v: ThemeSetting): ThemePick => (v === 'oled' ? 'night' : v);
   // Sofort anwenden, nicht neu zeichnen
   const setTheme = (v: ThemeSetting): void => { theme = v; save({ theme: v }); applyTheme(v); };
 
-  const themeSeg = segmented<ThemePick>({
+  const themeSeg = themePicker({ // v10 P: Kacheln mit Schloss und Preis statt Segment
     label: t('settings.theme'), help: t('settings.themeHelp'),
-    options: THEME_PICKS.map((v) => [v, themeLabel(v)] as const),
-    value: pick(theme),
+    options: THEME_PICKS, value: pick(theme),
     onChange: (v) => { setTheme(v); paintOled(); },
   });
   /** Nur bei Nacht/System sichtbar bzw. solange OLED aktiv ist; an → 'oled', aus → 'night'. */
@@ -1017,7 +1016,7 @@ const SECTIONS: readonly Section[] = [
   },
   {
     id: 'darstellung', icon: 'sun', title: 'settings.appearanceFeedback', intro: 'settings.introAppearance',
-    summary: (s) => [themeLabel(s.theme), t(LANG_LABEL[s.lang])].join(' · '),
+    summary: (s) => [themeLabel(effectiveTheme(s.theme, s.purchases)), t(LANG_LABEL[s.lang])].join(' · '),
     body: (s) => [appearanceGroup(s)],
   },
   {

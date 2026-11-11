@@ -152,7 +152,7 @@ export interface Session {
 }
 
 /** 'system' folgt prefers-color-scheme (→ 'paper' oder 'night'). Alte Werte: 'pastel' → 'paper' (Migration in schema.ts). */
-export type ThemeSetting = 'system' | 'paper' | 'night' | 'oled' | 'aurora' | 'neon';
+export type ThemeSetting = 'system' | 'paper' | 'night' | 'oled' | 'aurora' | 'neon' | 'sunset' | 'sand' | 'ocean'; // v10 P: sunset, sand, ocean aus dem Shop
 export type Theme = Exclude<ThemeSetting, 'system'>;
 /** Zeitanzeige im Training: Linie ohne Zahlen, Sekunden/Punkte/Level oder nichts. Gemessen wird immer. */
 export type TimerDisplay = 'calm' | 'precise' | 'off';

@@ -21,23 +21,24 @@ function fresh(): void {
 test('resolveTheme: system folgt prefers-color-scheme, feste Themes bleiben', () => {
   assert.equal(resolveTheme('system', false), 'paper');
   assert.equal(resolveTheme('system', true), 'night');
-  for (const th of ['paper', 'night', 'oled', 'aurora', 'neon'] as const) {
+  for (const th of ['paper', 'night', 'oled', 'aurora', 'neon', 'sunset', 'sand', 'ocean'] as const) {
     assert.equal(resolveTheme(th, false), th);
     assert.equal(resolveTheme(th, true), th);
   }
 });
 
-test('themeMeta: theme-color = --bg, color-scheme hell nur bei Papier', () => {
+test('themeMeta: theme-color = --bg, color-scheme hell nur bei Papier und Sand', () => {
   const expected: Record<Theme, [string, 'light' | 'dark']> = {
     paper: ['#F6F4EF', 'light'], night: ['#141619', 'dark'], oled: ['#000000', 'dark'],
     aurora: ['#0B0A14', 'dark'], neon: ['#08090A', 'dark'],
+    sunset: ['#1A1214', 'dark'], sand: ['#F1E8D8', 'light'], ocean: ['#0B1820', 'dark'], // v10 P
   };
   for (const [th, [color, scheme]] of Object.entries(expected) as Array<[Theme, [string, 'light' | 'dark']]>) {
     assert.deepEqual(themeMeta(th), { color, scheme });
   }
 });
 
-test('THEMES: alle sechs Einstellungen mit übersetztem Namen', () => {
+test('THEMES: alle neun Einstellungen mit übersetztem Namen', () => {
   assert.deepEqual(THEMES.map((x) => x.value), [...THEME_SETTINGS]);
   assert.equal(themeLabel('paper'), 'Papier');
   assert.equal(themeLabel('night'), 'Nacht');

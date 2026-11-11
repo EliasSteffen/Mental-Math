@@ -41,6 +41,9 @@ export const common = {
   themeOled: 'OLED',
   themeAurora: 'Aurora',
   themeNeon: 'Neon',
+  themeSunset: 'Abendrot',
+  themeSand: 'Sand',
+  themeOcean: 'Tiefsee',
   // Sheets, Fokus-Modus, Bedienelemente
   close: 'Schließen',
   exitFocus: 'Beenden',

@@ -48,7 +48,7 @@ export function isValidSession(x: unknown): x is Session {
 }
 
 /** Gültige Theme-Einstellungen (Reihenfolge wie im Profil). */
-export const THEME_SETTINGS: readonly ThemeSetting[] = ['system', 'paper', 'night', 'oled', 'aurora', 'neon'];
+export const THEME_SETTINGS: readonly ThemeSetting[] = ['system', 'paper', 'night', 'oled', 'aurora', 'neon', 'sunset', 'sand', 'ocean'];
 const TIMER_DISPLAYS: readonly TimerDisplay[] = ['calm', 'precise', 'off'];
 const KEYPAD_SIDES: ReadonlyArray<Settings['keypadSide']> = ['left', 'center', 'right'];
 

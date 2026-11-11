@@ -13,6 +13,8 @@ import { championInfo } from './achievements.ts';
 import { onChampionChange } from '../features/league-sync.ts';
 import { addCleanup } from '../router.ts';
 import { profileCardData } from './profile-card-data.ts';
+import { activeFrame } from '../features/shop.ts'; // v10 P
+import { xpView } from '../features/xp.ts'; // v10 P
 
 function stat(label: string, value: string, sub?: string): HTMLElement {
   return h('div', { class: 'pcard-stat' },
@@ -42,7 +44,7 @@ function buildPlayerCard(): HTMLElement {
   const view = rewardView();
   const d = profileCardData({
     attempts: getAttempts(), sessions: getSessions(), activity: getActivity(), dailyResults: getDailyResults(),
-    goalRounds: getSettings().dailyGoalRounds, boughtFreezes: getSettings().freezesBought, repairedDays: getSettings().streakRepairs, tier: view.tier, badges: view.badges, cards: view.cards,
+    goalRounds: getSettings().dailyGoalRounds, boughtFreezes: getSettings().freezesBought, repairedDays: getSettings().streakRepairs, tier: view.tier, badges: view.badges, cards: view.cards, xp: xpView(),
   });
   // Champion: nur bei Meister; Platz kommt aus Paket K (setChampionProvider in achievements.ts)
   const champion = tierInfo(d.tier).step === null ? championInfo() : null;
@@ -50,9 +52,10 @@ function buildPlayerCard(): HTMLElement {
   const name = accountName();
   const bar = progressBar(d.xpFraction * 100, { label: t('settings.cardXpAria') });
   const best = d.bestDaily ? `${d.bestDaily.correct}/${d.bestDaily.n}` : '–';
-  return h('a', { class: 'card pcard press', href: '#/erfolge', 'aria-label': `${t('settings.cardTitle')}: ${league}` },
-    h('span', { class: 'pcard-top' },
-      leagueEmblem({ tier: d.tier, size: 52, champion, labelled: false }),
+  // v10 P: Karte → #/erfolge (gestreckter Link), Guthaben-Zeile → Shop (eigener Link darüber, kein verschachteltes <a>)
+  return h('div', { class: 'card pcard press' },
+    h('a', { class: 'pcard-top pcard-main', href: '#/erfolge', 'aria-label': `${t('settings.cardTitle')}: ${league}` },
+      leagueEmblem({ tier: d.tier, size: 52, champion, labelled: false, frame: activeFrame() }),
       h('span', { class: 'pcard-id' },
         name ? h('span', { class: 'pcard-name' }, name) : null,
         h('span', { class: 'pcard-league' }, league),
@@ -61,6 +64,8 @@ function buildPlayerCard(): HTMLElement {
     h('span', { class: 'pcard-xp' },
       bar,
       h('span', { class: 'pcard-xp-line num' }, t('settings.cardXp', { into: fmt(d.xpInto, 0), needed: fmt(d.xpNeeded, 0) }))),
+    d.xpBalance === null ? null : h('a', { class: 'pcard-balance num', href: '#/erfolge/shop' },
+      t('shop.playerBalance', { n: fmt(d.xpBalance, 0) }), h('span', { class: 'pcard-balance-go', 'aria-hidden': 'true' }, icon('chevron-right', 16))),
     h('dl', { class: 'pcard-stats' },
       stat(t('settings.cardStreak'), `${d.streak}`, ` / ${d.streakBest}`),
       stat(t('settings.cardFreezes'), String(d.freezes)),
