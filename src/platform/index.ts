@@ -150,6 +150,21 @@ export async function liveUpdateBeta(): Promise<boolean | null> {
   }
 }
 
+/**
+ * Beta-Updates auf diesem Gerät auch ohne TestFlight freischalten (versteckt: 7 × „Build“ unter Profil → Hilfe & Info).
+ * true = der Schalter ist jetzt verfügbar; Website und Builds ohne Beta-Schlüssel: false.
+ */
+export async function unlockBetaUpdates(): Promise<boolean> {
+  if (!isNative()) return false;
+  try {
+    const m = await import('./live-update.ts');
+    m.unlockLiveUpdateBeta();
+    return (await m.liveUpdateStatus()).betaAvailable;
+  } catch {
+    return false;
+  }
+}
+
 /** Beta-Updates ein/aus; prüft sofort (gilt ab dem nächsten Start). */
 export function setLiveUpdateBeta(on: boolean): void {
   if (!isNative()) return;

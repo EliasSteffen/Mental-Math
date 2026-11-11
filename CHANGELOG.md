@@ -4,6 +4,13 @@ Alle nennenswerten Änderungen an Mental Math. Format nach [Keep a Changelog](ht
 
 <!-- Automatisch erzeugt mit `npm run changelog` aus src/releases.ts – nicht von Hand bearbeiten. -->
 
+## [2.0.1] - 2026-11-11
+
+### Hinter den Kulissen
+
+- Updates im Hintergrund lassen sich jetzt flexibler ausliefern – damit die nächste Version reibungslos ankommt.
+- Kleine Verbesserungen und Vorbereitung auf die nächste Version.
+
 ## [2.0.0] - 2026-11-09
 
 ### Gemacht fürs iPad
