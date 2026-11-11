@@ -2,6 +2,8 @@
 import type { Attempt, Mode, Session, SubtypeId } from '../types.ts';
 import { personalBest, xpInfo } from './progress.ts';
 import { subtypeStats } from './scoring.ts';
+import { leagueRating, nextTier } from './league.ts'; // v10 F
+import { levelOf } from './xp.ts'; // v10 F
 
 export interface RoundRecap {
   /** n ≥ 3, alle richtig, keine Hilfe genutzt */
@@ -11,7 +13,10 @@ export interface RoundRecap {
   vsLast: { deltaAvgMs: number; deltaAcc: number } | null;
   /** größter Zuwachs (> 0) unter den Subtypen der Runde */
   skill: { subtype: SubtypeId; before: number | null; after: number } | null;
+  /** Level aus dem XP-Konto (xp) bzw. aus den Aufgaben-XP; gained = XP dieser Runde (inkl. Geschenke) */
   level: { level: number; into: number; needed: number; gained: number; levelUp: boolean };
+  /** v10 F: Liga-Wertung (LP) vor und nach der Runde; tier = Stufe danach (mit Hysterese ab der gespeicherten Stufe) */
+  lp: { before: number; after: number; delta: number; tier: number };
 }
 
 /** Feste oder fremde Runden: kein Bestzeit-Vergleich */
@@ -20,6 +25,10 @@ export const NO_BEST = new Set(['daily', 'retry', 'review', 'placement', 'challe
 export function roundRecap(o: {
   mode: Mode; n: number; correct: number; avgMs: number; assistedAny: boolean;
   sessionsBefore: readonly Session[]; attemptsBefore: readonly Attempt[]; attemptsAfter: readonly Attempt[];
+  /** v10 F: alle je verdienten XP (XP-Konto) vor und nach der Runde; fehlt → Aufgaben-XP der Versuche */
+  xp?: { before: number; after: number };
+  /** v10 F: gespeicherte Liga-Stufe vor der Runde (null = noch nie ausgewertet) */
+  leagueTier?: number | null;
 }): RoundRecap {
   const { mode, n, correct, avgMs } = o;
   const perfect = n >= 3 && correct === n && !o.assistedAny;
@@ -57,10 +66,22 @@ export function roundRecap(o: {
     if (gain > bestGain) { bestGain = gain; skill = { subtype: id, before: b, after: a }; }
   }
 
-  const xb = xpInfo(o.attemptsBefore as Attempt[]);
-  const xa = xpInfo(o.attemptsAfter as Attempt[]);
-  return {
-    perfect, newBest, vsLast, skill,
-    level: { level: xa.level, into: xa.into, needed: xa.needed, gained: xa.xp - xb.xp, levelUp: xa.level > xb.level },
-  };
+  // v10 F: Level aus dem XP-Konto (Geschenke zählen mit); ohne Angabe wie bisher aus den Aufgaben-XP
+  let level: RoundRecap['level'];
+  if (o.xp) {
+    const a = levelOf(o.xp.after);
+    const b = levelOf(o.xp.before);
+    level = { level: a.level, into: a.into, needed: a.needed, gained: o.xp.after - o.xp.before, levelUp: a.level > b.level };
+  } else {
+    const xb = xpInfo(o.attemptsBefore as Attempt[]);
+    const xa = xpInfo(o.attemptsAfter as Attempt[]);
+    level = { level: xa.level, into: xa.into, needed: xa.needed, gained: xa.xp - xb.xp, levelUp: xa.level > xb.level };
+  }
+
+  // v10 F: Liga-Wertung vor/nach der Runde, Stufe nach der Runde
+  const ratingBefore = leagueRating(o.attemptsBefore as Attempt[]);
+  const ratingAfter = leagueRating(o.attemptsAfter as Attempt[]);
+  const lp = { before: ratingBefore, after: ratingAfter, delta: ratingAfter - ratingBefore, tier: nextTier(o.leagueTier ?? null, ratingAfter) };
+
+  return { perfect, newBest, vsLast, skill, level, lp };
 }
