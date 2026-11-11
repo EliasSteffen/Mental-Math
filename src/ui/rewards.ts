@@ -6,8 +6,6 @@ import { icon, list, row } from './kit.ts';
 import { leagueEmblem, tierName } from './league-badge.ts';
 import { badgeMedal, badgeName, cardMini, openCardSheet, tierLabel } from './collectibles.ts';
 import { badgeMaxTier } from '../core/badges.ts';
-import { cardCountOf } from '../core/rewards.ts';
-import { rewardView } from '../features/rewards.ts';
 import { t } from '../i18n/index.ts';
 
 function lineRow(line: RewardLine): HTMLElement {
@@ -25,7 +23,7 @@ function lineRow(line: RewardLine): HTMLElement {
     return row({
       leading: leagueEmblem({ tier: line.to, size: 26, labelled: false }),
       label: line.up ? t('rewards.promoted', { league: name }) : t('rewards.leagueNow', { league: name }),
-      href: '#/erfolge', class: line.up ? 'reward-row is-good' : 'reward-row is-quiet',
+      href: '#/erfolge/liga', class: line.up ? 'reward-row is-good' : 'reward-row is-quiet',
     });
   }
   if (line.kind === 'badge') {
@@ -52,15 +50,4 @@ export function rewardBlock(events: RewardEvents): HTMLElement | null {
     more > 0
       ? h('a', { class: 'reward-more press', href: '#/erfolge' }, t('rewards.more', { n: more }), icon('chevron-right', 16))
       : null);
-}
-
-/** Einstiegszeile „Erfolge“ (Fortschritt → Überblick): Emblem, Liga, Zahl der Orden und Karten. */
-export function achievementsRow(): HTMLElement {
-  const v = rewardView();
-  const badges = Object.values(v.badges).filter((tier) => tier > 0).length;
-  return row({
-    leading: leagueEmblem({ tier: v.tier, size: 26, labelled: false }),
-    label: t('rewards.rowTitle'), sub: t('rewards.rowSub', { badges, cards: cardCountOf(v.cards) }),
-    value: tierName(v.tier), href: '#/erfolge', class: 'ach-entry',
-  });
 }

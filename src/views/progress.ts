@@ -15,13 +15,12 @@ import { lw } from '../core/l10n.ts';
 import { getAttempts, getSettings, getReviews, getActivity, getDailyResults, getSessions } from '../data/storage.ts';
 import { heatmapGrid, progressBar, sparkline } from '../ui/charts.ts';
 import { app, h, appendChildren, type Child } from '../ui/dom.ts';
-import { barList, button, card, columns, group, icon, kpis, largeTitle, list, row, segmented, steps } from '../ui/kit.ts';
+import { backLink, barList, button, card, columns, group, icon, kpis, largeTitle, list, row, segmented, steps } from '../ui/kit.ts';
 import { openSheet } from '../ui/sheet.ts';
 import { setPrimaryAction } from '../ui/shell.ts';
 import { isTablet } from '../ui/viewport.ts';
 import { safeSteps } from '../ui/widgets.ts';
 import { t, locale } from '../i18n/index.ts';
-import { achievementsRow } from '../ui/rewards.ts'; // v9 J
 import {
   accuracyOf, attemptsLastDays, dailyHistory, firstLast, fmtSec, focusOf, minutesLastDays, patternCounts, recentErrors,
   relativeDay, rollingMean, trendOf, weekRounds, weekRoundsScaleMax, type FocusState, type PatternCounts,
@@ -171,7 +170,7 @@ function overviewView(attempts: Attempt[], settings: Settings, now: number): HTM
 
   return h('div', { class: 'prog-view' },
     weekCard(settings.dailyGoalRounds, now),
-    list([reviewRow, level, achievementsRow()]));
+    list([reviewRow, level]));
 }
 
 /* ---------- Kategorien ---------- */
@@ -321,11 +320,12 @@ export function renderAnalyse(): void {
   const attempts = getAttempts();
   const settings = getSettings();
   const now = Date.now();
-  const title = largeTitle(t('analyse.title'), t('analyse.sub'));
+  const back = backLink({ label: t('rewards.back'), href: '#/erfolge' }); // v11 E
+  const title = largeTitle(t('rewards.statsTitle'), t('analyse.sub'));
 
   // Noch nichts geübt: nur die ruhige Einladung, keine leeren Diagramme
   if (!attempts.length) {
-    appendChildren(app, [title, focusCard({ kind: 'few' }), group(null, list([achievementsRow()]))]); // v9 J
+    appendChildren(app, [back, title, focusCard({ kind: 'few' })]);
     setPrimaryAction({ label: t('analyse.ctaStart'), href: '#/train/all', icon: 'play' });
     return;
   }
@@ -346,7 +346,7 @@ export function renderAnalyse(): void {
 
   // Ab 720 px ist genug Platz für alles auf einmal: Dashboard statt Umschalter
   if (isTablet()) {
-    appendChildren(app, [title, columns(
+    appendChildren(app, [back, title, columns(
       [focusCard(focus), overviewView(attempts, settings, now), categoriesView(attempts, settings), errorsView(attempts, now)],
       [card([kpiRow]), historyView(attempts, settings, now)],
     )]);
@@ -378,6 +378,6 @@ export function renderAnalyse(): void {
   });
 
   switcher.el.classList.add('prog-switch');
-  appendChildren(app, [title, focusCard(focus), kpiRow, switcher.el, panel]);
+  appendChildren(app, [back, title, focusCard(focus), kpiRow, switcher.el, panel]);
   setPrimaryAction(ctaAction);
 }
