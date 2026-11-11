@@ -210,7 +210,7 @@ function scrollKey(route: Route): string | null {
 
 function routeTitle(route: Route): string | null {
   switch (route.name) {
-    case 'progress': return t('analyse.title');
+    case 'progress': return t('rewards.statsTitle'); // v11: Statistik unter Erfolge
     case 'achievements': return t('rewards.title'); // v9 J
     case 'profile': return t('settings.title');
     case 'learn': return t('lernen.title');
