@@ -79,6 +79,35 @@ Tests `tests/v12-race-core.test.ts`: Determinismus, nur gewählte Kategorie/Stuf
 
 **Tests** `tests/v12-race-server.test.ts` (Validierung, Mitgliedschaft, Zeitgrenzen, Flagging, ein Lauf je Person, unavailable) + SQL-Text/PGlite-Test wie `tests/v9-league-sql.test.ts`.
 
+## 3a. Schnittstelle R2 ↔ R3 (verbindlich, beide bauen dagegen)
+
+R1 ist gemergt: `src/core/race.ts` (`RaceConfig { durationS, cat, lvl }`, `raceTasks(seed: number, cfg)`, `raceScore`, `raceRanking`, `opponentsFromRuns`, `RaceOpponents`, `RACE_GRACE_MS`, `encodeRaceConfig`/`decodeRaceConfig`, `cleanRaceName`), `src/views/race/{index,setup,play,result,track}.ts` (`playRace({ root, cfg, tasks, name, title?, opponents?, startPerf?, onDone, onExit })` → `{ stop }`, `onDone({ cfg, steps, answers })` mit `answers[] = { i, task, given, ms, ok }`; `showRaceResult({ root, cfg, runs, tasks?, replay?, summary, rewards?, closeHref, primary, secondary })`; `configForm(initial)` → `{ el, get() }`; `raceCard()`, `waysGroup()` mit Platzhalter „kommt mit dem Gruppen-Rennen“).
+
+**HTTP** (alle unter `/api/challenge`, JSON, Auth wie die übrigen Challenge-Routen; Fehler `{ error }` mit `unavailable` 503 · `not_member` 403 · `not_found` 404 · `closed`/`already` 409 · `invalid` 400 · `rate_limited` 429):
+
+| Route | Paket | Körper → Antwort |
+|---|---|---|
+| `POST /race/create` | R2 | `{ groupId, kind: 'ghost'\|'live', config: RaceConfig, open?: '1h'\|'24h'\|'48h'\|'7d' }` → `{ race: RaceInfo }`. Ghost: `ends_at = jetzt + open` (Standard 24h). Live: `open` ignoriert, `ends_at = jetzt + 15 min` (Lobby-Verfall). |
+| `GET /race/list?group=<uuid>` | R2 | → `{ races: RaceListItem[] }` (offene + letzte 10 beendete, beide Arten) |
+| `GET /race/:id` | R2 | → `{ race: RaceInfo, board: RaceBoardRow[], me: { status, startedAt } \| null }` |
+| `POST /race/:id/start` | R2 | Ghost: setzt `started_at` einmal → `{ startedAt }`, zweiter Aufruf `409 already` mit `{ startedAt }`. Live: `started_at = starts_at` (nur nach `go`). |
+| `POST /race/:id/go` | R2 | nur Live, nur Mitglieder, nur solange `starts_at` leer und nicht verfallen → setzt `starts_at = jetzt + 5 s`, `ends_at = starts_at + Dauer + 60 s` → `{ startsAt }`; danach `409 already` mit `{ startsAt }`. |
+| `POST /race/:id/finish` | R2 | `{ answers: [{ i, input, ms }] }` → `{ rank, correct, wrong, status }`. `ms` relativ zu `started_at` (Ghost) bzw. `starts_at` (Live); Antworten nach Dauer + `RACE_GRACE_MS` verworfen; < 250 ms je Aufgabe oder nicht aufsteigend → `flagged`. |
+| `POST /race/:id/ticket` | **R3** | nur Live, nur Mitglieder → `{ ticket, expiresAt }` (60 s, HMAC-SHA-256 mit `AUTH_JWT_KEY`, Inhalt `{ raceId, userId, name, exp }`) |
+| `GET /api/race/live/<id>?t=<ticket>` (WebSocket) | **R3** | Pages Function → Durable Object `RACE_ROOM` |
+
+**Typen** (R2 legt sie in `src/core/race-api.ts` ab – DOM-frei, von Server und Client genutzt; R3 legt bis zum Merge eine gleichlautende Minimal-Kopie nur der benötigten Typen in `src/core/race-room.ts` an und markiert sie `// TODO(v12-merge): aus race-api.ts`):
+```ts
+export type RaceKind = 'ghost' | 'live';
+export type RunStatus = 'none' | 'running' | 'finished' | 'expired' | 'flagged';
+export interface RaceInfo { id: string; groupId: string; createdBy: string; createdByName: string; kind: RaceKind; config: RaceConfig; seed: number; createdAt: string; startsAt: string | null; endsAt: string }
+export interface RaceListItem extends RaceInfo { myStatus: RunStatus; runs: number }
+export interface RaceBoardRow { rank: number; name: string; me: boolean; correct: number; wrong: number; lastOkMs: number; status: RunStatus; steps: Array<[number, 0 | 1]> }
+```
+**Server-Store** (R2, `server/race.ts`): Schnittstelle `RaceStore` mit u. a. `info(raceId, userId): Promise<{ race: RaceInfo; member: boolean } | null>` – R3 baut seinen Ticket-Handler gegen genau diese Signatur (eigener Fake im Test) und hängt ihn in `server/challenge.ts` mit **einer** Zeile `// v12 R3` ein; R2 hängt seine Routen mit Zeilen `// v12 R2` ein. Die Hauptsession verdrahtet beim Merge.
+
+**Client**: R2 schreibt `src/features/race-sync.ts` (`createRace`, `listRaces`, `getRace`, `startRun`, `finishRun`, `goLive`, Offline-Abgabe). R3 schreibt `src/features/race-live.ts` (Ticket, WebSocket, Uhrversatz, `RaceOpponents` aus Live-Positionen) und ruft für Anlegen/`go`/Abgabe **eigene schlanke fetch-Helfer** mit denselben Routen auf (beim Merge auf `race-sync.ts` umgestellt). Routen: R2 `#/rennen/<id>`, R3 `#/rennen/<id>/live`. Gruppen-Sheet: R2 baut „Raketen-Rennen“ (Anlegen Geister + Liste beider Arten; Live-Einträge verlinken auf `#/rennen/<id>/live`); R3 ergänzt dort nur einen Knopf „Live-Rennen“ über eine exportierte Funktion aus `src/views/race/live.ts` (eine Zeile in `compete.ts`).
+
 ## 4. Paket R3 – Live-Rennen in Gruppen
 
 **Architektur**: neuer Worker `workers/race-room` (Muster `workers/rate-limiter`: `workers_dev = false`, SQLite-Durable-Object `RaceRoom`, Binding **`RACE_ROOM`** im Pages-Projekt) + Pages Function `functions/api/race/live/[[path]].ts` (WebSocket-Upgrade an das Durable Object weiterreichen). Das Durable Object ist **nur Treffpunkt und Taktgeber** (Lobby, Startzeit, Positionen verteilen); **gewertet wird wie bei R2** über `POST /race/:id/finish` (Server prüft gegen `starts_at`). So bleiben Ergebnisse, Rangliste und Verlauf für beide Spielweisen gleich.
