@@ -62,7 +62,7 @@ function vsLastLine(r: RoundRecap): HTMLElement | null {
 /** Neue Bestzeit (v9 A). */
 function newBestCard(nb: NonNullable<RoundRecap['newBest']>): HTMLElement {
   return insight({
-    icon: 'trophy', tone: 'good', title: t('recap.newBest'),
+    icon: 'trophy', tone: 'good', title: t(nb.prevAvgMs === null ? 'recap.firstBest' : 'recap.newBest'),
     text: nb.prevAvgMs === null
       ? t('recap.newBestFirst', { time: fmtSeconds(nb.avgMs) })
       : t('recap.newBestPrev', { time: fmtSeconds(nb.avgMs), prev: fmtSeconds(nb.prevAvgMs) }),
