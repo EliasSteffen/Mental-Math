@@ -17,5 +17,6 @@ import { compete } from './compete.ts';
 import { placement } from './placement.ts';
 import { tour } from './tour.ts';
 import { recap } from './recap.ts'; // v9 A
+import { cases } from './cases.ts'; // v9 C
 
-export const dict = { tour, common, home, train, parallel, chain, custom, analyse, lernen, settings, release, core, account, sol, onboarding, guide, compete, placement, recap } as const;
+export const dict = { tour, common, home, train, parallel, chain, custom, analyse, lernen, settings, release, core, account, sol, onboarding, guide, compete, placement, recap, cases } as const;
