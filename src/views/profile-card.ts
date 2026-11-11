@@ -10,6 +10,8 @@ import { h } from '../ui/dom.ts';
 import { icon } from '../ui/kit.ts';
 import { leagueEmblem, tierName } from '../ui/league-badge.ts';
 import { championInfo } from './achievements.ts';
+import { onChampionChange } from '../features/league-sync.ts';
+import { addCleanup } from '../router.ts';
 import { profileCardData } from './profile-card-data.ts';
 
 function stat(label: string, value: string, sub?: string): HTMLElement {
@@ -25,7 +27,18 @@ function accountName(): string | null {
   return getProfile().displayName || st.user.username;
 }
 
+/** Spielerkarte; tauscht sich selbst aus, wenn der Champion-Status (Paket K) später vom Server kommt – ohne rerender der Profilseite. */
 export function playerCard(): HTMLElement {
+  let el = buildPlayerCard();
+  addCleanup(onChampionChange(() => {
+    const next = buildPlayerCard();
+    el.replaceWith(next);
+    el = next;
+  }));
+  return el;
+}
+
+function buildPlayerCard(): HTMLElement {
   const view = rewardView();
   const d = profileCardData({
     attempts: getAttempts(), sessions: getSessions(), activity: getActivity(), dailyResults: getDailyResults(),

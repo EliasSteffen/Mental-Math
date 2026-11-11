@@ -18,7 +18,7 @@ import {
 } from '../ui/collectibles.ts';
 import { cardRarity } from '../core/cards.ts';
 import { isTablet } from '../ui/viewport.ts';
-import { championAvailable, championCount, championInfo, onChampionChange, syncLeague } from '../features/league-sync.ts'; // v9 K
+import { championAvailable, championCount, championInfo as cachedChampionInfo, onChampionChange, syncLeague } from '../features/league-sync.ts'; // v9 K
 import { addCleanup } from '../router.ts'; // v9 K
 import { t } from '../i18n/index.ts';
 
@@ -28,7 +28,7 @@ const TAB_LABEL = { liga: 'rewards.tabLeague', orden: 'rewards.tabBadges', karte
 const TAB_KEY = 'mm.achievementsTab';
 
 /** Champion-Status (Paket K): standardmäßig aus dem Zwischenspeicher von league-sync. */
-let championProvider: () => ChampionInfo | null = championInfo;
+let championProvider: () => ChampionInfo | null = cachedChampionInfo;
 export function setChampionProvider(fn: () => ChampionInfo | null): void { championProvider = fn; }
 /** v9 H: aktueller Champion-Status (Spielerkarte im Profil); null, solange Paket K nichts liefert. */
 export function championInfo(): ChampionInfo | null { return championProvider(); }
