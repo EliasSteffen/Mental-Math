@@ -5,6 +5,18 @@ const DATE = '2026-10-30';
 
 export const RELEASES: Release[] = [
   {
+    version: '2.1.0', date: '2026-11-11',
+    title: { de: 'Ligen, Orden & Mini-Cases', en: 'Leagues, badges & mini cases' },
+    highlights: [
+      { de: 'Neu: Ligen von Bronze bis Meister. Deine Liga folgt deinem Können über alle Aufgabentypen, und die besten 10 Meister werden Champion. Dazu 22 Orden in Bronze, Silber und Gold und eine Trick-Karte für jeden Aufgabentyp, den du sicher beherrschst – alles unter Fortschritt → Erfolge.', en: 'New: leagues from Bronze to Master. Your league follows your skill across all task types, and the best 10 Masters become Champion. Plus 22 badges in bronze, silver and gold, and a trick card for every task type you master – all under Progress → Achievements.' },
+      { de: 'Neu: Mini-Case. Ein Fall wie im Interview mit vier Rechenschritten, die aufeinander aufbauen, und am Ende eine Entscheidung. Acht Fälle von Marktgröße über Break-even bis zum Exhibit.', en: 'New: mini case. A case like in the interview, with four calculation steps that build on each other and a decision at the end. Eight cases, from market size and break-even to exhibits.' },
+      { de: 'Mehr Tempo, mehr Rückmeldung: Nach einer richtigen Antwort geht es von selbst weiter (abschaltbar unter Profil → Während der Runde). Das Ergebnis zeigt deine Bestzeit, den Vergleich mit der letzten Runde, wie sich dein Skill verändert hat und wie weit es bis zum nächsten Level ist.', en: 'More pace, more feedback: after a correct answer the next task follows on its own (you can turn this off under Profile → During a round). The result shows your best time, how you compare with your last round, how your skill changed and how far it is to the next level.' },
+      { de: 'Das Tagesziel zählt Runden statt Minuten. Eine Runde am Tag hält deine Serie, und für jede Woche am Stück bekommst du einen Freeze, der einen verpassten Tag überbrückt.', en: 'The daily goal counts rounds instead of minutes. One round a day keeps your streak, and for every week in a row you get a freeze that covers a missed day.' },
+      { de: 'Freund herausfordern: Spiel eine Runde und schick den Link. Dein Freund bekommt dieselben Aufgaben und sieht, wer gewonnen hat – auch mit der Daily und ganz ohne Konto.', en: 'Challenge a friend: play a round and send the link. Your friend gets the same tasks and sees who won – with the daily challenge too, and without an account.' },
+      { de: 'Außerdem: Spielerkarte im Profil, eine Lernkarte im Lernen-Tab, eine Beispielaufgabe in der Empfehlung, Schrift in der Textgröße deines iPhones, eine deutlich schneller startende Website und „Feedback senden“ unter Profil → Hilfe & Info.', en: 'Also: a player card in your profile, a learning map in the Learn tab, an example task in the recommendation, text that follows your iPhone’s text size, a much faster website start and “Send feedback” under Profile → Help & info.' },
+    ],
+  },
+  {
     version: '2.0.0', date: '2026-11-09',
     title: { de: 'Gemacht fürs iPad', en: 'Made for iPad' },
     tour: 'v2',

@@ -1,6 +1,6 @@
 # Plan v9 – Spielgefühl, Gewohnheit & Case-Realismus
 
-Stand: 2026-11-11 · Basis: `claude/nice-brahmagupta-gmpncl` @ `3c92b22` (2.0.0) · Tests grün (798 + 111 + 145)
+Stand: 2026-11-11 · **umgesetzt in 2.1.0** (Pakete A–K; §11 iOS-Widget und Android bleiben offen) · Basis war `3c92b22` (2.0.0)
 
 Quelle: Playtest am 2026-11-11 (iPhone-, iPad- und Desktop-Viewport, Neuinstallation → Einstufung → Runden → alle Tabs). Befunde:
 
