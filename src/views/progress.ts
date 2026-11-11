@@ -5,9 +5,10 @@ import type { Activity, Attempt, Settings } from '../types.ts';
 import { fmt } from '../core/numbers.ts';
 import { SUBTYPES, activeCategories } from '../core/catalog.ts';
 import { categoryStats, overall } from '../core/scoring.ts';
-import { apmSeries, xpInfo, dayKey } from '../core/progress.ts';
+import { apmSeries, dayKey } from '../core/progress.ts';
 import { roundsHeatmap } from '../core/habit.ts'; // v9 B
 import { currentHabit } from '../features/habit.ts'; // v10
+import { xpView } from '../features/xp.ts'; // v10 P
 import { dueReviews, nextDue } from '../core/review.ts';
 import { getMethod } from '../core/methods.ts';
 import { lw } from '../core/l10n.ts';
@@ -159,13 +160,14 @@ function overviewView(attempts: Attempt[], settings: Settings, now: number): HTM
       sub: next !== null && next > now ? t('analyse.reviewsNext', { date: dateFmt.format(new Date(next)) }) : undefined,
     });
 
-  const xp = xpInfo(attempts);
+  const xp = xpView(); // v10 P: Level aus dem XP-Konto
   const level = h('div', { class: 'prog-level' },
     h('div', { class: 'prog-level-head' },
       h('span', { class: 'prog-level-label' }, t('analyse.level', { n: xp.level })),
       h('span', { class: 'prog-level-meta num' },
         t('analyse.xpToNext', { into: fmt(xp.into), needed: fmt(xp.needed), next: xp.level + 1 }))),
-    progressBar(xp.needed > 0 ? (xp.into / xp.needed) * 100 : 0, { decorative: true }));
+    progressBar(xp.needed > 0 ? (xp.into / xp.needed) * 100 : 0, { decorative: true }),
+    h('a', { class: 'prog-level-balance num', href: '#/erfolge/shop' }, t('shop.playerBalance', { n: fmt(xp.balance) }))); // v10 P
 
   return h('div', { class: 'prog-view' },
     weekCard(settings.dailyGoalRounds, now),
