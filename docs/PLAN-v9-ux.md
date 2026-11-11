@@ -35,9 +35,13 @@ Quelle: Playtest am 2026-11-11 (iPhone-, iPad- und Desktop-Viewport, Neuinstalla
 | | **F** | Kleinkram: Plural, Willkommen, Feedback senden | haiku |
 | | **G** | Textgröße / Dynamic Type | sonnet |
 | Integration | – | Merge A→B→C→D→E→F→G, Konflikte lösen, alle Prüfungen, Playwright-Smoke | Hauptsession |
-| 2 (parallel) | **H** | Heute-Karte füllen, Spielerkarte im Profil (braucht A + B) | sonnet |
-| | **I** | Freund herausfordern (braucht A) | sonnet |
+| 2 (parallel) | **I** | Freund herausfordern per Link (braucht A) – **ohne** Freundesliste (Entscheidung 2026-11-11) | sonnet |
+| | **J** | Ligen, Orden, Trick-Karten (Client, „Erfolge“) | sonnet |
+| 3 (parallel) | **H** | Heute-Karte füllen, Spielerkarte im Profil (braucht A + B + J) | sonnet |
+| | **K** | Champion-Stufe: Top 10 der Meister über alle Konten (Server + SQL + Client, braucht J) | sonnet |
 | Abschluss | – | Merge, Prüfungen, Release Notes 2.1.0, Version, Push | Hauptsession |
+
+**Entscheidungen des Product Owners (2026-11-11):** keine Freundesliste; Ränge als klassische Ligen Bronze → Silber → Gold → Platin → Diamant → Meister (je Stufe I–III, Meister ohne Stufen), darüber **Champion** = nur die besten 10 (Zahl später erweiterbar, daher konfigurierbar); Sammelobjekte: **Orden** und **Trick-Karten**.
 
 ---
 
@@ -73,7 +77,7 @@ npm run typecheck
 npm test
 npm run build
 ```
-UI-Pakete zusätzlich mit Playwright (vorinstalliert, `require('playwright')`, `chromium.launch()` ohne Optionen) gegen `python3 -m http.server <PORT> -d dist` – **jedes Paket eigener Port** (A 5181, B 5182, C 5183, D 5184, E 5185, F 5186, G 5187, H 5188, I 5189). Viewports 390×844 (`isMobile`, `hasTouch`, `locale: 'de-DE'`) und 1180×820; Screenshots mit `deviceScaleFactor: 1` ansehen; keine `pageerror`/Konsolenfehler; kein waagerechtes Scrollen (`scrollWidth ≤ innerWidth`). Server danach beenden.
+UI-Pakete zusätzlich mit Playwright (vorinstalliert, `require('playwright')`, `chromium.launch()` ohne Optionen) gegen `python3 -m http.server <PORT> -d dist` – **jedes Paket eigener Port** (A 5181, B 5182, C 5183, D 5184, E 5185, F 5186, G 5187, H 5188, I 5189, J 5190, K 5191). Viewports 390×844 (`isMobile`, `hasTouch`, `locale: 'de-DE'`) und 1180×820; Screenshots mit `deviceScaleFactor: 1` ansehen; keine `pageerror`/Konsolenfehler; kein waagerechtes Scrollen (`scrollWidth ≤ innerWidth`). Server danach beenden.
 
 **Commit:** im Worktree, konventionelle Nachricht auf Deutsch wie im Repo (`feat(train): …`), Abschluss-Zeilen:
 ```
@@ -290,13 +294,13 @@ Der Push-Takt ruft die **Produktions**-API; Vorschau-Clients melden ihren Stand 
 
 ---
 
-## 9. Phase 2 – Paket H: Heute-Karte & Spielerkarte (nach A + B)
+## 9. Phase 3 – Paket H: Heute-Karte & Spielerkarte (nach A + B + J)
 
 - **Heute-Karte** (`src/views/home.ts`, Funktion `hero`; `public/css/views/today.css`): Die Leerfläche auf dem Telefon füllen mit
   - „Zum Beispiel“ + einer Beispielaufgabe des empfohlenen Typs groß in Zahlen-Schrift (`generate(subtype, rng, { level })` mit tagesstabilem Seed `seedFromString(dayKey + subtype)`, damit sie nicht bei jedem Rendern springt); Exhibit-Typen: nur der Fragetext; bei `review`/`mixed`: 2–3 Subtyp-Namen der Runde.
   - Tagesziel als Punkte (●●○ = 2 von 3 Runden) aus `habitInfo`.
   - Ohne Scrollen auf 375×667 und 390×844 (wie bisher), iPad unverändert oder entsprechend.
-- **Spielerkarte** oben im Profil (`src/views/settings.ts` Startseite des Profils): Level + XP-Balken (`xpInfo`), Serie (aktuell / beste) + Freezes (`habitInfo`), gelöste Aufgaben, Runden, Genauigkeit gesamt, beste Daily (`getDailyResults`), mit Konto der Anzeigename. Antippen → `#/fortschritt`. Ruhig, eine Karte.
+- **Spielerkarte** oben im Profil (`src/views/settings.ts` Startseite des Profils): **Liga-Emblem + Liga** (Paket J, bei Champion Platz), Level + XP-Balken (`xpInfo`), Serie (aktuell / beste) + Freezes (`habitInfo`), Orden x/y und Trick-Karten x/y (Paket J), gelöste Aufgaben, Runden, Genauigkeit gesamt, beste Daily (`getDailyResults`), mit Konto der Anzeigename. Antippen → `#/erfolge`. Ruhig, eine Karte.
 - **Tests:** DOM-freie Zusammenstellung (`src/views/profile-card-data.ts` o. ä.) in `tests/v9-profile-card.test.ts`.
 
 ## 10. Phase 2 – Paket I: Freund herausfordern (ohne Server)
@@ -314,6 +318,100 @@ Der Push-Takt ruft die **Produktions**-API; Vorschau-Clients melden ihren Stand 
   - Teilen über `shareText` (Plattform) mit `${publicUrl()}#/duell?d=…`. Name optional: Feld im Teilen-Sheet, gemerkt in neuer Einstellung `duelName` (String ≤ 24, synchronisiert; mit Konto Vorschlag aus dem Profilnamen).
 - **Tests:** `tests/v9-duel-link.test.ts` (Roundtrip, Manipulation/Übergröße abgelehnt, Determinismus gleicher Payload → gleiche Aufgaben, Daily-Variante, Ausgang).
 - **Abnahme:** zwei Browser-Profile in Playwright: A fordert heraus, B öffnet Link, spielt, sieht Vergleich; Revanche-Link funktioniert.
+
+---
+
+## 10a. Phase 2 – Paket J: Ligen, Orden, Trick-Karten
+
+**Ziel:** sichtbare, sammelbare Fortschritte, die zum Weiterspielen motivieren – im ruhigen Design (klare Zeilen, Embleme, Fortschrittsbalken; kein Spielautomaten-Effekt; Konfetti nur mit `confetti`).
+
+### J1 Ligen (`src/core/league.ts`, DOM-frei, getestet)
+- **Ligawertung (LP, 0–1000)** = 10 × Mittelwert der Skill-Werte (0–100, `subtypeStats(...)[id].score`, ungeübt = 0) über **alle** Subtypen des Katalogs (unabhängig von `enabledCategories`, damit Werte über Konten vergleichbar sind – wichtig für Paket K). Misst aktuelles Können in der Breite, nicht Fleiß.
+- **Ligen** (Stufen aufsteigend I → II → III, III ist die höchste):
+
+  | Liga | I | II | III |
+  |---|---|---|---|
+  | Bronze | 0 | 50 | 100 |
+  | Silber | 150 | 200 | 250 |
+  | Gold | 300 | 350 | 400 |
+  | Platin | 450 | 500 | 550 |
+  | Diamant | 600 | 660 | 720 |
+  | Meister | ab 780 (eine Stufe) | | |
+  | Champion | Meister **und** unter den besten `CHAMPION_COUNT` (Standard 10) aller Konten – nur mit Konto, kommt vom Server (Paket K) | | |
+
+- API:
+  ```ts
+  export const LEAGUES: readonly LeagueDef[];          // id: 'bronze'|'silver'|'gold'|'platinum'|'diamond'|'master', Schwellen wie oben
+  export const DEMOTE_BUFFER = 25;                      // Abstieg erst 25 LP unter der Schwelle
+  export const CHAMPION_DEFAULT = 10;                   // Server-Konfiguration CHAMPION_COUNT kann das erhöhen
+  export function leagueRating(attempts: readonly Attempt[]): number;   // 0–1000, ganzzahlig
+  export function tierIndex(rating: number): number;     // 0 (Bronze I) … 15 (Meister)
+  export function nextTier(prevTier: number | null, rating: number): number; // Hysterese: Aufstieg sofort, Abstieg erst unter Schwelle − DEMOTE_BUFFER
+  export function tierInfo(tier: number): { league: LeagueId; step: 1 | 2 | 3 | null; min: number; next: number | null };
+  ```
+- Gespeichert in neuer Einstellung `league: { tier: number; peak: number; ts: number } | null` (synchronisiert, `normalizeSettings` prüft Ganzzahlen 0–15). Aktualisierung nach jeder Runde (Training, Mini-Case, Kette, Parallel) über eine Funktion `updateProgressRewards()` (s. J4).
+- **Emblem** `src/ui/league-badge.ts`: SVG (Schild/Wappen-Form) je Liga mit Stufen-Zahl, Farben als Tokens (`--league-bronze` … `--league-master`, `--league-champion` in `public/css/tokens.css`, für alle Themes lesbar, Kontrast ≥ 3:1 zur Fläche). Champion-Emblem mit Krone.
+
+### J2 Orden (`src/core/badges.ts`, DOM-frei, getestet)
+- Katalog von ~20 Orden mit je drei Stufen Bronze/Silber/Gold; jede Stufe aus der Historie berechenbar (`attempts`, `sessions`, `getDailyResults`, `habitInfo` (B), Ketten-/Parallel-Bestwerte, Liga-Peak):
+
+  | id | Name | Bronze / Silber / Gold |
+  |---|---|---|
+  | `streak` | Dranbleiber – beste Serie (Tage) | 7 / 30 / 100 |
+  | `perfect` | Fehlerfrei – perfekte Runden (n ≥ 5) | 1 / 10 / 50 |
+  | `solved` | Rechenwerk – richtige Aufgaben | 100 / 1.000 / 5.000 |
+  | `rounds` | Ausdauer – Runden | 10 / 100 / 500 |
+  | `blitz` | Blitz – richtig in ≤ ⅓ der Zielzeit | 25 / 250 / 1.000 |
+  | `daily` | Tagesform – Dailys gespielt | 7 / 30 / 100 |
+  | `dailyPerfect` | Tagessieger – Daily ohne Fehler | 1 / 5 / 20 |
+  | `bests` | Rekordjäger – neue Bestzeiten (chronologisch) | 1 / 10 / 50 |
+  | `noHelp` | Ohne Netz – Runden ≥ 10 Aufgaben, ≥ 90 %, ohne Hilfe | 1 / 10 / 50 |
+  | `reviews` | Fehler ausgemerzt – richtige Wiederholungen | 10 / 100 / 500 |
+  | `variety` | Allrounder – verschiedene Aufgabentypen geübt | 10 / 25 / alle |
+  | `categories` | Fachgebiet – Kategorien komplett „sicher“ | 1 / 5 / alle |
+  | `cards` | Sammler – Trick-Karten | 10 / 25 / alle |
+  | `cases` | Berater – Mini-Cases fehlerfrei (Bronze 1, Silber alle Vorlagen, Gold 50 insgesamt) | 1 / alle / 50 |
+  | `exhibits` | Chartleser – richtige Exhibit-Aufgaben | 10 / 100 / 500 |
+  | `estimate` | Überschlagsprofi – richtige Schätzaufgaben | 10 / 100 / 500 |
+  | `chain` | Kettenreaktion – Kettenrechnen-Bestwert (Level-übergreifend, Schwellen nach `src/views/chain.ts` wählen) | – |
+  | `parallel` | Multitasker – parallele Ketten (beste Anzahl) | 2 / 3 / 4 |
+  | `climber` | Aufsteiger – höchste Liga | Silber / Gold / Diamant |
+  | `early` / `night` | Frühaufsteher (Runde vor 7 Uhr) / Nachteule (nach 22 Uhr) | 1 / 10 / 50 |
+
+  (`placement` „Standortbestimmung“ – Einstufungstest gemacht – als einstufiger Orden.)
+- API: `export const BADGES: readonly BadgeDef[]; export function badgeTiers(input: BadgeInput): Record<BadgeId, 0 | 1 | 2 | 3>; export function badgeProgress(id, input): { tier; value; nextAt: number | null }`.
+- Gespeichert: `badges: Record<string, { tier: 1 | 2 | 3; ts: number }>` (synchronisiert). Stufe = max(gespeichert, berechnet) – nie verlieren (auch wenn alte Sessions/Versuche durch Limits wegfallen).
+
+### J3 Trick-Karten (`src/core/cards.ts`)
+- Eine Karte je Subtyp (alle Subtypen des Katalogs). **Freigeschaltet**, sobald der Subtyp einmal „sicher“ ist (`masteryOf(score) === 'full'`, s. `src/ui/kit.ts` bzw. die Schwellen dort → in core verwenden, nicht duplizieren). Bleibt für immer.
+- Seltenheit aus `SUBTYPES[id].weight`: 1 → „Gewöhnlich“, 1,5 → „Selten“, ≥ 2 → „Episch“ (Rahmenfarbe über Tokens).
+- Kartenvorderseite: Kategorie, Subtyp-Name, der Trick (`sub.tip` bzw. `getMethod(id)?.trick`), ein kurzes Beispiel; gesperrt: Silhouette mit „?“, Fortschritt zum Freischalten („Skill 62 / 80“).
+- Gespeichert: `cards: Record<string, number>` (Subtyp → ts, synchronisiert).
+
+### J4 Belohnungen erkennen & zeigen
+- `src/features/rewards.ts`: `updateProgressRewards(): RewardEvents` – berechnet Liga (mit Hysterese), Orden, Karten, vergleicht mit den gespeicherten Einstellungen, speichert Neues (`setSettings`) und gibt `{ promoted?: { from, to }, demoted?: …, badges: Array<{ id, tier }>, cards: SubtypeId[] }` zurück. Aufruf am Ende jeder Runde (Training-Ergebnis, Mini-Case-Ergebnis, Kette, Parallel) und einmal beim Start (still, ohne Anzeige – holt Bestandsnutzer nach).
+- **Ergebnis-Bildschirme**: ruhige Zeilen/Karten unter der Rundenbilanz: „Aufstieg: Gold II“ (Emblem, Ton `good`), „Neuer Orden: Dranbleiber · Bronze“, „Trick-Karte freigeschaltet: × 5 / 25 / 50“ (kleine Kartenvorschau, antippbar). Abstieg nur dezent („Liga: Silber III“). Höchstens 3 Zeilen, Rest als „+2 weitere“ → `#/erfolge`.
+- **Bestandsnutzer:** Beim ersten Start nach dem Update werden alle bereits verdienten Orden/Karten still gespeichert; einmalig ein Hinweis-Toast „Neu: Ligen, Orden & Trick-Karten – schau unter Fortschritt → Erfolge“.
+
+### J5 Seite „Erfolge“ (`#/erfolge`, `src/views/achievements.ts`)
+- Segment-Tabs **Liga · Orden · Karten** (Komponente wie in Fortschritt).
+  - **Liga:** großes Emblem, Liga + Stufe, LP-Balken zur nächsten Stufe („412 / 450 LP bis Platin I“), höchste erreichte Liga, Leiter aller Ligen (aktuelle markiert), Erklärung „Deine Liga folgt deinem Können über alle Aufgabentypen. Abstieg erst mit Abstand.“ und Champion-Zeile („Die besten 10 Meister werden Champion – mit Konto“; Paket K füllt sie mit Daten).
+  - **Orden:** Raster; Orden mit Stufen-Punkten (●○○); gesperrt grau; Antippen → Sheet mit Beschreibung, Fortschritt zur nächsten Stufe.
+  - **Karten:** „27 / 49 gesammelt“, Raster nach Kategorie, Antippen → Sheet mit großer Karte + „Methode ansehen“ (`#/lernen/<id>`).
+- Einstiege: Fortschritt → Überblick (Zeile „Erfolge“ mit Emblem + „5 Orden · 12 Karten“), Lernen-Detailseite eines Subtyps (Karte freigeschaltet/gesperrt), Profil (Paket H). Router-Tab `progress`.
+- **Tests:** `tests/v9-league.test.ts` (Wertung, Schwellen, Hysterese, Peak), `tests/v9-badges.test.ts` (jede Orden-Definition an den Schwellen, nie verlieren), `tests/v9-cards.test.ts`, `tests/v9-rewards.test.ts` (Ereignisse, Bestandsnutzer still).
+- **Abnahme:** Playwright: frische Installation → Bronze I; gesäte Historie (Import-Datei) → mehrere Orden/Karten still übernommen + einmaliger Hinweis; eine Runde, die eine Karte freischaltet → Zeile auf dem Ergebnis; `#/erfolge` alle drei Tabs, Telefon + iPad, hell + dunkel.
+
+## 10b. Phase 3 – Paket K: Champion (Top 10 aller Meister)
+
+- **SQL** `sql/007_league.sql` (idempotent, nur hinzufügen; Muster wie `006_challenges.sql`: RLS an, keine Policies, nur `service_role`):
+  - Tabelle `public.league_scores (user_id uuid pk → public.users on delete cascade, rating integer check 0–1000, tier smallint check 0–15, updated_at timestamptz, day_key date, day_start_rating integer)`.
+  - `league_put(p_user, p_rating, p_tier, p_max_daily_gain)` – Upsert; Plausibilität: höchstens `p_max_daily_gain` (150) LP Zuwachs pro Tag gegenüber `day_start_rating`.
+  - `league_champions(p_min_rating, p_limit, p_user, p_active_days, p_min_ranked)` → `rank, display_name (nur bei listed oder ich), rating, is_me, total` – nur Konten mit `rating ≥ p_min_rating` (Meister), Update in den letzten `p_active_days` (30) Tagen und mindestens `p_min_ranked` (3) beendeten gewerteten Dailys in diesem Zeitraum (`challenge_attempts`, server-geprüft); sortiert nach `rating desc, updated_at asc`.
+- **Server** (`server/challenge.ts` bzw. neues `server/league.ts`, eingebunden in `/api/challenge`): `POST /league` `{ rating, tier }` (angemeldet, `tier === tierIndex(rating)` aus `src/core/league.ts`, Rate-Limit wie vorhandene Routen) und `GET /league/champions` → `{ count, champions: [...], me: { rank, rating, champion } }`. **`CHAMPION_COUNT`** als Pages-Variable (Standard 10, Grenzen 1–1000) – „später erweiterbar“ ohne Code-Änderung. Ohne SQL/Tabelle → `503 unavailable`, die App blendet Champion dann aus.
+- **Client:** `src/features/league-sync.ts`: nach `updateProgressRewards()` und beim Start (mit Konto) die Wertung hochladen (gedrosselt, höchstens alle 10 min, nur bei Änderung); Champion-Status cachen. Emblem/Liga-Anzeige zeigt „Champion · Platz 3“, wenn der Server es meldet. Wettkampf-Tab (`src/views/compete.ts`): Karte „Champions“ mit der Top-Liste (Namen nur bei Zustimmung wie bei den Ranglisten, sonst „Anonym“). Ohne Konto: Hinweis „Mit Konto kannst du Champion werden“.
+- **Doku:** README-Abschnitt „Ligen & Champion“ (SQL einmal ausführen, `CHAMPION_COUNT`). Hinweis: Wertung wird vom Gerät gemeldet; die Daily-Pflicht und die Tageszuwachs-Grenze sind der Schutz gegen Manipulation.
+- **Tests:** `tests/v9-league-server.test.ts` (Validierung, Rate-Limit, unavailable, Champion-Auswahl mit Fake-Store wie `tests/challenge-server.test.ts`), SQL-Text-Test wie `tests/data-sql.test.ts`/`push-sql.test.ts`.
 
 ---
 
@@ -342,6 +440,6 @@ Beides lässt sich in dieser Umgebung (Linux, ohne Xcode bzw. Android-SDK) nicht
 
 1. Phase-1-Branches in dieser Reihenfolge mergen: A, B, C, D, E, F, G. Erwartete Konflikte: `src/types.ts`/`schema.ts` (Felder am Ende), `settings.ts` (Schalter/Stepper), i18n-Indizes, `result.ts` (`statusLine`-Zeile: Runden aus B **ohne** `xp`, da A die Level-Karte zeigt), `modes.ts` (`modeName`), `home.ts` (B statusLine, C Modi-Einträge).
 2. Nach jedem Merge: `npm run typecheck && npm test`; nach allen: `npm run build` + Playwright-Smoke (Neuinstallation, Einstufung, Runde mit Auto-Weiter, Ergebnis mit Bestzeit, Mini-Case, Kettenrechnen zählt als Runde, Fortschritt, Profil, Lernkarte, große Schrift, iPad), Kaltstart-Messung.
-3. Phase 2 (H, I) auf dem integrierten Stand, dann mergen und dieselben Prüfungen.
+3. Phase 2 (I, J) auf dem integrierten Stand, mergen, prüfen; dann Phase 3 (H, K), mergen, prüfen. `sql/007_league.sql` muss der Product Owner einmal im Supabase-SQL-Editor ausführen (wie 004–006).
 4. Release Notes **2.1.0** in `src/releases.ts` (de/en), `package.json` 2.1.0, `npm run changelog`, Tests.
 5. Push auf `claude/nice-brahmagupta-gmpncl`.
