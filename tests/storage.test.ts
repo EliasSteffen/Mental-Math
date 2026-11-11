@@ -64,6 +64,7 @@ test('Defaults, alte Daten werden ergänzt (In-Memory)', () => {
     onboardingDone: false, placement: null,
     dailyGoalRounds: 3, // v9 B
     autoAdvance: true, // v9 A
+    duelName: '', // v9 I
   });
   assert.deepEqual(getReviews(), {});
   assert.deepEqual(getActivity(), {});

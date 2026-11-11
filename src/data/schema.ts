@@ -17,6 +17,7 @@ export const DEFAULT_SETTINGS: Settings = {
   placement: null,
   dailyGoalRounds: 3, // v9 B
   autoAdvance: true, // v9 A
+  duelName: '', // v9 I
 };
 
 export const DEFAULT_PARALLEL_STATS: ParallelStats = { nextStart: 2, bestChains: 0, bestCorrectStreak: 0, rounds: 0 };
@@ -82,6 +83,7 @@ export function normalizeSettings(raw: unknown): Settings {
     dailyGoalRounds: typeof s.dailyGoalRounds === 'number' && Number.isInteger(s.dailyGoalRounds) && s.dailyGoalRounds >= 1 && s.dailyGoalRounds <= 10
       ? s.dailyGoalRounds : DEFAULT_SETTINGS.dailyGoalRounds,
     autoAdvance: typeof s.autoAdvance === 'boolean' ? s.autoAdvance : DEFAULT_SETTINGS.autoAdvance, // v9 A
+    duelName: typeof s.duelName === 'string' ? Array.from(s.duelName.replace(/[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u2028-\u202e\u2060-\u206f\ufeff]/g, ' ').trim()).slice(0, 24).join('') : '', // v9 I: ≤ 24 Zeichen, ohne Steuerzeichen
   };
 }
 
