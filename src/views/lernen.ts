@@ -44,14 +44,13 @@ function stackBar(c: MasteryCounts, cls: string, label?: string): HTMLElement {
   return h('span', { class: `learn-stack ${cls}`, ...a11y }, seg('full', c.full), seg('half', c.half), seg('empty', c.empty));
 }
 
-/** Lernkarte oben in der Liste: Meisterung gesamt, Balken und Weiterlernen; ohne Aufgabentypen keine Karte. */
-function summaryCard(c: MasteryCounts, next: Subtype | null): HTMLElement | null {
+/** Lernkarte oben in der Liste: Meisterung gesamt und Balken (Weiterlernen steht schon als Primärbutton); ohne Aufgabentypen keine Karte. */
+function summaryCard(c: MasteryCounts): HTMLElement | null {
   if (!c.total) return null;
   const counts = { full: c.full, half: c.half, empty: c.empty, total: c.total };
   return card([
     h('p', { class: 'learn-card-count' }, t('lernen.cardCount', counts)),
     stackBar(c, 'learn-card-bar', t('lernen.cardBarAria', counts)),
-    next ? button({ label: t('lernen.cardContinue', { name: next.name }), kind: 'link', icon: 'play', href: `#/lernen/${next.id}` }) : null,
   ], { title: t('lernen.cardTitle'), class: 'learn-summary' });
 }
 
@@ -112,7 +111,7 @@ function listParts(): ListParts {
 
   // Weiterlernen: erster Subtyp mit der niedrigsten Meisterung (Kategorienreihenfolge; ohne Daten der erste)
   const next = pickNext(order, (o) => MASTERY_RANK[o.mastery])?.sub ?? null;
-  const summary = summaryCard(counts.overall, next);
+  const summary = summaryCard(counts.overall);
 
   // Ruhiger Leer-Hinweis; role=status liest ihn vor, sobald er erscheint
   const empty = h('p', { class: 'learn-empty', role: 'status' });

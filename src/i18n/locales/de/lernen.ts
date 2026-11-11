@@ -32,6 +32,5 @@ export const lernen = {
   cardTitle: 'Deine Lernkarte',
   cardCount: '{full} von {total} Aufgabentypen sicher · {half} in Arbeit · {empty} offen',
   cardBarAria: '{full} sicher, {half} in Arbeit, {empty} offen',
-  cardContinue: 'Weiterlernen: {name}',
   categorySolid: '{full}/{total} sicher',
 } as const;

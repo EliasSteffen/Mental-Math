@@ -34,6 +34,5 @@ export const lernen: Record<keyof typeof De, string> = {
   cardTitle: 'Your learning card',
   cardCount: '{full} of {total} task types solid · {half} in progress · {empty} open',
   cardBarAria: '{full} solid, {half} in progress, {empty} open',
-  cardContinue: 'Continue: {name}',
   categorySolid: '{full}/{total} solid',
 };
