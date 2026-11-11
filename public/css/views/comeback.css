@@ -1,0 +1,32 @@
+/* Comeback- und Reparatur-Karte auf „Heute“ (v10 C). Ruhig: eine Karte, ein Akzent, keine Animation. */
+@layer views {
+  .comeback-card { display:flex; flex-direction:column; gap:var(--space-3); padding:16px; min-width:0; }
+  .comeback-head { display:flex; align-items:center; gap:var(--space-3); min-width:0; }
+  .comeback-icon {
+    flex:none; display:inline-flex; align-items:center; justify-content:center; width:36px; height:36px; border-radius:50%;
+    background:color-mix(in srgb, var(--good) 14%, transparent); color:var(--good);
+  }
+  .comeback-card.is-repair .comeback-icon { background:color-mix(in srgb, var(--streak) 16%, transparent); color:var(--streak); }
+  .comeback-title { margin:0; min-width:0; font-size:var(--text-md); font-weight:var(--weight-semibold); line-height:1.25; }
+  .comeback-text { margin:0; font-size:var(--text-sm); line-height:1.45; color:var(--muted); }
+  .comeback-progress { display:flex; align-items:center; gap:var(--space-3); font-size:var(--text-xs); color:var(--muted); }
+  .comeback-dots { display:inline-flex; gap:6px; }
+  .comeback-dot { width:10px; height:10px; border-radius:50%; background:var(--surface-2); border:1px solid var(--border); }
+  .comeback-dot.is-on { background:var(--streak); border-color:var(--streak); }
+  .comeback-actions { display:flex; flex-wrap:wrap; gap:var(--space-2); }
+  .comeback-actions > .btn { flex:1 1 140px; min-width:0; }
+
+  /* Mit Karte darf Heute auf dem Telefon scrollen (sonst fest auf einen Bildschirm) */
+  @media (max-width: 719px) and (min-height: 500px) {
+    body.is-today.has-comeback { overflow:auto; overscroll-behavior:auto; }
+    .screen.is-today.has-comeback { height:auto; min-height:100dvh; overflow:visible; }
+    .screen.is-today.has-comeback .today-hero { flex:none; overflow:visible; }
+  }
+  @media (min-width: 720px) {
+    /* Über die ganze Breite des Rasters (Empfehlung und Kacheln folgen darunter) */
+    .today-main > .comeback-card { grid-column:1 / -1; }
+    .comeback-card { padding:20px; }
+    .comeback-text { max-width:60ch; }
+    .comeback-actions > .btn { flex:0 1 auto; }
+  }
+}

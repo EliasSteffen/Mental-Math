@@ -339,6 +339,7 @@ export function showResult(ctx: TrainCtx): void {
     leagueTier,
   });
   const goal = currentGoals(1)[0] ?? null; // v10 F: Zeile am Ende der Bilanz
+  const habitNow = currentHabit(); // v10 C: nach den Belohnungen (eine Reparatur durch Runden verlängert die Serie)
   const ins = roundInsight(results);
   const tasksText = n === 1 ? t('train.tasksOne') : t('train.tasksMany', { n });
 
@@ -361,7 +362,7 @@ export function showResult(ctx: TrainCtx): void {
       duelBox, // v9 I
       recap.newBest ? newBestCard(recap.newBest) : null,
       ins ? insightCard(ins) : null,
-      statusLine({ todayRounds: habit.todayRounds, goalRounds: habit.goalRounds, streak: habit.streak, freezes: habit.freezes }),
+      statusLine({ todayRounds: habitNow.todayRounds, goalRounds: habitNow.goalRounds, streak: habitNow.streak, freezes: habitNow.freezes }),
       goalHit ? h('p', { class: 'goal-reached rise' }, icon('check', 16), t('common.goalReached')) : null,
       n ? recapBlock(recap, goal) : null,
       rewards,
