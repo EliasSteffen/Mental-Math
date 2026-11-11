@@ -132,6 +132,7 @@ export const settings = {
   betaUpdates: 'Beta-Updates',
   betaUpdatesHelp: 'Nur TestFlight: neue Versionen der Oberfläche aus der Entwicklung, bevor sie im App Store erscheinen.',
   betaUpdatesNext: 'Gilt ab dem nächsten Start der App.',
+  betaUnlocked: 'Beta-Updates freigeschaltet – der Schalter steht jetzt oben in der Liste.',
   deviceId: 'Geräte-ID',
   profileId: 'Profil-ID',
   // Erweitert

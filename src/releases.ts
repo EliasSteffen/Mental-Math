@@ -5,6 +5,14 @@ const DATE = '2026-10-30';
 
 export const RELEASES: Release[] = [
   {
+    version: '2.0.1', date: '2026-11-11',
+    title: { de: 'Hinter den Kulissen', en: 'Behind the scenes' },
+    highlights: [
+      { de: 'Updates im Hintergrund lassen sich jetzt flexibler ausliefern – damit die nächste Version reibungslos ankommt.', en: 'Background updates can now be delivered more flexibly – so the next version arrives smoothly.' },
+      { de: 'Kleine Verbesserungen und Vorbereitung auf die nächste Version.', en: 'Small improvements and groundwork for the next version.' },
+    ],
+  },
+  {
     version: '2.0.0', date: '2026-11-09',
     title: { de: 'Gemacht fürs iPad', en: 'Made for iPad' },
     tour: 'v2',

@@ -21,7 +21,7 @@ import * as acct from '../features/account.ts';
 import { getSyncStatus, logoutAndForgetDevice, onSyncStatus, syncNow, syncStatusEntries, wipeCloudData } from '../features/sync.ts';
 import { remindersGroup } from './settings-reminders.ts';
 import { isPushEnabled, pushConfig } from '../platform/reminders.ts';
-import { APP_STORE_URL, isNative, liveUpdateBeta, openStorePage, publicUrl, saveFile, setLiveUpdateBeta } from '../platform/index.ts';
+import { APP_STORE_URL, isNative, liveUpdateBeta, openStorePage, publicUrl, saveFile, setLiveUpdateBeta, unlockBetaUpdates } from '../platform/index.ts';
 import { REPLAY_CHAPTERS } from '../features/tour-scripts.ts';
 import { TAB_HREF } from '../ui/shell.ts';
 import { isTablet, isWide } from '../ui/viewport.ts';
@@ -31,6 +31,9 @@ const NAME_MIN = 2;
 const ROUTE_SETTLE_MS = 240;
 const NAME_MAX = 32;
 const SOURCE_URL = 'https://github.com/EliasSteffen/Mental-Math';
+/** Versteckte Beta-Freischaltung: so viele Tipps auf „Build“, je höchstens so weit auseinander */
+const BETA_UNLOCK_TAPS = 7;
+const BETA_TAP_GAP_MS = 1500;
 
 let uid = 0;
 const nextId = (prefix: string): string => `prof-${prefix}-${++uid}`;
@@ -415,18 +418,37 @@ function aboutGroup(): HTMLElement {
     onChange: (on) => { setLiveUpdateBeta(on); toast(t('settings.betaUpdatesNext')); },
   });
   beta.el.hidden = true;
-  void liveUpdateBeta().then((on) => {
-    if (on === null) return;
-    beta.set(on);
-    beta.el.hidden = false;
-  });
+  const showBeta = (): void => {
+    void liveUpdateBeta().then((on) => {
+      if (on === null) return;
+      beta.set(on);
+      beta.el.hidden = false;
+    });
+  };
+  showBeta();
   const meta = (label: string, value: string, title?: string): HTMLElement =>
     h('div', null, h('dt', null, label), h('dd', { class: 'num', title }, value));
+  const buildRow = meta(t('settings.build'), [BUILD_INFO.build, fmtIsoDate(BUILD_INFO.date), BUILD_INFO.channel === 'preview' ? t('settings.channelPreview') : '']
+    .filter(Boolean).join(' · '));
+  // Versteckt: 7 × schnell auf „Build“ schaltet Beta-Updates auch in App-Store-Installationen frei (nur dieses Gerät)
+  let taps = 0;
+  let lastTap = 0;
+  buildRow.addEventListener('click', () => {
+    const now = Date.now();
+    taps = now - lastTap < BETA_TAP_GAP_MS ? taps + 1 : 1;
+    lastTap = now;
+    if (taps < BETA_UNLOCK_TAPS || !beta.el.hidden) return;
+    taps = 0;
+    void unlockBetaUpdates().then((ok) => {
+      if (!ok) return;
+      toast(t('settings.betaUnlocked'), { kind: 'success' });
+      showBeta();
+    });
+  });
   return profGroup(
     list([help, intro, news, store, beta.el, privacy, source]),
     h('dl', { class: 'prof-meta' },
-      meta(t('settings.build'), [BUILD_INFO.build, fmtIsoDate(BUILD_INFO.date), BUILD_INFO.channel === 'preview' ? t('settings.channelPreview') : '']
-        .filter(Boolean).join(' · ')),
+      buildRow,
       meta(t('settings.deviceId'), short(profile.deviceId), profile.deviceId),
       meta(t('settings.profileId'), short(profile.id), profile.id)));
 }
