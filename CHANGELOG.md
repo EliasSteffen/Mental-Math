@@ -4,6 +4,16 @@ Alle nennenswerten Änderungen an Mental Math. Format nach [Keep a Changelog](ht
 
 <!-- Automatisch erzeugt mit `npm run changelog` aus src/releases.ts – nicht von Hand bearbeiten. -->
 
+## [2.3.0] - 2026-11-11
+
+### Neu sortiert
+
+- Vier Tabs: Heute, Lernen, Erfolge und Wettkampf. Profil und Einstellungen findest du jetzt hinter deinem Liga-Emblem oben rechts, auf dem iPad unten in der Seitenleiste. „Schließen“ bringt dich zurück, wo du warst.
+- Aus Fortschritt wird Erfolge: Spielerkarte, Quests, Liga, Orden, Trick-Karten und Shop auf einen Blick. Deine Statistik findest du unter Erfolge → Statistik.
+- Heute hat eine eigene Kachel für den Mini-Case. Wer neu ist, bekommt den Einstufungstest gleich als Empfehlung.
+- Shop neu abgestimmt: Themes, Rahmen und Freezes kosten mehr, damit sich das Sammeln über Wochen lohnt. Dafür bringen Quests, Wochentruhen und der Comeback-Bonus deutlich mehr XP. Was du schon gekauft hast, bleibt dir.
+- Der Rundgang zeigt die neue Sortierung – jederzeit wieder unter Profil → Hilfe & Info.
+
 ## [2.2.0] - 2026-11-11
 
 ### Shop, Quests & Comeback
