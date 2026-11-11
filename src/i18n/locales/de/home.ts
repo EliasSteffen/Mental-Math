@@ -52,7 +52,7 @@ export const home = {
   ctaMinutes: 'ca. {n} min',
   // v9 C
   caseTitle: 'Mini-Case',
-  caseSub: 'Ein Fall, mehrere Rechenschritte',
+  caseSub: 'wie im Interview',
   // v9 H
   exampleLabel: 'Zum Beispiel',
   exampleNames: 'In dieser Runde',

@@ -49,7 +49,7 @@ export const home: Record<keyof typeof De, string> = {
   ctaMinutes: 'about {n} min',
   // v9 C
   caseTitle: 'Mini case',
-  caseSub: 'One case, several steps',
+  caseSub: 'like the interview',
   // v9 H
   exampleLabel: 'For example',
   exampleNames: 'In this round',
