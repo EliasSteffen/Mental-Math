@@ -24,7 +24,9 @@ import { isChallengeId } from './core/challenge.ts';
 import { onLangChange, t } from './i18n/index.ts';
 import { setTitle } from './ui/title.ts';
 import { modeName } from './core/modes.ts';
-import { initShell, setPrimaryAction, setShell, type TabId } from './ui/shell.ts';
+import { initShell, setPrimaryAction, setShell } from './ui/shell.ts';
+import { LAST_TAB_KEY, lastTabHash, shellOf, type ShellState, type TabId } from './core/nav.ts'; // v11 N
+import { mountAccountButton, paintSidebarProfile } from './ui/account-button.ts'; // v11 N
 import { onLayoutChange } from './ui/viewport.ts';
 import { renderCrash } from './ui/crash.ts';
 
@@ -165,17 +167,30 @@ function parseRoute(): Route {
   return { name: 'today' };
 }
 
-/** Tab einer Route; null = Fokus-Modus (Training, Ketten, Parallel). „Eigenes“ (Einstellungen) gehört zu Heute. */
-function tabOf(route: Route): TabId | null {
-  switch (route.name) {
-    case 'today': case 'custom': case 'quests': return 'today'; // v10 Q: quests
-    case 'case': return route.id ? null : 'today'; // v9 C: Auswahl mit Tableiste, Spiel im Fokus-Modus
-    case 'compete': case 'board': case 'challenge': case 'duel': return 'compete';
-    case 'learn': return 'learn';
-    case 'progress': case 'achievements': return 'progress'; // v9 J
-    case 'profile': return 'profile';
-    default: return null;
-  }
+/**
+ * Tab und Shell-Zustand einer Route (v11 N, Zuordnung in core/nav.ts): vier Tabs; Profil = Modal-Seite ohne Tab;
+ * Training, Ketten, Parallel = Fokus-Modus. „Eigenes“ gehört zu Heute, Statistik zu Erfolge.
+ */
+function shellFor(route: Route): ShellState {
+  return shellOf(route.name, { caseId: route.name === 'case' ? route.id : null });
+}
+const tabOf = (route: Route): TabId | null => shellFor(route).tab;
+
+/** Startseite eines Tabs (Profil-Knopf oben rechts): Heute, Lernen-Liste, Erfolge-Übersicht, Wettkampf. */
+function isTabStart(route: Route): boolean {
+  return route.name === 'today' || route.name === 'compete' || (route.name === 'learn' && !route.id) || (route.name === 'achievements' && !route.tab);
+}
+
+function readLastTab(): string | null {
+  try { return sessionStorage.getItem(LAST_TAB_KEY); } catch { return null; }
+}
+
+/** Hash des zuletzt gezeigten Tabs (Ziel von „Schließen“ im Profil). */
+export function lastTabTarget(): string { return lastTabHash(readLastTab()); }
+
+function rememberTab(route: Route): void {
+  if (!tabOf(route)) return;
+  try { sessionStorage.setItem(LAST_TAB_KEY, location.hash || '#/'); } catch { /* Speicher gesperrt: Schließen führt zu Heute */ }
 }
 
 /**
@@ -280,8 +295,10 @@ function withTransition(from: TabId | null | undefined, to: TabId | null, update
 export function render({ keepScroll = false }: RenderOptions = {}): void {
   canonicalize();
   const route = parseRoute();
-  const tab = tabOf(route);
+  const shell = shellFor(route);
+  const tab = shell.tab;
   const key = scrollKey(route);
+  const wasModal = document.body.classList.contains('is-modal');
   const prevKey = shownKey;
   // Position der verlassenen Tab-Seite merken
   if (prevKey !== null && prevKey !== key) scrollByKey.set(prevKey, window.scrollY);
@@ -290,7 +307,10 @@ export function render({ keepScroll = false }: RenderOptions = {}): void {
   withTransition(shownTab, tab, () => {
     runCleanup();
     setTitle(routeTitle(route));
-    setShell(tab);
+    setShell(tab, { modal: shell.modal });
+    app.classList.toggle('modal-enter', shell.modal && !wasModal);
+    paintSidebarProfile();
+    rememberTab(route);
     setPrimaryAction(null);
     app.replaceChildren();
     // Für seitenspezifische Layouts ab Tablet-Breite (public/css/layout.css)
@@ -306,6 +326,8 @@ export function render({ keepScroll = false }: RenderOptions = {}): void {
       setPrimaryAction(null);
       renderCrash(app, e, location.hash || '#/', () => rerender());
     }
+    // v11 N: Profil-Knopf (Liga-Emblem) in den Titel der Tab-Startseiten; nicht bei der Fehlerkarte
+    if (isTabStart(route) && !app.querySelector('.crash')) mountAccountButton(app);
     // Für den Start-Wächter (public/js/boot-guard.js): Die App hat gezeichnet
     document.documentElement.dataset['booted'] = '1';
     const y = keepY ?? (key !== null && key !== prevKey ? (scrollByKey.get(key) ?? 0) : 0);

@@ -35,6 +35,10 @@ export const common: Record<keyof typeof De, string> = {
   tabLearn: 'Learn',
   tabCompete: 'Compete',
   tabProgress: 'Progress',
+  tabAchievements: 'Achievements',
+  profileButton: 'Profile and settings',
+  profileEntry: 'Profil',
+  profileClose: 'Close',
   tabProfile: 'Profile',
   // Themes
   themeSystem: 'System',

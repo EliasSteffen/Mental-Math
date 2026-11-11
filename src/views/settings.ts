@@ -15,7 +15,7 @@ import { CATEGORIES } from '../core/catalog.ts';
 import { fmt } from '../core/numbers.ts';
 import { deviceKind, feedbackMailto, type FeedbackKind } from '../core/feedback.ts';
 import { app, h, appendChildren, type Child } from '../ui/dom.ts';
-import { rerender, addCleanup, go } from '../router.ts';
+import { rerender, addCleanup, go, lastTabTarget } from '../router.ts';
 import { backLink, button, group, icon, largeTitle, list, row, segmented, setButtonLabel, stepper, switchRow, type IconName, type SwitchControl } from '../ui/kit.ts';
 import { openSheet, type SheetHandle } from '../ui/sheet.ts';
 import type { PasskeyInfo, RecoveryStatus } from '../vendor/auth.ts';
@@ -27,7 +27,6 @@ import { effectiveTheme } from '../core/shop.ts'; // v10 P
 import { isPushEnabled, pushConfig } from '../platform/reminders.ts';
 import { APP_STORE_URL, isNative, liveUpdateBeta, openMailto, openStorePage, publicUrl, saveFile, setLiveUpdateBeta, unlockBetaUpdates } from '../platform/index.ts';
 import { REPLAY_CHAPTERS } from '../features/tour-scripts.ts';
-import { TAB_HREF } from '../ui/shell.ts';
 import { isTablet, isWide } from '../ui/viewport.ts';
 
 const NAME_MIN = 2;
@@ -908,12 +907,14 @@ function openAccountSheet(): void {
   });
 }
 
+const PROFILE_HREF = '#/profil';
+
 /** Konto-Sheet von außerhalb (Einführung): erst zum Profil, dann öffnen – ein Routenwechsel schlösse das Sheet sofort. */
 export function openAccountOnProfile(): void {
-  if (location.hash.startsWith(TAB_HREF.profile)) { openAccountSheet(); return; }
+  if (location.hash.startsWith(PROFILE_HREF)) { openAccountSheet(); return; }
   // Nach dem Zeichnen des Profils (inkl. Tab-Überblendung, --dur-state)
   window.addEventListener('hashchange', () => { setTimeout(openAccountSheet, ROUTE_SETTLE_MS); }, { once: true });
-  location.hash = TAB_HREF.profile;
+  location.hash = PROFILE_HREF;
 }
 
 /** Zeile „Geräte-Sync“ mit Status; „bald verfügbar“ nur ohne Konto-Funktion. */
@@ -1060,7 +1061,7 @@ function sectionMenu(s: Settings, active: Section | null): { el: HTMLElement; pa
 
 function sectionNodes(sec: Section, s: Settings, live: HTMLElement, back: boolean): Child[] {
   return [
-    back ? backLink({ label: t('settings.title'), href: TAB_HREF.profile }) : null,
+    back ? backLink({ label: t('settings.title'), href: PROFILE_HREF }) : null,
     h('div', { class: 'prof-head' }, largeTitle(t(sec.title)), h('p', { class: 'prof-intro' }, t(sec.intro))),
     sec.body(s, live),
     live,
@@ -1068,6 +1069,23 @@ function sectionNodes(sec: Section, s: Settings, live: HTMLElement, back: boolea
 }
 
 /** Hauptseite, Bereich oder ab 1024 px beides nebeneinander. Kein Floating CTA (der Router setzt setPrimaryAction(null)). */
+/** v11 N: Kopf der Profil-Startseite mit „Schließen“ (✕) oben rechts; führt zum zuletzt gezeigten Tab. Esc schließt ebenso. */
+function profileHead(): HTMLElement {
+  const close = (): void => go(lastTabTarget());
+  const onKey = (e: KeyboardEvent): void => {
+    if (e.key !== 'Escape' || e.defaultPrevented || document.querySelector('dialog[open]')) return;
+    const el = document.activeElement;
+    if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement) return;
+    close();
+  };
+  document.addEventListener('keydown', onKey);
+  addCleanup(() => document.removeEventListener('keydown', onKey));
+  const head = largeTitle(t('settings.title'));
+  head.classList.add('has-action');
+  head.append(h('button', { type: 'button', class: 'modal-close press', 'aria-label': t('common.profileClose'), onclick: close }, icon('close', 20)));
+  return head;
+}
+
 export function renderSettings(sectionId: string | null): void {
   const s = getSettings();
   const live = h('p', { class: 'sr-only', role: 'status' });
@@ -1080,7 +1098,7 @@ export function renderSettings(sectionId: string | null): void {
     addCleanup(onChange(() => menu.paint()));
     appendChildren(app, [
       h('div', { class: 'split' },
-        h('div', { class: 'split-master' }, largeTitle(t('settings.title')), playerCard(), accountCard(), menu.el),
+        h('div', { class: 'split-master' }, profileHead(), playerCard(), accountCard(), menu.el),
         h('div', { class: 'split-detail' }, sectionNodes(shown, s, live, false))),
     ]);
     return;
@@ -1089,5 +1107,5 @@ export function renderSettings(sectionId: string | null): void {
     appendChildren(app, sectionNodes(section, s, live, true));
     return;
   }
-  appendChildren(app, [largeTitle(t('settings.title')), playerCard(), accountCard(), sectionMenu(s, null).el]);
+  appendChildren(app, [profileHead(), playerCard(), accountCard(), sectionMenu(s, null).el]);
 }

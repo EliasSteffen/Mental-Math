@@ -79,7 +79,7 @@ const COMPETE: TourChapter = {
 const PROGRESS: TourChapter = {
   id: 'progress', title: 'tour.chProgress',
   steps: [
-    tap('[data-tab="progress"]'),
+    go('#/fortschritt'),
     say('tour.progressFocus', '.prog-focus', 3200),
     tap('.prog-switch button:nth-child(3)', 'phone'),
     say('tour.progressHistory', '.heatmap', 3000),
@@ -89,7 +89,7 @@ const PROGRESS: TourChapter = {
 const SETTINGS: TourChapter = {
   id: 'settings', title: 'tour.chSettings',
   steps: [
-    tap('[data-tab="profile"]'),
+    go('#/profil'),
     say('tour.settingsMenu', 'nav .list', 2800),
     tap(sectionRow('training')),
     say('tour.settingsTraining', SECTION_BODY, 2800),
@@ -123,7 +123,7 @@ const V2_COMPETE: TourChapter = {
 const V2_SETTINGS: TourChapter = {
   id: 'v2-settings', title: 'tour.chSettings',
   steps: [
-    tap('[data-tab="profile"]'),
+    go('#/profil'),
     say('tour.v2Menus', 'nav .list', 3200),
   ],
 };

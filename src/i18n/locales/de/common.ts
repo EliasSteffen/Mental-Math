@@ -33,6 +33,10 @@ export const common = {
   tabLearn: 'Lernen',
   tabCompete: 'Wettkampf',
   tabProgress: 'Fortschritt',
+  tabAchievements: 'Erfolge',
+  profileButton: 'Profil und Einstellungen',
+  profileEntry: 'Profil',
+  profileClose: 'Schließen',
   tabProfile: 'Profil',
   // Themes
   themeSystem: 'System',
