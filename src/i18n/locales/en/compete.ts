@@ -177,4 +177,15 @@ export const compete = {
   'err.server_error': 'The server is not reachable right now.',
   'err.no_attempt': 'No attempt found.',
   'err.network': 'No connection – please try again later.',
+  'err.unavailable': 'This is not available here right now.',
+  // Champions (v9 K)
+  championsTitle: 'Champions',
+  championsMeta: 'The top {n} Masters',
+  championsEmpty: 'No Champions yet. Masters with at least {min} ranked Dailies in the last {days} days count.',
+  championsRule: 'You become Champion by being a Master, playing at least {min} ranked Dailies in the last {days} days and placing in the top {n}.',
+  championsNeedAccount: 'With an account you can become Champion.',
+  championsYou: 'You are Champion · Rank {rank}',
+  championsYouNot: 'You are a Master but do not count yet: play at least {min} ranked Dailies within {days} days.',
+  championsYouBelow: 'You are rank {rank} among Masters – the top {n} become Champion.',
+  championsRating: '{n} LP',
 };

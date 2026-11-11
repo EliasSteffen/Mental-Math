@@ -3,7 +3,7 @@ import type { BadgeInput } from '../core/badges.ts';
 import { BADGES } from '../core/badges.ts';
 import { CARD_IDS } from '../core/cards.ts';
 import { CATEGORIES, SUBTYPES } from '../core/catalog.ts';
-import { LEAGUES, TIER_MINS, tierInfo, tierOf, tierProgress, CHAMPION_DEFAULT, type ChampionInfo } from '../core/league.ts';
+import { LEAGUES, TIER_MINS, tierInfo, tierOf, tierProgress, type ChampionInfo } from '../core/league.ts';
 import { fmt } from '../core/numbers.ts';
 import { cardCountOf } from '../core/rewards.ts';
 import { rewardView } from '../features/rewards.ts';
@@ -18,6 +18,8 @@ import {
 } from '../ui/collectibles.ts';
 import { cardRarity } from '../core/cards.ts';
 import { isTablet } from '../ui/viewport.ts';
+import { championAvailable, championCount, championInfo, onChampionChange, syncLeague } from '../features/league-sync.ts'; // v9 K
+import { addCleanup } from '../router.ts'; // v9 K
 import { t } from '../i18n/index.ts';
 
 export type AchievementTab = 'liga' | 'orden' | 'karten';
@@ -25,8 +27,8 @@ export const ACHIEVEMENT_TABS: readonly AchievementTab[] = ['liga', 'orden', 'ka
 const TAB_LABEL = { liga: 'rewards.tabLeague', orden: 'rewards.tabBadges', karten: 'rewards.tabCards' } as const;
 const TAB_KEY = 'mm.achievementsTab';
 
-/** Champion-Status (Paket K): bis dahin nie gesetzt, die Seite zeigt nur die Erklärung. */
-let championProvider: () => ChampionInfo | null = () => null;
+/** Champion-Status (Paket K): standardmäßig aus dem Zwischenspeicher von league-sync. */
+let championProvider: () => ChampionInfo | null = championInfo;
 export function setChampionProvider(fn: () => ChampionInfo | null): void { championProvider = fn; }
 
 function loadTab(): AchievementTab {
@@ -90,7 +92,7 @@ function ladder(v: View): HTMLElement {
 function leagueView(v: View, champion: ChampionInfo | null): HTMLElement {
   const info = h('div', { class: 'ach-info' },
     h('p', null, t('rewards.leagueExplain')),
-    h('p', null, t('rewards.championLine', { n: CHAMPION_DEFAULT })));
+    championAvailable() ? h('p', null, t('rewards.championLine', { n: championCount() })) : null); // v9 K: ohne Liga-SQL ausgeblendet
   const left = [heroCard(v, champion), info];
   if (isTablet()) return h('div', { class: 'ach-view' }, columns(left, [ladder(v)]));
   return h('div', { class: 'ach-view' }, ...left, ladder(v));
@@ -163,10 +165,10 @@ function cardsView(v: View): HTMLElement {
 
 export function renderAchievements(tabIn: string | null = null): void {
   const v = rewardView();
-  const champion = championProvider();
   const initial: AchievementTab = ACHIEVEMENT_TABS.find((x) => x === tabIn) ?? loadTab();
   const build = (tab: AchievementTab): HTMLElement =>
-    tab === 'orden' ? badgesView(v) : tab === 'karten' ? cardsView(v) : leagueView(v, champion);
+    tab === 'orden' ? badgesView(v) : tab === 'karten' ? cardsView(v) : leagueView(v, championProvider());
+  let current: AchievementTab = initial; // v9 K
   const panel = h('div', { class: 'ach-panel' }, build(initial));
   const switcher = segmented<AchievementTab>({
     label: t('rewards.tabsLabel'), hideLabel: true,
@@ -174,6 +176,7 @@ export function renderAchievements(tabIn: string | null = null): void {
     value: initial,
     onChange: (tab) => {
       saveTab(tab);
+      current = tab;
       const view = build(tab);
       view.classList.add('rise');
       panel.replaceChildren(view);
@@ -188,4 +191,7 @@ export function renderAchievements(tabIn: string | null = null): void {
     panel,
   ]);
   setPrimaryAction(null);
+  // v9 K: Champion-Status im Hintergrund auffrischen; ändert er sich, den Liga-Tab neu zeichnen
+  addCleanup(onChampionChange(() => { if (current === 'liga') panel.replaceChildren(build('liga')); }));
+  void syncLeague();
 }

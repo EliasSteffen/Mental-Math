@@ -4,6 +4,7 @@ import { cardCountOf, currentBadgeTiers, emptyEvents, evaluateRewards, type Rewa
 import {
   getActivity, getAttempts, getChainBest, getDailyResults, getParallelStats, getSessions, getSettings, setSettings,
 } from '../data/storage.ts';
+import { scheduleLeagueSync } from './league-sync.ts'; // v9 K
 import { toast } from '../ui/toast.ts';
 import { go } from '../router.ts';
 import { t } from '../i18n/index.ts';
@@ -35,6 +36,7 @@ export function updateProgressRewards(): RewardEvents & { first?: boolean } {
   try {
     const res = evaluateRewards(rewardHistory(), rewardStore(), Date.now());
     if (res.changed) setSettings({ league: res.store.league, badges: res.store.badges, cards: res.store.cards });
+    scheduleLeagueSync(); // v9 K: Wertung melden (Konto, gedrosselt, im Hintergrund)
     return res.first ? { ...emptyEvents(), first: true } : res.events;
   } catch (e) {
     console.error('rewards', e);

@@ -11,6 +11,10 @@ import {
 } from '../features/challenge.ts';
 import type { Overview } from '../features/challenge.ts';
 import { fmt, fmtSeconds } from '../core/numbers.ts';
+import { ACTIVE_DAYS, MASTER_RATING, MIN_RANKED_DAILIES } from '../core/champion.ts'; // v9 K
+import { challengeErrorCode } from '../features/challenge.ts'; // v9 K
+import { loadChampions } from '../features/league-sync.ts'; // v9 K
+import type { ChampionBoard } from '../features/league-sync.ts'; // v9 K
 import { t } from '../i18n/index.ts';
 import { addCleanup, go, rerender } from '../router.ts';
 import { app, h } from '../ui/dom.ts';
@@ -66,6 +70,42 @@ function boardsGroup(previewId: string | null): HTMLElement {
     row({ icon: 'trophy', label: t('compete.boardToday'), value: preview ? t('compete.boardAll') : undefined, href: '#/rangliste' }),
     row({ icon: 'bars', label: t('compete.boardWeek'), href: '#/rangliste?tab=week' }),
   ]));
+}
+
+/**
+ * Karte „Champions“ (v9 K): die besten Meister als Liste; ohne Konto mit Hinweis. Ohne Liga-SQL auf dem Server
+ * (503 unavailable) verschwindet sie ganz. Die Liste lädt im Hintergrund, die Seite wartet nicht darauf.
+ */
+function championsGroup(signedIn: boolean, isAlive: () => boolean): HTMLElement {
+  const holder = h('div', { class: 'compete-champions' });
+  const title = t('compete.championsTitle');
+  const rule = (n: number): HTMLElement => h('p', { class: 'compete-foot' }, t('compete.championsRule', { n, min: MIN_RANKED_DAILIES, days: ACTIVE_DAYS }));
+  const hint = signedIn ? null : notice(t('compete.championsNeedAccount'));
+  holder.replaceChildren(group(title, hint ?? notice(t('compete.loading'))));
+
+  const draw = (b: ChampionBoard): void => {
+    const rows = b.champions.map((c) => row({
+      leading: h('span', { class: 'compete-rank-no num', 'aria-label': t('compete.rankAria', { rank: c.rank }) }, String(c.rank)),
+      label: c.name || t('compete.anonymous'), sub: c.me ? t('compete.you') : undefined,
+      value: t('compete.championsRating', { n: fmt(c.rating, 0) }), class: c.me ? 'is-me' : undefined,
+    }));
+    const me = b.me;
+    const note = !me ? null
+      : me.champion ? t('compete.championsYou', { rank: me.rank ?? 0 })
+        : me.rank !== null ? t('compete.championsYouBelow', { rank: me.rank, n: b.count })
+          : me.rating >= MASTER_RATING ? t('compete.championsYouNot', { min: MIN_RANKED_DAILIES, days: ACTIVE_DAYS }) : null;
+    holder.replaceChildren(group({ title, meta: t('compete.championsMeta', { n: b.count }) },
+      hint,
+      rows.length ? list(rows) : notice(t('compete.championsEmpty', { min: MIN_RANKED_DAILIES, days: ACTIVE_DAYS })),
+      note ? h('p', { class: 'compete-foot' }, note) : null,
+      rule(b.count)));
+  };
+  void loadChampions().then((b) => { if (isAlive()) draw(b); }, (e: unknown) => {
+    if (!isAlive()) return;
+    if (challengeErrorCode(e) === 'unavailable') holder.remove();
+    else holder.replaceChildren(group(title, hint ?? notice(t('compete.err.network'))));
+  });
+  return holder;
 }
 
 let sheet: SheetHandle | null = null;
@@ -253,7 +293,7 @@ export function renderCompete(query: URLSearchParams): void {
           h('p', { class: 'compete-text' }, t('compete.needAccount')),
           button({ label: t('compete.createAccount'), kind: 'primary', full: true, cta: false, onClick: openAccountOnProfile }),
         ], { hero: true })],
-      [duelCard(), boardsGroup(null), // v9 I
+      [duelCard(), boardsGroup(null), championsGroup(false, () => alive), // v9 I, K
         group(t('compete.unrankedTitle'), list([row({ icon: 'calendar', label: t('compete.practiceUnranked'), href: '#/train/daily' })]))],
     ));
     return;
@@ -272,7 +312,7 @@ export function renderCompete(query: URLSearchParams): void {
     }));
     const needName = (fn: () => void) => (): void => { if (o.profile) fn(); else nameSheet(null, username, fn); };
     app.replaceChildren(head, columns(
-      [dailyHero(o.daily), duelCard(), boardsGroup(o.daily.id)], // v9 I
+      [dailyHero(o.daily), duelCard(), boardsGroup(o.daily.id), championsGroup(true, () => alive)], // v9 I, K
       [
         group(t('compete.competitions'), comps.length
           ? list(comps.map((c) => challengeRow(c)))

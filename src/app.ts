@@ -17,6 +17,7 @@ import { startAppUpdateCheck } from './features/app-store.ts';
 import { watchKeyboardInset } from './ui/keyboard-inset.ts';
 import { watchTextScale } from './ui/text-scale.ts';
 import { startProgressRewards } from './features/rewards.ts'; // v9 J
+import { startLeagueSync } from './features/league-sync.ts'; // v9 K
 
 // iOS-App: vorgemerktes Live-Update anwenden, bevor etwas gezeichnet wird (docs/PLAN-live-updates.md). Lädt die WebView
 // nicht binnen 5 s neu, geht es mit dem laufenden Bundle weiter.
@@ -52,6 +53,7 @@ safely('sync', startSync);
 safely('push', startPush);
 safely('whats-new', maybeShowWhatsNew);
 safely('rewards', startProgressRewards); // v9 J: Liga, Orden, Karten still nachholen (Bestandsnutzer: einmal Hinweis)
+safely('league', () => startLeagueSync()); // v9 K: Liga-Wertung melden, Champion-Status holen (nur mit Konto, im Hintergrund)
 safely('app-store', startAppUpdateCheck); // nur iOS: neue Version im App Store
 appReady(); // nur iOS: Oberfläche läuft – bestätigt ein Live-Update, sucht nach neuen
 
