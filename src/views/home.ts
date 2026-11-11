@@ -152,6 +152,7 @@ export function renderHome(): void {
   addCleanup(close);
   const modeRow = (label: string, sub: string, href: string): HTMLElement => row({ label, sub, href, onClick: close });
   const openModes = (): void => open(t('home.moreModes'), [
+    modeRow(t('home.caseTitle'), t('home.caseSub'), '#/case'), // v9 C
     modeRow(t('home.chainTitle'), t('home.chainSub'), '#/chain'),
     modeRow(t('home.parallelTitle'), t('home.parallelSub'), '#/parallel'),
     modeRow(t('home.estimateTitle'), t('home.estimateSub'), '#/train/all?est=1'),
@@ -178,6 +179,7 @@ export function renderHome(): void {
       sub: t('lernen.skill', { n: stats[c.id]?.score ?? '–' }), href: `#/train/${c.id}`,
     }))),
     tileSection(t('home.moreModes'), [
+      tile({ icon: 'target', label: t('home.caseTitle'), sub: t('home.caseSub'), href: '#/case' }), // v9 C
       tile({ icon: 'link', label: t('home.chainTitle'), sub: t('home.chainSub'), href: '#/chain' }),
       tile({ icon: 'bars', label: t('home.parallelTitle'), sub: t('home.parallelSub'), href: '#/parallel' }),
       tile({ icon: 'target', label: t('home.estimateTitle'), sub: t('home.estimateSub'), href: '#/train/all?est=1' }),

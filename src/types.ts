@@ -138,10 +138,13 @@ export interface Attempt {
   choices?: string[];
 }
 
+/** Runden außerhalb von #/train (zählen fürs Tagesziel, v9) */
+export type ExtraSessionMode = 'chain' | 'parallel' | `case:${string}`;
+
 export interface Session {
   id: string;
   ts: number;
-  mode: Mode;
+  mode: Mode | ExtraSessionMode;
   n: number;
   correct: number;
   points: number;

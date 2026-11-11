@@ -47,4 +47,7 @@ export const home = {
   categories: 'Kategorien',
   ctaPractice: 'Jetzt üben',
   ctaMinutes: 'ca. {n} min',
+  // v9 C
+  caseTitle: 'Mini-Case',
+  caseSub: 'Ein Fall, mehrere Rechenschritte',
 } as const;

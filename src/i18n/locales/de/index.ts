@@ -16,5 +16,6 @@ import { guide } from './guide.ts';
 import { compete } from './compete.ts';
 import { placement } from './placement.ts';
 import { tour } from './tour.ts';
+import { cases } from './cases.ts'; // v9 C
 
-export const dict = { tour, common, home, train, parallel, chain, custom, analyse, lernen, settings, release, core, account, sol, onboarding, guide, compete, placement } as const;
+export const dict = { tour, common, home, train, parallel, chain, custom, analyse, lernen, settings, release, core, account, sol, onboarding, guide, compete, placement, cases } as const;

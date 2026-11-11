@@ -1,6 +1,8 @@
 import type { CustomRange } from './types.ts';
 import { SUBTYPES } from './core/catalog.ts';
 import { renderChain } from './views/chain.ts';
+import { renderCase } from './views/case.ts'; // v9 C
+import { caseById } from './core/cases/index.ts'; // v9 C
 import { renderParallel } from './views/parallel/index.ts';
 import { renderCustom } from './views/custom.ts';
 import { isValidMode } from './core/modes.ts';
@@ -65,6 +67,7 @@ type Route =
   | { name: 'profile'; section: string | null }
   | { name: 'learn'; id: string | null; guide: boolean }
   | { name: 'chain' }
+  | { name: 'case'; id: string | null } // v9 C: null = Auswahl, 'random' = Zufall
   | { name: 'parallel' }
   | { name: 'custom' }
   | { name: 'compete'; query: URLSearchParams }
@@ -134,6 +137,7 @@ function parseRoute(): Route {
     return { name: 'learn', id, guide: id !== null && parts[2] === 'schritte' };
   }
   if (p0 === 'chain') return { name: 'chain' };
+  if (p0 === 'case') return { name: 'case', id: p1 !== undefined && (p1 === 'random' || caseById(p1) !== null) ? p1 : null }; // v9 C
   if (p0 === 'parallel') return { name: 'parallel' };
   if (p0 === 'custom') return { name: 'custom' };
   if (p0 === 'wettbewerbe') return { name: 'compete', query };
@@ -156,6 +160,7 @@ function parseRoute(): Route {
 function tabOf(route: Route): TabId | null {
   switch (route.name) {
     case 'today': case 'custom': return 'today';
+    case 'case': return route.id ? null : 'today'; // v9 C: Auswahl mit Tableiste, Spiel im Fokus-Modus
     case 'compete': case 'board': case 'challenge': return 'compete';
     case 'learn': return 'learn';
     case 'progress': return 'progress';
@@ -185,6 +190,7 @@ function routeTitle(route: Route): string | null {
     case 'profile': return t('settings.title');
     case 'learn': return t('lernen.title');
     case 'chain': return t('settings.routeChain');
+    case 'case': return t('cases.title'); // v9 C
     case 'parallel': return t('settings.routeParallel');
     case 'custom': return t('settings.routeCustom');
     case 'compete': return t('compete.title');
@@ -201,6 +207,7 @@ function draw(route: Route): void {
   else if (route.name === 'learn') renderLernen(route.id, route.guide);
   else if (route.name === 'profile') renderSettings(route.section);
   else if (route.name === 'chain') renderChain();
+  else if (route.name === 'case') renderCase(route.id); // v9 C
   else if (route.name === 'parallel') renderParallel();
   else if (route.name === 'custom') renderCustom();
   else if (route.name === 'compete') renderCompete(route.query);
