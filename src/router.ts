@@ -5,6 +5,7 @@ import { renderCase } from './views/case.ts'; // v9 C
 import { caseById } from './core/cases/index.ts'; // v9 C
 import { renderDuel } from './views/duel.ts'; // v9 I
 import { renderQuests } from './views/quests.ts'; // v10 Q
+import { renderRace, renderRaceReihum } from './views/race/index.ts'; // v12 R1
 import { renderParallel } from './views/parallel/index.ts';
 import { renderCustom } from './views/custom.ts';
 import { isValidMode } from './core/modes.ts';
@@ -82,6 +83,8 @@ type Route =
   | { name: 'placement' }
   | { name: 'duel'; d: string | null } // v9 I
   | { name: 'quests' } // v10 Q
+  | { name: 'race' } // v12 R1: Übersicht
+  | { name: 'race-reihum' } // v12 R1: ein Gerät reihum (Fokus-Modus)
   | { name: 'train'; mode: string; n: number | null; intro: boolean; estimate: boolean; custom: CustomRange | null };
 
 /** Alte Pfade (Lesezeichen, PWA-Start) → neue; die Query (z. B. ?tab=) bleibt erhalten (E6). */
@@ -152,6 +155,7 @@ function parseRoute(): Route {
   if (p0 === 'wettbewerbe') return { name: 'compete', query };
   if (p0 === 'einstufung') return { name: 'placement' };
   if (p0 === 'quests') return { name: 'quests' }; // v10 Q
+  if (p0 === 'rennen') return p1 === 'reihum' ? { name: 'race-reihum' } : { name: 'race' }; // v12 R1
   if (p0 === 'duell') return { name: 'duel', d: query.get('d') }; // v9 I
   if (p0 === 'rangliste') return { name: 'board', board: parseBoardQuery(query) };
   if (p0 === 'challenge' && isChallengeId(p1)) return { name: 'challenge', id: p1 };
@@ -223,6 +227,7 @@ function routeTitle(route: Route): string | null {
     case 'challenge': return t('compete.title');
     case 'duel': return t('duel.title'); // v9 I
     case 'quests': return t('quests.title'); // v10 Q
+    case 'race': case 'race-reihum': return t('race.title'); // v12 R1
     case 'placement': return t('placement.title');
     case 'train': return modeName(route.mode);
     default: return t('settings.routeTraining');
@@ -244,6 +249,8 @@ function draw(route: Route): void {
   else if (route.name === 'placement') renderPlacement();
   else if (route.name === 'duel') renderDuel(route.d); // v9 I
   else if (route.name === 'quests') renderQuests(); // v10 Q
+  else if (route.name === 'race') renderRace(); // v12 R1
+  else if (route.name === 'race-reihum') renderRaceReihum(); // v12 R1
   else if (route.name === 'train') renderTrain(route.mode, { n: route.n, intro: route.intro, estimate: route.estimate, custom: route.custom });
   else renderHome();
 }

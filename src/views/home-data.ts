@@ -219,9 +219,9 @@ export type PhoneTile = 'daily' | 'quests' | 'case' | 'mixed' | 'categories' | '
 export const PHONE_TILES: readonly PhoneTile[] = ['daily', 'quests', 'case', 'mixed', 'categories', 'modes'];
 
 /** Zeilen im Sheet „Weitere Modi“ (Mini-Case gehört nicht hierher, sondern in eine eigene Kachel). */
-export type ModeRow = 'placement' | 'chain' | 'parallel' | 'estimate' | 'custom';
+export type ModeRow = 'placement' | 'chain' | 'parallel' | 'estimate' | 'custom' | 'race';
 
 export function modeRows(o: { placementRow: boolean }): ModeRow[] {
-  const rest: ModeRow[] = ['chain', 'parallel', 'estimate', 'custom'];
+  const rest: ModeRow[] = ['chain', 'parallel', 'estimate', 'custom', 'race']; // v12 R1: Raketen-Rennen
   return o.placementRow ? ['placement', ...rest] : rest;
 }

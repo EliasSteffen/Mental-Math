@@ -5,7 +5,8 @@ export type TabId = 'today' | 'learn' | 'achievements' | 'compete';
 /** Namen der Routen des Routers (src/router.ts). */
 export type RouteName =
   | 'today' | 'progress' | 'profile' | 'achievements' | 'learn' | 'chain' | 'case' | 'parallel' | 'custom'
-  | 'compete' | 'board' | 'challenge' | 'placement' | 'duel' | 'quests' | 'train';
+  | 'compete' | 'board' | 'challenge' | 'placement' | 'duel' | 'quests' | 'train'
+  | 'race' | 'race-reihum'; // v12 R1: Raketen-Rennen (Übersicht, „Reihum“ im Fokus-Modus)
 
 export interface ShellState {
   /** Aktiver Tab; null = kein Tab */
@@ -19,7 +20,7 @@ export function shellOf(name: RouteName, o: { caseId?: string | null } = {}): Sh
   switch (name) {
     case 'today': case 'custom': case 'quests': return { tab: 'today', modal: false };
     case 'case': return { tab: o.caseId ? null : 'today', modal: false }; // Auswahl mit Tab, Spiel im Fokus-Modus
-    case 'compete': case 'board': case 'challenge': case 'duel': return { tab: 'compete', modal: false };
+    case 'compete': case 'board': case 'challenge': case 'duel': case 'race': return { tab: 'compete', modal: false };
     case 'learn': return { tab: 'learn', modal: false };
     case 'progress': case 'achievements': return { tab: 'achievements', modal: false }; // Statistik gehört zu Erfolge
     case 'profile': return { tab: null, modal: true };

@@ -27,6 +27,7 @@ export function modeName(mode: Mode | ExtraSessionMode): string {
   // v9 B: Runden außerhalb von #/train
   if (mode === 'chain') return t('chain.title');
   if (mode === 'parallel') return t('parallel.title');
+  if (mode === 'race') return t('race.title'); // v12 R1
   // v9 C: Mini-Case-Runden („case:<Vorlage>“)
   if (mode.startsWith('case:')) {
     const tpl = caseById(mode.slice(5));

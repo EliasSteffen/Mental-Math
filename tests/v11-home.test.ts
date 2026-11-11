@@ -29,8 +29,8 @@ test('Kacheln Telefon: Daily · Quests · Mini-Case · Gemischt · Kategorien ·
 });
 
 test('Sheet „Weitere Modi“: ohne Mini-Case, Einstufung nur oben und nur wenn offen', () => {
-  assert.deepEqual(modeRows({ placementRow: false }), ['chain', 'parallel', 'estimate', 'custom']);
-  assert.deepEqual(modeRows({ placementRow: true }), ['placement', 'chain', 'parallel', 'estimate', 'custom']);
+  assert.deepEqual(modeRows({ placementRow: false }), ['chain', 'parallel', 'estimate', 'custom', 'race']);
+  assert.deepEqual(modeRows({ placementRow: true }), ['placement', 'chain', 'parallel', 'estimate', 'custom', 'race']);
 });
 
 test('Texte: Hero-Schlüssel in beiden Sprachen vorhanden und passend', () => {
