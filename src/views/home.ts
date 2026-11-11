@@ -215,6 +215,7 @@ export function renderHome(): void {
     parallel: () => modeRow(t('home.parallelTitle'), t('home.parallelSub'), '#/parallel'),
     estimate: () => modeRow(t('home.estimateTitle'), t('home.estimateSub'), '#/train/all?est=1'),
     custom: () => modeRow(t('home.customTitle'), t('home.customSub'), '#/custom'),
+    race: () => modeRow(t('race.title'), t('race.homeSub'), '#/rennen'), // v12 R1
   };
   const openModes = (): void => open(t('home.moreModes'), modeRows({ placementRow }).map((id) => modeEntries[id]()));
   const openCategories = (): void => open(t('home.categories'), activeCategories(settings.enabledCategories).map((c) => row({
@@ -246,6 +247,7 @@ export function renderHome(): void {
       tile({ icon: 'bars', label: t('home.parallelTitle'), sub: t('home.parallelSub'), href: '#/parallel' }),
       tile({ icon: 'target', label: t('home.estimateTitle'), sub: t('home.estimateSub'), href: '#/train/all?est=1' }),
       tile({ icon: 'gear', label: t('home.customTitle'), sub: t('home.customSub'), href: '#/custom' }),
+      tile({ icon: 'rocket', label: t('race.title'), sub: t('race.homeSub'), href: '#/rennen' }), // v12 R1
     ]));
 
   // Seite passt auf einen Bildschirm (CSS: .screen.is-today, ohne Scrollen auf dem Telefon)
