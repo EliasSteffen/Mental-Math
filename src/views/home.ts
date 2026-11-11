@@ -6,7 +6,7 @@ import { CATEGORIES, SUBTYPES, activeCategories } from '../core/catalog.ts';
 import { categoryStats } from '../core/scoring.ts';
 import { dueReviews } from '../core/review.ts';
 import { dayKey, recommendation } from '../core/progress.ts';
-import { habitInfo } from '../core/habit.ts'; // v9 B
+import { currentHabit } from '../features/habit.ts'; // v9 B, v10
 import { fmtSeconds } from '../core/numbers.ts';
 import { getActivity, getAttempts, getDailyResults, getReviews, getSessions, getSettings } from '../data/storage.ts';
 import { app, appendChildren, h } from '../ui/dom.ts';
@@ -130,7 +130,7 @@ export function renderHome(): void {
   const attempts = getAttempts();
   const reviews = getReviews();
   const settings = getSettings();
-  const habit = habitInfo({ sessions: getSessions(), activity: getActivity(), goalRounds: settings.dailyGoalRounds, now }); // v9 B
+  const habit = currentHabit(now); // v9 B, v10: mit gekauften Freezes und Reparaturen
   const rec = recommendation(attempts, reviews, now, { enabledCategories: settings.enabledCategories });
   const plan = heroPlan(rec, {
     sessionLength: settings.sessionLength || 10,

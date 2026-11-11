@@ -6,7 +6,8 @@ import { fmt } from '../core/numbers.ts';
 import { SUBTYPES, activeCategories } from '../core/catalog.ts';
 import { categoryStats, overall } from '../core/scoring.ts';
 import { apmSeries, xpInfo, dayKey } from '../core/progress.ts';
-import { habitInfo, roundsHeatmap } from '../core/habit.ts'; // v9 B
+import { roundsHeatmap } from '../core/habit.ts'; // v9 B
+import { currentHabit } from '../features/habit.ts'; // v10
 import { dueReviews, nextDue } from '../core/review.ts';
 import { getMethod } from '../core/methods.ts';
 import { lw } from '../core/l10n.ts';
@@ -225,7 +226,7 @@ function dailyGroup(now: number): HTMLElement {
 function historyView(attempts: Attempt[], settings: Settings, now: number): HTMLElement {
   const activity = getActivity();
   const sessions = getSessions();
-  const st = habitInfo({ sessions, activity, goalRounds: settings.dailyGoalRounds, now });
+  const st = currentHabit(now); // v10
   const legend = h('p', { class: 'prog-heat-legend', 'aria-hidden': 'true' },
     t('analyse.less'),
     [0, 1, 2, 3].map((l) => h('span', { class: 'hm-cell is-legend', 'data-level': String(l) })),

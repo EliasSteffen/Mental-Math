@@ -101,7 +101,7 @@ test('Karten-Zahl treibt „Sammler“ in derselben Auswertung', () => {
   assert.ok(r.events.badges.some((b) => b.id === 'cards' && b.tier === 1));
 });
 
-test('Ergebniszeilen: Reihenfolge, höchstens 3, Rest als „+N“', () => {
+test('Ergebniszeilen: Reihenfolge, höchstens 4 (v10), Rest als „+N“', () => {
   const ev = {
     promoted: { from: 5, to: 6 },
     badges: [{ id: 'streak' as const, tier: 1 as const }, { id: 'rounds' as const, tier: 2 as const }],
@@ -110,8 +110,8 @@ test('Ergebniszeilen: Reihenfolge, höchstens 3, Rest als „+N“', () => {
   const lines = rewardLines(ev);
   assert.deepEqual(lines.map((l) => l.kind), ['league', 'badge', 'badge', 'card', 'card']);
   const { shown, more } = splitRewardLines(ev);
-  assert.equal(shown.length, 3);
-  assert.equal(more, 2);
+  assert.equal(shown.length, 4);
+  assert.equal(more, 1);
   assert.deepEqual(splitRewardLines(emptyEvents()), { shown: [], more: 0 });
   assert.deepEqual(splitRewardLines({ badges: [], cards: ['pct.of'] }), { shown: [{ kind: 'card', id: 'pct.of' }], more: 0 });
   // Abstieg dezent, zuletzt
@@ -124,7 +124,8 @@ test('Einstellungen: Defaults und Normalisierung', () => {
   assert.equal(DEFAULT_SETTINGS.league, null);
   assert.deepEqual(DEFAULT_SETTINGS.badges, {});
   assert.deepEqual(DEFAULT_SETTINGS.cards, {});
-  assert.deepEqual(Object.keys(DEFAULT_SETTINGS).slice(-3), ['league', 'badges', 'cards'], 'ans Ende angehängt');
+  const keys = Object.keys(DEFAULT_SETTINGS);
+  assert.deepEqual(keys.slice(keys.indexOf('league'), keys.indexOf('league') + 3), ['league', 'badges', 'cards'], 'angehängt (v10 folgt danach)');
 
   assert.deepEqual(normalizeLeague({ tier: 4, peak: 9, ts: 5 }), { tier: 4, peak: 9, ts: 5 });
   assert.deepEqual(normalizeLeague({ tier: 9, peak: 4, ts: 5 }), { tier: 9, peak: 9, ts: 5 }, 'Peak nie unter der Stufe');

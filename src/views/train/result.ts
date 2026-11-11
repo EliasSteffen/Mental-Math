@@ -5,7 +5,7 @@ import { SUBTYPES } from '../../core/catalog.ts';
 import { getMethod } from '../../core/methods.ts';
 import { modeName } from '../../core/modes.ts';
 import { dayKey } from '../../core/progress.ts';
-import { habitInfo } from '../../core/habit.ts'; // v9 B
+import { currentHabit } from '../../features/habit.ts'; // v9 B, v10
 import { confetti } from '../../ui/charts.ts'; // v9 B
 import { roundRecap, type RoundRecap } from '../../core/recap.ts'; // v9 A
 import { updateProgressRewards } from '../../features/rewards.ts'; // v9 J
@@ -297,7 +297,7 @@ export function showResult(ctx: TrainCtx): void {
   });
   const settings = getSettings();
   // v9 B: Runden heute (die eben gespeicherte Runde zählt mit); erreicht genau diese Runde das Ziel → Zeile, ggf. Konfetti
-  const habit = habitInfo({ sessions: getSessions(), activity: getActivity(), goalRounds: settings.dailyGoalRounds });
+  const habit = currentHabit(); // v10: mit gekauften Freezes und Reparaturen
   const goalHit = habit.todayRounds === habit.goalRounds && dayKey(ctx.startedAt) === dayKey(Date.now());
   if (goalHit && settings.celebrated !== dayKey(Date.now())) {
     setSettings({ celebrated: dayKey(Date.now()) });

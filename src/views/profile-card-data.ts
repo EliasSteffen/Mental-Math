@@ -42,6 +42,9 @@ export function profileCardData(o: {
   activity: Activity;
   dailyResults: Readonly<Record<string, DailyResult>>;
   goalRounds: number;
+  /** v10: zusätzliche Freezes und reparierte Tage (Einstellungen) */
+  boughtFreezes?: readonly number[];
+  repairedDays?: readonly string[];
   /** Liga-Stufe 0–15 (rewardView().tier) */
   tier: number;
   /** wirksame Ordensstufen (rewardView().badges) */
@@ -51,7 +54,10 @@ export function profileCardData(o: {
   now?: number;
 }): ProfileCardData {
   const xp = xpInfo([...o.attempts]);
-  const habit = habitInfo({ sessions: o.sessions, activity: o.activity, goalRounds: o.goalRounds, now: o.now });
+  const habit = habitInfo({
+    sessions: o.sessions, activity: o.activity, goalRounds: o.goalRounds, now: o.now,
+    boughtFreezes: o.boughtFreezes, repairedDays: o.repairedDays,
+  });
   const answered = o.attempts.filter((a) => a.errorType !== 'skip');
   const correct = answered.filter((a) => a.correct).length;
   return {

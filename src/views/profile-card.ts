@@ -42,7 +42,7 @@ function buildPlayerCard(): HTMLElement {
   const view = rewardView();
   const d = profileCardData({
     attempts: getAttempts(), sessions: getSessions(), activity: getActivity(), dailyResults: getDailyResults(),
-    goalRounds: getSettings().dailyGoalRounds, tier: view.tier, badges: view.badges, cards: view.cards,
+    goalRounds: getSettings().dailyGoalRounds, boughtFreezes: getSettings().freezesBought, repairedDays: getSettings().streakRepairs, tier: view.tier, badges: view.badges, cards: view.cards,
   });
   // Champion: nur bei Meister; Platz kommt aus Paket K (setChampionProvider in achievements.ts)
   const champion = tierInfo(d.tier).step === null ? championInfo() : null;

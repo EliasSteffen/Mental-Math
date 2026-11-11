@@ -9,5 +9,6 @@ export function currentReminderState(now = Date.now()): ReminderState {
     activity: getActivity(), goalMin: s.dailyGoalMin, reviews: getReviews(), attempts: getAttempts(),
     enabledCategories: s.enabledCategories,
     sessions: getSessions(), goalRounds: s.dailyGoalRounds, // v9 B
+    boughtFreezes: s.freezesBought, repairedDays: s.streakRepairs, // v10
   }, now);
 }
