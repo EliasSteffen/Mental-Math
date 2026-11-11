@@ -7,13 +7,15 @@ import { modeName } from '../../core/modes.ts';
 import { dayKey } from '../../core/progress.ts';
 import { habitInfo } from '../../core/habit.ts'; // v9 B
 import { confetti } from '../../ui/charts.ts'; // v9 B
-import { addSession, getActivity, getSessions, getSettings, setDailyResult, setSettings } from '../../data/storage.ts';
+import { roundRecap, type RoundRecap } from '../../core/recap.ts'; // v9 A
+import { addSession, getActivity, getAttempts, getSessions, getSettings, setDailyResult, setSettings } from '../../data/storage.ts';
 import { go, addCleanup } from '../../router.ts';
 import { toast } from '../../ui/toast.ts';
 import { h } from '../../ui/dom.ts';
 import { setTitle } from '../../ui/title.ts';
 import { isModalOpen } from '../../ui/modal.ts';
 import { button, group, icon, insight, list, resultRow, resultSegments, statusLine, steps } from '../../ui/kit.ts';
+import { progressBar } from '../../ui/charts.ts';
 import { dock } from '../../ui/dock.ts';
 import { isSheetOpen, openSheet } from '../../ui/sheet.ts';
 import { safeSteps } from '../../ui/widgets.ts';
@@ -47,6 +49,46 @@ function insightCard(ins: RoundInsight): HTMLElement {
   const tip = ins.type === 'nullen' ? t('train.tipZeros')
     : subTip || (ins.type === 'knapp' ? t('train.tipClose') : t('train.tipSkip'));
   return insight({ icon: 'bulb', tone: 'warn', title, text: t('train.insightTip', { tip }) });
+}
+
+/** Vergleichszeile unter dem Durchschnitt: nur ab 0,1 s Unterschied (v9 A). */
+function vsLastLine(r: RoundRecap): HTMLElement | null {
+  const d = r.vsLast?.deltaAvgMs ?? 0;
+  if (Math.abs(d) < 100) return null;
+  return h('p', { class: `train-result-vs num${d < 0 ? ' is-good' : ''}` },
+    t(d < 0 ? 'recap.faster' : 'recap.slower', { time: fmtSeconds(Math.abs(d)) }));
+}
+
+/** Neue Bestzeit (v9 A). */
+function newBestCard(nb: NonNullable<RoundRecap['newBest']>): HTMLElement {
+  return insight({
+    icon: 'trophy', tone: 'good', title: t('recap.newBest'),
+    text: nb.prevAvgMs === null
+      ? t('recap.newBestFirst', { time: fmtSeconds(nb.avgMs) })
+      : t('recap.newBestPrev', { time: fmtSeconds(nb.avgMs), prev: fmtSeconds(nb.prevAvgMs) }),
+  });
+}
+
+/** Skill-Zeile und Level-Karte (v9 A): ruhige Zeilen mit Balken, ohne Effekte. */
+function recapBlock(r: RoundRecap): HTMLElement {
+  const lv = r.level;
+  const rows: Array<HTMLElement | null> = [];
+  if (r.skill) {
+    const name = SUBTYPES[r.skill.subtype]?.name ?? r.skill.subtype;
+    const values = r.skill.before === null
+      ? t('recap.skillAfter', { after: r.skill.after })
+      : t('recap.skillChange', { before: r.skill.before, after: r.skill.after });
+    rows.push(h('div', { class: 'recap-row' },
+      h('p', { class: 'recap-line' }, h('span', { class: 'recap-label' }, t('recap.skill', { sub: name })), h('span', { class: 'recap-value num' }, values)),
+      progressBar(r.skill.after, { decorative: true })));
+  }
+  rows.push(h('div', { class: 'recap-row' },
+    h('p', { class: 'recap-line' },
+      h('span', { class: 'recap-label' }, t('recap.level', { level: lv.level })),
+      h('span', { class: 'recap-value num' }, t('recap.xpGained', { n: lv.gained }))),
+    progressBar((lv.into / lv.needed) * 100, { label: t('recap.levelProgress', { into: lv.into, needed: lv.needed }) }),
+    lv.levelUp ? h('p', { class: 'recap-up' }, t('recap.levelUp', { level: lv.level })) : null));
+  return h('section', { class: 'recap' }, ...rows);
 }
 
 /** Lösungsweg einer Aufgabe im modalen Sheet. */
@@ -153,6 +195,8 @@ export function showResult(ctx: TrainCtx): void {
   const totalMs = results.reduce((s, r) => s + r.timeMs, 0);
   const avg = n ? totalMs / n : 0;
 
+  // v9 A: Stand vor dieser Runde (für die Bilanz), bevor die Runde gespeichert wird
+  const sessionsBefore = getSessions();
   addSession({ id: ctx.sessionId, ts: ctx.startedAt, mode, n, correct, points: ctx.points, avgTimeMs: Math.round(avg) });
   if (ctx.ranked) {
     showRankedResult(ctx, { n, correct, totalMs, avg });
@@ -204,6 +248,14 @@ export function showResult(ctx: TrainCtx): void {
     }, label, h('span', { class: 'train-more-chevron' }, icon('chevron-down', 18)));
   }
 
+  const attemptsAfter = getAttempts();
+  const recap = roundRecap({
+    mode, n, correct, avgMs: avg,
+    assistedAny: attemptsAfter.some((a) => a.sessionId === ctx.sessionId && a.assisted === true),
+    sessionsBefore,
+    attemptsBefore: attemptsAfter.filter((a) => a.sessionId !== ctx.sessionId),
+    attemptsAfter,
+  });
   const settings = getSettings();
   // v9 B: Runden heute (die eben gespeicherte Runde zählt mit); erreicht genau diese Runde das Ziel → Zeile, ggf. Konfetti
   const habit = habitInfo({ sessions: getSessions(), activity: getActivity(), goalRounds: settings.dailyGoalRounds });
@@ -216,18 +268,21 @@ export function showResult(ctx: TrainCtx): void {
   const tasksText = n === 1 ? t('train.tasksOne') : t('train.tasksMany', { n });
 
   // Überschrift bekommt den Fokus: Screenreader lesen „8 von 10 richtig“, Enter = Nochmal, Esc = Übersicht
-  const title = h('h1', { class: 'train-result-title num', tabindex: '-1' }, t('train.resultScore', { good: correct, n }));
+  const title = h('h1', { class: 'train-result-title num', tabindex: '-1' }, recap.perfect ? t('recap.perfect', { n }) : t('train.resultScore', { good: correct, n }));
   const again = button({ label: t('common.again'), kind: 'primary', full: true, onClick: () => go(ctx.restart) });
   root.replaceChildren(
     h('div', { class: 'stage is-start train-result' },
       h('header', { class: 'train-result-head' },
         h('p', { class: 'train-result-sub' }, `${modeName(mode)} · ${tasksText}`),
         title,
-        h('p', { class: 'train-result-avg num' }, t('train.avgPerTask', { time: fmtSeconds(avg) }))),
+        h('p', { class: 'train-result-avg num' }, t('train.avgPerTask', { time: fmtSeconds(avg) })),
+        vsLastLine(recap)),
       n ? resultSegments(results.map((r) => r.ev.correct)) : null,
+      recap.newBest ? newBestCard(recap.newBest) : null,
       ins ? insightCard(ins) : null,
-      statusLine({ todayRounds: habit.todayRounds, goalRounds: habit.goalRounds, streak: habit.streak, freezes: habit.freezes, xp: ctx.points }),
+      statusLine({ todayRounds: habit.todayRounds, goalRounds: habit.goalRounds, streak: habit.streak, freezes: habit.freezes }),
       goalHit ? h('p', { class: 'goal-reached rise' }, icon('check', 16), t('common.goalReached')) : null,
+      n ? recapBlock(recap) : null,
       n ? group({ title: t('train.tasks'), meta: wrongRows.length ? t('train.wrongFirst') : undefined },
         list([...wrongRows, toggle, ...rightRows])) : null),
     dock(
@@ -255,6 +310,6 @@ export function showResult(ctx: TrainCtx): void {
   setTitle(t('common.roundDone'));
   window.scrollTo(0, 0);
   title.focus({ preventScroll: true });
-  // Bitte um eine Bewertung (nur iOS, selten); ein Bestwert setzt hier ohnehin ≥ 80 % voraus (personalBest)
-  addCleanup(maybeAskForReview({ correct, n, newBest: false }));
+  // Bitte um eine Bewertung (nur iOS, selten)
+  addCleanup(maybeAskForReview({ correct, n, newBest: recap.newBest !== null }));
 }

@@ -188,4 +188,7 @@ export const settings: Record<keyof typeof De, string> = {
   // v9 B
   roundsN: '{n} rounds',
   roundsNOne: '{n} round',
+  // v9 A
+  autoAdvance: 'Continue automatically after a correct answer',
+  autoAdvanceHint: 'After a correct answer the next task follows on its own. After a mistake the solution stays until you tap.',
 };

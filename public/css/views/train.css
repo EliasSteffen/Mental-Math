@@ -229,4 +229,26 @@
     .train-breathe-out { animation:none; opacity:0; }
     .train-ghost { transition:none; }
   }
+
+  /* ---------- Auto-Weiter (v9 A): dezente Füllung auf „Weiter“ ---------- */
+  .btn.is-auto { position:relative; overflow:hidden; isolation:isolate; }
+  .btn.is-auto::before {
+    content:""; position:absolute; inset:0; z-index:-1; pointer-events:none;
+    background:color-mix(in srgb, var(--on-accent) 22%, transparent);
+    transform:scaleX(0); transform-origin:left center;
+    animation:auto-fill var(--auto-ms, 700ms) linear forwards;
+  }
+  @keyframes auto-fill { to { transform:scaleX(1); } }
+  @media (prefers-reduced-motion: reduce) { .btn.is-auto::before { animation:none; display:none; } }
+
+  /* ---------- Rundenbilanz (v9 A) ---------- */
+  .train-result-vs { font-size:var(--text-sm); color:var(--muted); }
+  .train-result-vs.is-good { color:var(--good); }
+  .recap { display:flex; flex-direction:column; gap:var(--space-4); padding:var(--space-4); border-radius:var(--radius-card, 16px); background:var(--surface); }
+  .recap-row { display:flex; flex-direction:column; gap:var(--space-2); min-width:0; }
+  .recap-line { display:flex; justify-content:space-between; align-items:baseline; gap:var(--space-3); font-size:var(--text-sm); }
+  .recap-label { min-width:0; overflow-wrap:anywhere; color:var(--muted); }
+  .recap-label:first-child { color:var(--text); font-weight:var(--weight-semibold); }
+  .recap-value { flex:none; color:var(--text); }
+  .recap-up { font-size:var(--text-sm); font-weight:var(--weight-semibold); color:var(--good); }
 }

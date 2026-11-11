@@ -186,4 +186,7 @@ export const settings = {
   // v9 B
   roundsN: '{n} Runden',
   roundsNOne: '{n} Runde',
+  // v9 A
+  autoAdvance: 'Bei richtiger Antwort automatisch weiter',
+  autoAdvanceHint: 'Nach einer richtigen Antwort geht es kurz danach von selbst weiter. Bei Fehlern bleibt die Lösung stehen, bis du tippst.',
 } as const;

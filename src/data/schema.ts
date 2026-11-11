@@ -16,6 +16,7 @@ export const DEFAULT_SETTINGS: Settings = {
   onboardingDone: false,
   placement: null,
   dailyGoalRounds: 3, // v9 B
+  autoAdvance: true, // v9 A
 };
 
 export const DEFAULT_PARALLEL_STATS: ParallelStats = { nextStart: 2, bestChains: 0, bestCorrectStreak: 0, rounds: 0 };
@@ -80,6 +81,7 @@ export function normalizeSettings(raw: unknown): Settings {
     // v9 B: ganze Zahl 1–10
     dailyGoalRounds: typeof s.dailyGoalRounds === 'number' && Number.isInteger(s.dailyGoalRounds) && s.dailyGoalRounds >= 1 && s.dailyGoalRounds <= 10
       ? s.dailyGoalRounds : DEFAULT_SETTINGS.dailyGoalRounds,
+    autoAdvance: typeof s.autoAdvance === 'boolean' ? s.autoAdvance : DEFAULT_SETTINGS.autoAdvance, // v9 A
   };
 }
 

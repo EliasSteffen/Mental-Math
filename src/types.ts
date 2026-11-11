@@ -207,6 +207,9 @@ export interface Settings {
   // v9 B
   /** Tagesziel in Runden (1–10); `dailyGoalMin` bleibt für alte Clients */
   dailyGoalRounds: number;
+  // v9 A
+  /** Nach einer richtigen Antwort kurz danach automatisch weiter */
+  autoAdvance: boolean;
 }
 
 export interface ReviewItem { box: number; dueAt: number; lastTs: number }

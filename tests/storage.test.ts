@@ -63,6 +63,7 @@ test('Defaults, alte Daten werden ergänzt (In-Memory)', () => {
     lastStoreCheck: 0, updateNotifiedVersion: '', updateNotifiedAt: 0, reviewAskedVersion: '', reviewAskedAt: 0,
     onboardingDone: false, placement: null,
     dailyGoalRounds: 3, // v9 B
+    autoAdvance: true, // v9 A
   });
   assert.deepEqual(getReviews(), {});
   assert.deepEqual(getActivity(), {});
