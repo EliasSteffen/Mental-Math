@@ -29,6 +29,7 @@ import { openAccountOnProfile } from './settings.ts';
 import { boardList } from './leaderboard.ts';
 import { duelCard } from './duel.ts'; // v9 I
 import { raceCard } from './race/index.ts'; // v12 R1
+import { groupRacesBlock, raceSheetRow } from './race/group.ts'; // v12 R2
 import { challengeTitle, errorText, notice, participantsText, profileForm, stateValue, whenLine } from './compete-ui.ts';
 
 /** So viele Plätze zeigt die Vorschau der Tagesrangliste ab 720 px. */
@@ -265,6 +266,7 @@ function groupSheet(g: GroupInfo): void {
     list([
       row({ icon: 'trophy', label: t('compete.groupBoard'), href: `#/rangliste?group=${g.id}`, onClick: closeSheet }),
       row({ icon: 'bars', label: t('compete.groupWeek'), href: `#/rangliste?tab=week&group=${g.id}`, onClick: closeSheet }),
+      raceSheetRow(g, closeSheet), // v12 R2: Raketen-Rennen der Gruppe
       g.owner ? row({ icon: 'play', label: t('compete.compSheetTitle', { name: g.name }), onClick: () => competeSheet(g), chevron: true }) : null,
     ]),
     leave,
@@ -313,7 +315,7 @@ export function renderCompete(query: URLSearchParams): void {
     }));
     const needName = (fn: () => void) => (): void => { if (o.profile) fn(); else nameSheet(null, username, fn); };
     app.replaceChildren(head, columns(
-      [dailyHero(o.daily), raceCard(), duelCard(), boardsGroup(o.daily.id), championsGroup(true, () => alive)], // v9 I, K, v12 R1
+      [dailyHero(o.daily), raceCard({ groups: o.groups }), groupRacesBlock(o.groups, () => alive), duelCard(), boardsGroup(o.daily.id), championsGroup(true, () => alive)], // v9 I, K, v12 R1
       [
         group(t('compete.competitions'), comps.length
           ? list(comps.map((c) => challengeRow(c)))

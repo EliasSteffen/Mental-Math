@@ -149,6 +149,19 @@
   .race-tasks-meta { font-size:var(--text-sm); color:var(--muted); }
   .race-tasks-body { padding:0 var(--space-2) var(--space-2); }
 
+  /* ---------- Gruppen-Rennen (R2): Vorschau, Hinweise, Sheet ---------- */
+  .stage.race-preview { align-items:center; justify-content:center; gap:var(--space-3); text-align:center; }
+  .race-preview-title { max-width:100%; font-size:var(--text-xl); font-weight:var(--weight-bold); line-height:1.15; overflow-wrap:anywhere; }
+  .race-preview-note { max-width:34ch; font-size:var(--text-sm); line-height:1.5; color:var(--muted); }
+  .race-preview .compete-notice { width:100%; max-width:420px; }
+  .race-extra { display:flex; flex-direction:column; gap:var(--space-2); }
+  .race-extra:empty { display:none; }
+  .race-extra-note { font-size:var(--text-sm); line-height:1.5; color:var(--muted); }
+  .race-extra-note.is-warn { color:var(--bad); }
+  .race-sheet-form { display:flex; flex-direction:column; gap:var(--space-4); }
+  .race-sheet-list { display:flex; flex-direction:column; gap:var(--space-4); margin-top:var(--space-4); }
+  .race-groups-block:empty { display:none; }
+
   @media (min-width: 720px) {
     .race-track { max-width:640px; height:clamp(200px, 32dvh, 340px); }
     .race-lane { max-width:140px; }

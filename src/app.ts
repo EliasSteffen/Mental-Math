@@ -8,6 +8,7 @@ import { detectLang, setLang } from './i18n/index.ts';
 import { restoreAccount, watchAccountRestore } from './features/account.ts';
 import { startSync } from './features/sync.ts';
 import { watchPending } from './features/challenge.ts';
+import { watchRacePending } from './features/race-sync.ts'; // v12 R2
 import { maybeShowWhatsNew } from './features/whats-new.ts';
 import { shouldShowOnboarding } from './features/onboarding.ts';
 import { markNavHintSeen } from './core/nav-hint.ts';
@@ -51,6 +52,7 @@ safely('lang', () => setLang(detectLang(getSettings().lang)));
 safely('router', startRouter); // zeichnet selbst fehlertolerant (Fehlerkarte statt leerer Seite)
 safely('account', () => { void restoreAccount(); });
 safely('account-watch', () => watchAccountRestore()); // Offline-Kaltstart: Anmeldung wiederherstellen, sobald das Netz zurück ist
+safely('race', () => watchRacePending()); // v12 R2: wartende Rennen-Abgabe senden
 safely('challenge', () => watchPending()); // Gewertete Challenge: offene Abgabe senden, sobald angemeldet bzw. wieder online
 safely('sync', startSync);
 safely('push', startPush);

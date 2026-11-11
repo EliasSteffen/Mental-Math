@@ -3,15 +3,18 @@
 // Die Spielweisen der Gruppen (R2 Geister, R3 live) hängen sich an `waysGroup` und an dieselben Bausteine (play, result, setup).
 import { newRaceSeed, raceDurationMs, raceTasks, type RaceConfig, type RaceRun } from '../../core/race.ts';
 import { addSession } from '../../data/storage.ts';
+import { getAccountState } from '../../features/account.ts'; // v12 R2
+import type { GroupInfo } from '../../core/challenge.ts'; // v12 R2
 import { updateProgressRewards } from '../../features/rewards.ts';
 import { t } from '../../i18n/index.ts';
 import { go, setCleanup } from '../../router.ts';
 import { app, h } from '../../ui/dom.ts';
-import { button, card, backLink, focusHead, group, icon, largeTitle } from '../../ui/kit.ts';
+import { button, card, backLink, focusHead, group, icon, largeTitle, list, row } from '../../ui/kit.ts';
 import { confirmDialog } from '../../ui/modal.ts';
 import { dock } from '../../ui/dock.ts';
 import { rewardBlock } from '../../ui/rewards.ts';
 import { setTitle } from '../../ui/title.ts';
+import { openGroupPicker } from './group.ts'; // v12 R2
 import { playRace, type RaceAnswer } from './play.ts';
 import { showRaceResult } from './result.ts';
 import { configForm, configLine, finalizeNames, loadConfig, loadNames, playersForm, saveConfig, saveNames } from './setup.ts';
@@ -21,23 +24,30 @@ export const REIHUM_HREF = '#/rennen/reihum';
 
 /* ---------- Übersicht und Karte ---------- */
 
-/** Karte „Raketen-Rennen“ im Wettkampf-Tab (auch ohne Konto): Reihum jetzt, Gruppen-Rennen folgen mit R2/R3. */
-export function raceCard(): HTMLElement {
+/**
+ * Karte „Raketen-Rennen“ im Wettkampf-Tab (auch ohne Konto): Reihum auf diesem Gerät und – mit Konto und Gruppe – das Gruppen-Rennen.
+ * `groups`: die Gruppen der angemeldeten Person; ohne Angabe (kein Konto) steht ein Hinweis.
+ */
+export function raceCard(o: { groups?: readonly GroupInfo[] } = {}): HTMLElement {
+  const groups = o.groups;
   return card([
     h('p', { class: 'race-card-title' }, icon('rocket', 20), h('span', null, t('race.title'))),
     h('p', { class: 'race-card-text' }, t('race.cardText')),
     button({ label: t('race.reihum'), kind: 'primary', full: true, icon: 'play', href: REIHUM_HREF }),
     h('p', { class: 'race-card-note' }, t('race.reihumSub')),
-    h('p', { class: 'race-card-note' }, `${t('race.group')}: ${t('race.groupSoon')}`),
+    groups && groups.length > 0
+      ? button({ label: t('race.groupGo'), kind: 'soft', full: true, icon: 'person', onClick: () => openGroupPicker(groups) })
+      : h('p', { class: 'race-card-note' }, `${t('race.group')}: ${groups ? t('race.groupNeedGroup') : t('race.groupNoAccount')}`),
+    groups && groups.length > 0 ? h('p', { class: 'race-card-note' }, t('race.groupGoSub')) : null,
   ], { class: 'race-card' });
 }
 
-/**
- * Spielweisen mit Gruppe (nur mit Konto). R1: Hinweis „kommt mit Gruppen-Rennen“; R2/R3 ersetzen diesen Block
- * durch das Anlegen und die Liste offener Rennen.
- */
+/** Spielweisen mit Gruppe (nur mit Konto): Gruppen-Rennen werden in der Gruppe gestartet (Wettkampf → Gruppe → Raketen-Rennen). */
 export function waysGroup(): HTMLElement {
-  return group(t('race.group'), h('p', { class: 'race-note-line' }, t('race.groupSoon')));
+  const signedIn = getAccountState().status === 'signed-in';
+  return group(t('race.group'), signedIn
+    ? list([row({ icon: 'rocket', label: t('race.groupGo'), sub: t('race.groupGoSub'), href: '#/wettbewerbe' })])
+    : h('p', { class: 'race-note-line' }, t('race.groupNoAccount')));
 }
 
 export function renderRace(): void {
