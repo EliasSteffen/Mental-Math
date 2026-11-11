@@ -41,9 +41,13 @@ function main(): void {
   ];
   // Storage-Bundle wird beim Start offline gebraucht (vorladen); das Auth-Bundle braucht ohnehin Netz und bleibt draußen,
   // das Native-Bundle (Capacitor) läuft nur in der iOS-App.
+  // Seit dem Bundle (scripts/bundle.ts) gehören auch deren Chunks dazu: app-only.json listet, was der Start nie lädt.
+  const appOnly: Set<string> = new Set(['/js/vendor/auth.js', '/js/vendor/native.js']);
+  const appOnlyPath: string = join(DIST, 'app-only.json');
+  if (existsSync(appOnlyPath)) for (const f of (JSON.parse(readFileSync(appOnlyPath, 'utf8')) as { files: string[] }).files) appOnly.add(f);
   const files: string[] = abs
     .map((p) => '/' + relative(DIST, p).split(sep).join('/'))
-    .filter((f) => f !== '/js/vendor/auth.js' && f !== '/js/vendor/native.js')
+    .filter((f) => !appOnly.has(f))
     .sort();
 
   const swPath: string = join(DIST, 'sw.js');

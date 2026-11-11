@@ -39,7 +39,7 @@ npm run dev:ai     # Build + http://localhost:8788 (mit KI-Function; liest GOOGL
 ```
 
 ```bash
-npm run build      # clean (dist/ leeren) → tsc (src → dist/js, sw.ts → dist/sw.js) → copy-static (public/ → dist/) → precache (dist/precache.json)
+npm run build      # clean (dist/ leeren) → tsc (Typprüfung, sw.ts → dist/sw.js) → copy-static (public/ → dist/) → pages → bundle (esbuild: src/app.ts → dist/js/app.js + Lazy-Chunks, CSS → dist/css/app.css; Einzelmodule entfallen) → precache (dist/precache.json)
 npm run clean      # löscht dist/
 npm run typecheck  # tsc über src, server, functions, tests, scripts
 npm test           # Tests (node --test, TypeScript direkt per Type-Stripping)
@@ -343,7 +343,7 @@ src/
   features/         ai-client, activity, account, sync, reminder-input
   platform/         Website vs. iOS-App: index (einzige Schnittstelle), web, native (Capacitor),
                     reminders (web-push | native-reminders), native-auth
-  vendor/           esbuild-Einstiege: auth, storage, native (Capacitor-Plugins, nur in der App)
+  vendor/           Einstiege für scripts/bundle.ts: auth, storage, native (Capacitor-Plugins, nur in der App)
   views/            home, lernen, analyse, settings, daily, chain, train/
   router.ts  app.ts
   sw.ts             Service Worker (→ dist/sw.js)

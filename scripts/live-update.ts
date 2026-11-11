@@ -23,8 +23,8 @@ export const MANIFEST_PATH = 'ota/manifest.json';
 export const APP_ONLY_FILES: readonly string[] = ['/js/vendor/auth.js', '/js/vendor/native.js'];
 
 /** Dateien des Bundles: Precache-Liste plus App-Bundles, sortiert, ohne Dubletten. */
-export function bundlePaths(precacheFiles: readonly string[]): string[] {
-  const paths = [...new Set([...precacheFiles, ...APP_ONLY_FILES])].sort();
+export function bundlePaths(precacheFiles: readonly string[], appOnly: readonly string[] = []): string[] {
+  const paths = [...new Set([...precacheFiles, ...APP_ONLY_FILES, ...appOnly])].sort();
   // CapacitorHttp liefert JSON (Content-Type application/json) geparst statt als Bytes – solche Dateien gehören nicht hinein
   const json = paths.filter((p) => p.endsWith('.json'));
   if (json.length) throw new Error(`Bundle enthält JSON-Dateien: ${json.join(', ')}`);
@@ -117,11 +117,14 @@ async function publish(channel: LiveChannel): Promise<void> {
       throw new Error('ios/native-version.json ist veraltet (native Teile geändert) – npm run native:stamp');
     }
     const precache = JSON.parse(readFileSync(join(dist, 'precache.json'), 'utf8')) as { files: string[] };
+    // Chunks, die nur Auth/Native laden (scripts/bundle.ts), stehen nicht im Precache, gehören aber ins App-Bundle
+    const appOnlyPath = join(dist, 'app-only.json');
+    const appOnly = existsSync(appOnlyPath) ? (JSON.parse(readFileSync(appOnlyPath, 'utf8')) as { files: string[] }).files : [];
     input = {
       ...input,
       bundle: {
         version: BUILD_INFO.version, build: BUILD_INFO.build, minNative: native.minNative,
-        files: describeFiles(dist, bundlePaths(precache.files)),
+        files: describeFiles(dist, bundlePaths(precache.files, appOnly)),
       },
     };
   }
