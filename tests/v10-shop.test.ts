@@ -30,8 +30,8 @@ const item = (id: string) => {
 test('Artikel und Preise laut Plan', () => {
   const prices = Object.fromEntries(SHOP_ITEMS.map((i) => [i.id, i.price]));
   assert.deepEqual(prices, {
-    freeze: 1500, 'theme:sunset': 4000, 'theme:sand': 6000, 'theme:ocean': 8000,
-    'frame:silver': 3000, 'frame:gold': 6000, 'frame:diamond': 12000, 'frame:chest': null,
+    freeze: 6000, 'theme:sunset': 40000, 'theme:sand': 60000, 'theme:ocean': 90000,
+    'frame:silver': 30000, 'frame:gold': 75000, 'frame:diamond': 150000, 'frame:chest': null,
   });
   assert.equal(new Set(SHOP_ITEMS.map((i) => i.id)).size, SHOP_ITEMS.length);
 });
@@ -46,52 +46,52 @@ test('Artikeltexte in de und en vorhanden', () => {
 });
 
 test('canBuy: alle Gründe', () => {
-  const base = { balance: 10000, owned: false, freezes: 0 };
+  const base = { balance: 1_000_000, owned: false, freezes: 0 };
   assert.deepEqual(canBuy(item('theme:sunset'), base), { ok: true });
   assert.deepEqual(canBuy(item('theme:sunset'), { ...base, owned: true }), { ok: false, reason: 'owned' });
-  assert.deepEqual(canBuy(item('theme:sunset'), { ...base, balance: 3999 }), { ok: false, reason: 'balance' });
-  assert.deepEqual(canBuy(item('theme:sunset'), { ...base, balance: 4000 }), { ok: true });
+  assert.deepEqual(canBuy(item('theme:sunset'), { ...base, balance: 39999 }), { ok: false, reason: 'balance' });
+  assert.deepEqual(canBuy(item('theme:sunset'), { ...base, balance: 40000 }), { ok: true });
   assert.deepEqual(canBuy(item('frame:chest'), base), { ok: false, reason: 'notForSale' });
   assert.deepEqual(canBuy(item('frame:chest'), { ...base, owned: true }), { ok: false, reason: 'owned' });
   assert.deepEqual(canBuy(item('freeze'), base), { ok: true });
   assert.deepEqual(canBuy(item('freeze'), { ...base, freezes: MAX_FREEZES - 1 }), { ok: true });
   assert.deepEqual(canBuy(item('freeze'), { ...base, freezes: MAX_FREEZES }), { ok: false, reason: 'max' });
-  assert.deepEqual(canBuy(item('freeze'), { ...base, balance: 1499 }), { ok: false, reason: 'balance' });
-  assert.equal(missingXp(item('theme:ocean'), 7340), 660);
-  assert.equal(missingXp(item('theme:ocean'), 9000), 0);
+  assert.deepEqual(canBuy(item('freeze'), { ...base, balance: 5999 }), { ok: false, reason: 'balance' });
+  assert.equal(missingXp(item('theme:ocean'), 89340), 660);
+  assert.equal(missingXp(item('theme:ocean'), 90000), 0);
   assert.equal(missingXp(item('frame:chest'), 0), 0);
 });
 
 test('Kauf zieht genau den Preis ab, Level bleibt', () => {
-  fresh(5000);
+  fresh(50000);
   const before = xpView();
-  assert.equal(before.balance, 5000);
+  assert.equal(before.balance, 50000);
   assert.equal(buyItem('theme:sunset', 1000), true);
   const after = xpView();
-  assert.equal(after.balance, 1000);
+  assert.equal(after.balance, 10000);
   assert.equal(after.lifetime, before.lifetime);
   assert.equal(after.level, before.level);
   assert.equal(getSettings().purchases['theme:sunset'], 1000);
   // nicht doppelt kaufbar, Guthaben unverändert
   assert.equal(buyItem('theme:sunset'), false);
-  assert.equal(xpView().balance, 1000);
+  assert.equal(xpView().balance, 10000);
 });
 
 test('Kauf scheitert ohne Guthaben und bei Truhen-Rahmen, ohne etwas zu ändern', () => {
-  fresh(3999);
+  fresh(39999);
   assert.equal(buyItem('theme:sunset'), false);
   assert.equal(buyItem('frame:chest'), false);
   assert.equal(buyItem('nichts'), false);
-  assert.equal(xpView().balance, 3999);
+  assert.equal(xpView().balance, 39999);
   assert.deepEqual(getSettings().purchases, {});
 });
 
 test('Freeze: nur unter dem Maximum, hängt Zeitpunkt an freezesBought', () => {
-  fresh(10000);
+  fresh(100000);
   const t0 = new Date(2026, 5, 10, 12).getTime();
   const start = shopState(t0).freezes;
   assert.equal(buyItem('freeze', t0), true);
-  assert.equal(xpView().balance, 8500);
+  assert.equal(xpView().balance, 94000);
   assert.deepEqual(getSettings().freezesBought, [t0]);
   assert.equal(shopState(t0).freezes, Math.min(MAX_FREEZES, start + 1));
   // bis zum Maximum aufstocken, dann ist Schluss
@@ -99,11 +99,11 @@ test('Freeze: nur unter dem Maximum, hängt Zeitpunkt an freezesBought', () => {
   while (buyItem('freeze', t0 + bought)) bought++;
   assert.ok(shopState(t0 + bought).freezes >= MAX_FREEZES);
   assert.equal(buyItem('freeze', t0 + 99), false);
-  assert.equal(xpView().balance, 10000 - 1500 * bought);
+  assert.equal(xpView().balance, 100000 - 6000 * bought);
 });
 
 test('Rahmen: nur besessene wählbar, effectiveFrame ignoriert fremde', () => {
-  fresh(7000);
+  fresh(80000);
   assert.equal(useFrame('frame:gold'), false);
   assert.equal(buyItem('frame:gold'), true);
   assert.equal(useFrame('frame:gold'), true);

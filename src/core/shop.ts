@@ -14,13 +14,13 @@ export interface ShopItem {
 }
 
 export const SHOP_ITEMS: readonly ShopItem[] = [
-  { id: 'freeze', kind: 'freeze', price: 1500, nameKey: 'shop.item_freeze', descKey: 'shop.desc_freeze' },
-  { id: 'theme:sunset', kind: 'theme', price: 4000, nameKey: 'shop.item_theme_sunset', descKey: 'shop.desc_theme_sunset' },
-  { id: 'theme:sand', kind: 'theme', price: 6000, nameKey: 'shop.item_theme_sand', descKey: 'shop.desc_theme_sand' },
-  { id: 'theme:ocean', kind: 'theme', price: 8000, nameKey: 'shop.item_theme_ocean', descKey: 'shop.desc_theme_ocean' },
-  { id: 'frame:silver', kind: 'frame', price: 3000, nameKey: 'shop.item_frame_silver', descKey: 'shop.desc_frame_silver' },
-  { id: 'frame:gold', kind: 'frame', price: 6000, nameKey: 'shop.item_frame_gold', descKey: 'shop.desc_frame_gold' },
-  { id: 'frame:diamond', kind: 'frame', price: 12000, nameKey: 'shop.item_frame_diamond', descKey: 'shop.desc_frame_diamond' },
+  { id: 'freeze', kind: 'freeze', price: 6000, nameKey: 'shop.item_freeze', descKey: 'shop.desc_freeze' },
+  { id: 'theme:sunset', kind: 'theme', price: 40000, nameKey: 'shop.item_theme_sunset', descKey: 'shop.desc_theme_sunset' },
+  { id: 'theme:sand', kind: 'theme', price: 60000, nameKey: 'shop.item_theme_sand', descKey: 'shop.desc_theme_sand' },
+  { id: 'theme:ocean', kind: 'theme', price: 90000, nameKey: 'shop.item_theme_ocean', descKey: 'shop.desc_theme_ocean' },
+  { id: 'frame:silver', kind: 'frame', price: 30000, nameKey: 'shop.item_frame_silver', descKey: 'shop.desc_frame_silver' },
+  { id: 'frame:gold', kind: 'frame', price: 75000, nameKey: 'shop.item_frame_gold', descKey: 'shop.desc_frame_gold' },
+  { id: 'frame:diamond', kind: 'frame', price: 150000, nameKey: 'shop.item_frame_diamond', descKey: 'shop.desc_frame_diamond' },
   { id: 'frame:chest', kind: 'frame', price: null, nameKey: 'shop.item_frame_chest', descKey: 'shop.desc_frame_chest' },
 ];
 

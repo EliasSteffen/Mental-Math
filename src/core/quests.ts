@@ -9,7 +9,7 @@ import { dayKey } from './progress.ts';
 
 export type QuestLevel = 1 | 2 | 3;
 /** XP je Schwierigkeit */
-export const QUEST_XP: Readonly<Record<QuestLevel, number>> = { 1: 100, 2: 200, 3: 300 };
+export const QUEST_XP: Readonly<Record<QuestLevel, number>> = { 1: 300, 2: 600, 3: 1000 };
 export type QuestLog = Record<string, { picks: string[]; done: string[] }>;
 
 /** Quest-Vorlagen: Basis-ID (Teil vor „:“) → Schwierigkeit. Der Titel steht in i18n unter `quests.q_<Basis>`. */
@@ -195,14 +195,17 @@ export function readyChest(stars: number, opened: number): 0 | ChestTier {
 }
 
 /** XP-Spannen je Stufe (vor dem Öffnen sichtbar). */
-export const CHEST_XP: Readonly<Record<ChestTier, readonly [number, number]>> = { 1: [300, 600], 2: [800, 1200], 3: [1500, 2500] };
+export const CHEST_XP: Readonly<Record<ChestTier, readonly [number, number]>> = { 1: [2000, 3000], 2: [5000, 7000], 3: [10000, 15000] };
+/** Ersatz, wenn der Freeze-Vorrat voll ist (Silber) bzw. der Rahmen schon vorhanden ist (Gold) */
+export const CHEST_FREEZE_SWAP_XP = 3000;
+export const CHEST_FRAME_SWAP_XP = 5000;
 const CHEST_STEP = 10;
 
 export interface ChestContents { tier: ChestTier; xp: number; freeze: boolean; frame: boolean }
 
 /**
  * Inhalt einer Truhe: deterministisch je Woche und Stufe (leicht variabel in der Spanne). Silber enthält einen Freeze
- * (Vorrat voll: +500 XP), Gold den Rahmen „Truhe“ (schon vorhanden: +1.000 XP).
+ * (Vorrat voll: + CHEST_FREEZE_SWAP_XP), Gold den Rahmen „Truhe“ (schon vorhanden: + CHEST_FRAME_SWAP_XP).
  */
 export function chestContents(week: string, tier: ChestTier, o: { freezes: number; hasFrame: boolean }): ChestContents {
   const rng = mulberry32(seedFromString(`chest:${week}:${tier}`));
@@ -212,11 +215,11 @@ export function chestContents(week: string, tier: ChestTier, o: { freezes: numbe
   let frame = false;
   if (tier === 2) {
     if (o.freezes < MAX_FREEZES) freeze = true;
-    else xp += 500;
+    else xp += CHEST_FREEZE_SWAP_XP;
   }
   if (tier === 3) {
     if (!o.hasFrame) frame = true;
-    else xp += 1000;
+    else xp += CHEST_FRAME_SWAP_XP;
   }
   return { tier, xp, freeze, frame };
 }

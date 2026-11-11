@@ -1,5 +1,6 @@
 // Rundenergebnis (Artboard „Ergebnis“): Kopf, Ergebnis-Segmente, Erkenntnis (E20), Status Line,
 // Aufgabenliste (falsche zuerst, richtige aufklappbar) und Dock mit „Fehler üben“ / „Fertig“ / „Ergebnis teilen“ / „Nochmal“.
+import type { Task } from '../../types.ts';
 import { fmt, fmtSeconds } from '../../core/numbers.ts';
 import { SUBTYPES } from '../../core/catalog.ts';
 import { getMethod } from '../../core/methods.ts';
@@ -124,19 +125,21 @@ function recapBlock(r: RoundRecap, goal: NextGoal | null): HTMLElement {
   return h('section', { class: 'recap' }, ...rows);
 }
 
-/** Lösungsweg einer Aufgabe im modalen Sheet. */
-function openTaskSheet(r: TrainResult): void {
-  const list = safeSteps(r.task);
+/** Lösungsweg einer Aufgabe im modalen Sheet (auch vom Raketen-Rennen genutzt). */
+export function openSolutionSheet(task: Task): void {
+  const list = safeSteps(task);
   openSheet({
-    title: r.task.prompt,
+    title: task.prompt,
     children: [
       list.length ? steps(list) : h('p', { class: 'train-sheet-empty' }, t('train.noSteps')),
-      SUBTYPES[r.task.subtype] && getMethod(r.task.subtype)
-        ? button({ label: t('train.openInLearn'), kind: 'link', icon: 'book', href: `#/lernen/${r.task.subtype}` })
+      SUBTYPES[task.subtype] && getMethod(task.subtype)
+        ? button({ label: t('train.openInLearn'), kind: 'link', icon: 'book', href: `#/lernen/${task.subtype}` })
         : null,
     ],
   });
 }
+
+const openTaskSheet = (r: TrainResult): void => openSolutionSheet(r.task);
 
 /** Zeile einer Aufgabe: Punkt (richtig/falsch), Aufgabe, darunter deine/richtige Antwort bzw. Zeit. */
 function taskRow(r: TrainResult): HTMLElement {

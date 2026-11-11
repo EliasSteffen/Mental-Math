@@ -1,4 +1,4 @@
-// Seite „Erfolge“ (#/erfolge, v9 J): Liga · Orden · Karten. Alles aus der Historie berechnet, nichts geladen.
+// Erfolge (v9 J, v11 E): Übersicht #/erfolge und Unterseiten Liga · Orden · Karten · Shop. Alles aus der Historie berechnet.
 import type { BadgeInput } from '../core/badges.ts';
 import { BADGES } from '../core/badges.ts';
 import { CARD_IDS } from '../core/cards.ts';
@@ -9,7 +9,7 @@ import { cardCountOf } from '../core/rewards.ts';
 import { rewardView } from '../features/rewards.ts';
 import { setPrimaryAction } from '../ui/shell.ts';
 import { app, appendChildren, h } from '../ui/dom.ts';
-import { backLink, card, columns, group, largeTitle, list, row, segmented } from '../ui/kit.ts';
+import { backLink, card, columns, group, largeTitle, list, row } from '../ui/kit.ts';
 import { progressBar } from '../ui/charts.ts';
 import { leagueEmblem, leagueLabel, tierName } from '../ui/league-badge.ts';
 import { badgeMaxTier } from '../core/badges.ts';
@@ -22,31 +22,16 @@ import { championAvailable, championCount, championInfo as cachedChampionInfo, o
 import { addCleanup } from '../router.ts'; // v9 K
 import { activeFrame } from '../features/shop.ts'; // v10 P
 import { shopView } from './shop.ts'; // v10 P
+import { overviewView } from './achievements-overview.ts'; // v11 E
 import { t } from '../i18n/index.ts';
 
 export type AchievementTab = 'liga' | 'orden' | 'karten' | 'shop';
 export const ACHIEVEMENT_TABS: readonly AchievementTab[] = ['liga', 'orden', 'karten', 'shop']; // v10 P: Shop
-const TAB_LABEL = { liga: 'rewards.tabLeague', orden: 'rewards.tabBadges', karten: 'rewards.tabCards', shop: 'shop.tab' } as const;
-const TAB_KEY = 'mm.achievementsTab';
-
 /** Champion-Status (Paket K): standardmäßig aus dem Zwischenspeicher von league-sync. */
 let championProvider: () => ChampionInfo | null = cachedChampionInfo;
 export function setChampionProvider(fn: () => ChampionInfo | null): void { championProvider = fn; }
 /** v9 H: aktueller Champion-Status (Spielerkarte im Profil); null, solange Paket K nichts liefert. */
 export function championInfo(): ChampionInfo | null { return championProvider(); }
-
-function loadTab(): AchievementTab {
-  try {
-    const v = sessionStorage.getItem(TAB_KEY);
-    return ACHIEVEMENT_TABS.find((x) => x === v) ?? 'liga';
-  } catch {
-    return 'liga';
-  }
-}
-
-function saveTab(v: AchievementTab): void {
-  try { sessionStorage.setItem(TAB_KEY, v); } catch { /* Speicher gesperrt: gilt nur bis zum nächsten Aufruf */ }
-}
 
 type View = ReturnType<typeof rewardView>;
 
@@ -167,35 +152,36 @@ function cardsView(v: View): HTMLElement {
 
 /* ---------- Seite ---------- */
 
+/** Titel und Untertitel der Unterseiten. */
+const SUB_TITLE: Record<AchievementTab, { title: string; sub: string }> = {
+  liga: { title: 'rewards.leagueLabel', sub: 'rewards.subLeague' },
+  orden: { title: 'rewards.tabBadges', sub: 'rewards.subBadges' },
+  karten: { title: 'rewards.secCards', sub: 'rewards.subCards' },
+  shop: { title: 'shop.title', sub: 'rewards.sub' },
+};
+
+/** v11 E: `#/erfolge` (tabIn = null) ist die Übersicht; `#/erfolge/liga|orden|karten|shop` die Unterseiten mit „‹ Erfolge“. */
 export function renderAchievements(tabIn: string | null = null): void {
+  const tab = ACHIEVEMENT_TABS.find((x) => x === tabIn) ?? null;
+  if (tab === null) {
+    const panel = h('div', { class: 'ach-panel' }, overviewView(championProvider()));
+    appendChildren(app, [largeTitle(t('rewards.title'), t('rewards.sub')), panel]);
+    setPrimaryAction(null);
+    addCleanup(onChampionChange(() => panel.replaceChildren(overviewView(championProvider()))));
+    void syncLeague();
+    return;
+  }
   const v = rewardView();
-  const initial: AchievementTab = ACHIEVEMENT_TABS.find((x) => x === tabIn) ?? loadTab();
-  const build = (tab: AchievementTab): HTMLElement =>
+  const build = (): HTMLElement =>
     tab === 'orden' ? badgesView(v) : tab === 'karten' ? cardsView(v) : tab === 'shop' ? shopView(v.tier) : leagueView(v, championProvider());
-  let current: AchievementTab = initial; // v9 K
-  const panel = h('div', { class: 'ach-panel' }, build(initial));
-  const switcher = segmented<AchievementTab>({
-    label: t('rewards.tabsLabel'), hideLabel: true,
-    options: ACHIEVEMENT_TABS.map((x) => [x, t(TAB_LABEL[x])] as const),
-    value: initial,
-    onChange: (tab) => {
-      saveTab(tab);
-      current = tab;
-      const view = build(tab);
-      view.classList.add('rise');
-      panel.replaceChildren(view);
-      try { history.replaceState(history.state, '', `#/erfolge/${tab}`); } catch { /* ohne History-API bleibt die Adresse */ }
-    },
-  });
-  switcher.el.classList.add('ach-switch');
+  const panel = h('div', { class: 'ach-panel' }, build());
+  const head = SUB_TITLE[tab];
   appendChildren(app, [
-    backLink({ label: t('analyse.title'), href: '#/fortschritt' }),
-    largeTitle(t('rewards.title'), t('rewards.sub')),
-    switcher.el,
+    backLink({ label: t('rewards.back'), href: '#/erfolge' }),
+    largeTitle(t(head.title as 'rewards.title'), tab === 'shop' ? undefined : t(head.sub as 'rewards.sub')),
     panel,
   ]);
   setPrimaryAction(null);
-  // v9 K: Champion-Status im Hintergrund auffrischen; ändert er sich, den Liga-Tab neu zeichnen
-  addCleanup(onChampionChange(() => { if (current === 'liga') panel.replaceChildren(build('liga')); }));
+  if (tab === 'liga') addCleanup(onChampionChange(() => panel.replaceChildren(build()))); // v9 K
   void syncLeague();
 }

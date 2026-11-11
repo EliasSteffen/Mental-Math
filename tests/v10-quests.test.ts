@@ -3,7 +3,7 @@ process.env.TZ = 'Europe/Berlin';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  CHEST_STARS, CHEST_XP, QUEST_BASES, QUEST_XP, chestContents, dayPicks, msUntilNextDay, newlyDone, parseQuestId, pickQuests, questCandidates,
+  CHEST_FRAME_SWAP_XP, CHEST_FREEZE_SWAP_XP, CHEST_STARS, CHEST_XP, QUEST_BASES, QUEST_XP, chestContents, dayPicks, msUntilNextDay, newlyDone, parseQuestId, pickQuests, questCandidates,
   questLevel, questProgress, questTitle, questXp, readyChest, weekDays, weekStars, weekStart, withDone, withPicks,
   type PickContext, type QuestData,
 } from '../src/core/quests.ts';
@@ -22,10 +22,10 @@ const round = (o: Parameters<typeof sess>[0] = {}) => sess({ ts: noon(DAY), ...o
 
 /* ---------- Pool ---------- */
 
-test('Pool: mindestens 14 Quests, XP 100/200/300 je Stufe, Texte in de und en', () => {
+test('Pool: mindestens 14 Quests, XP 300/600/1000 je Stufe, Texte in de und en', () => {
   const bases = Object.keys(QUEST_BASES);
   assert.ok(bases.length >= 14);
-  assert.deepEqual(QUEST_XP, { 1: 100, 2: 200, 3: 300 });
+  assert.deepEqual(QUEST_XP, { 1: 300, 2: 600, 3: 1000 });
   for (const lang of ['de', 'en'] as const) {
     assert.ok(allKeys(lang).includes('quests.q_round'));
     for (const b of bases) assert.ok(allKeys(lang).includes(`quests.q_${b}`), `${lang}: q_${b}`);
@@ -34,7 +34,7 @@ test('Pool: mindestens 14 Quests, XP 100/200/300 je Stufe, Texte in de und en', 
   assert.equal(questTitle('round'), 'Eine Runde spielen');
   assert.equal(questTitle('weak:pct.change'), `5 richtige Antworten in deiner Schwäche: ${SUBTYPES['pct.change']?.name}`);
   assert.match(questTitle('cat:mult'), /^Eine Runde in .+/);
-  assert.equal(questXp('perfect'), 300);
+  assert.equal(questXp('perfect'), 1000);
   assert.equal(questLevel('weak:pct.change'), 2);
   assert.equal(parseQuestId('nope'), null);
   assert.deepEqual(parseQuestId('review:3'), { base: 'review', param: '3' });
@@ -177,11 +177,11 @@ test('Truhen-Inhalt: Spannen, deterministisch, Ersatz bei vollem Vorrat und vorh
   for (let i = 0; i < 30; i++) {
     const week = dayKey(noon(DAY) + i * 7 * 86_400_000);
     const b = chestContents(week, 1, open);
-    assert.ok(b.xp >= 300 && b.xp <= 600 && !b.freeze && !b.frame);
+    assert.ok(b.xp >= 2000 && b.xp <= 3000 && !b.freeze && !b.frame);
     const s = chestContents(week, 2, open);
-    assert.ok(s.xp >= 800 && s.xp <= 1200 && s.freeze && !s.frame);
+    assert.ok(s.xp >= 5000 && s.xp <= 7000 && s.freeze && !s.frame);
     const g = chestContents(week, 3, open);
-    assert.ok(g.xp >= 1500 && g.xp <= 2500 && !g.freeze && g.frame);
+    assert.ok(g.xp >= 10000 && g.xp <= 15000 && !g.freeze && g.frame);
     assert.deepEqual(chestContents(week, 3, open), g, 'deterministisch');
   }
   const xps = new Set(Array.from({ length: 30 }, (_, i) => chestContents(dayKey(noon(DAY) + i * 7 * 86_400_000), 1, open).xp));
@@ -189,11 +189,11 @@ test('Truhen-Inhalt: Spannen, deterministisch, Ersatz bei vollem Vorrat und vorh
   const full = chestContents('2026-11-09', 2, { freezes: MAX_FREEZES, hasFrame: false });
   const base = chestContents('2026-11-09', 2, open);
   assert.equal(full.freeze, false);
-  assert.equal(full.xp, base.xp + 500);
+  assert.equal(full.xp, base.xp + CHEST_FREEZE_SWAP_XP);
   const owned = chestContents('2026-11-09', 3, { freezes: 0, hasFrame: true });
   assert.equal(owned.frame, false);
-  assert.equal(owned.xp, chestContents('2026-11-09', 3, open).xp + 1000);
-  assert.deepEqual(CHEST_XP[1], [300, 600]);
+  assert.equal(owned.xp, chestContents('2026-11-09', 3, open).xp + CHEST_FRAME_SWAP_XP);
+  assert.deepEqual(CHEST_XP[1], [2000, 3000]);
 });
 
 test('Protokoll-Helfer und Countdown', () => {

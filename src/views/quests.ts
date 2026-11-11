@@ -1,6 +1,6 @@
 // Seite „Quests“ (#/quests, v10 Q): die drei Tagesquests mit Fortschritt, Countdown bis zu den neuen, Wochenleiste mit drei Truhen.
 // Ruhig: Zeilen und Balken, die Truhe öffnet sich mit einem sanften Einblenden (Reduced Motion: sofort).
-import { CHEST_STARS, CHEST_XP, msUntilNextDay, type ChestContents, type ChestTier } from '../core/quests.ts';
+import { CHEST_FRAME_SWAP_XP, CHEST_FREEZE_SWAP_XP, CHEST_STARS, CHEST_XP, msUntilNextDay, type ChestContents, type ChestTier } from '../core/quests.ts';
 import { fmt } from '../core/numbers.ts';
 import { currentHabit } from '../features/habit.ts';
 import { openChest, questsView, type QuestItem, type QuestsView } from '../features/quests.ts';
@@ -65,9 +65,9 @@ function chestCard(v: QuestsView, tier: ChestTier, onOpen: () => void): HTMLElem
 function reveal(c: ChestContents, hadFreezeRoom: boolean, hadFrame: boolean, onClose: () => void): void {
   const lines: HTMLElement[] = [h('p', { class: 'quest-reveal-xp num' }, t('quests.revealXp', { xp: fmt(c.xp) }))];
   if (c.freeze) lines.push(h('p', { class: 'quest-reveal-item' }, icon('snowflake', 18), h('span', null, t('quests.revealFreeze'))));
-  else if (c.tier === 2 && !hadFreezeRoom) lines.push(h('p', { class: 'quest-reveal-note' }, t('quests.revealFreezeFull')));
+  else if (c.tier === 2 && !hadFreezeRoom) lines.push(h('p', { class: 'quest-reveal-note' }, t('quests.revealFreezeFull', { xp: fmt(CHEST_FREEZE_SWAP_XP) })));
   if (c.frame) lines.push(h('p', { class: 'quest-reveal-item' }, icon('trophy', 18), h('span', null, t('quests.revealFrame'))));
-  else if (c.tier === 3 && hadFrame) lines.push(h('p', { class: 'quest-reveal-note' }, t('quests.revealFrameOwned')));
+  else if (c.tier === 3 && hadFrame) lines.push(h('p', { class: 'quest-reveal-note' }, t('quests.revealFrameOwned', { xp: fmt(CHEST_FRAME_SWAP_XP) })));
   const sheet = openSheet({
     title: t('quests.revealTitle', { tier: t(TIER_KEY[c.tier]) }),
     onClose,

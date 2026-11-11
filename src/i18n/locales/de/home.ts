@@ -27,6 +27,9 @@ export const home = {
   placementTitle: 'Einstufungstest',
   placementSub: 'Findet deine Startstufe',
   placementValue: 'ca. 2 min',
+  // v11 H: Einstufungstest als Hero für neue Nutzer
+  placementReason: 'Finde in 2 Minuten deine Startstufe',
+  placementCta: 'Test starten',
   dailyRanked: 'gewertet · ein Versuch',
   dailyUnranked: 'ungewertet · mit Konto in die Rangliste',
   competeTitle: 'Wettbewerbe & Ranglisten',
@@ -49,7 +52,7 @@ export const home = {
   ctaMinutes: 'ca. {n} min',
   // v9 C
   caseTitle: 'Mini-Case',
-  caseSub: 'Ein Fall, mehrere Rechenschritte',
+  caseSub: 'wie im Interview',
   // v9 H
   exampleLabel: 'Zum Beispiel',
   exampleNames: 'In dieser Runde',

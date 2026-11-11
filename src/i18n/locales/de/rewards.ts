@@ -2,11 +2,27 @@
 export const rewards = {
   // Seite
   title: 'Erfolge',
-  sub: 'Liga, Orden und Trick-Karten',
+  // v11 E: Erfolge-Zentrale
+  sub: 'Dein Weg und deine Belohnungen',
+  back: 'Erfolge',
+  secQuests: 'Quests heute',
+  secLeague: 'Liga',
+  secBadges: 'Orden',
+  secCards: 'Trick-Karten',
+  secShop: 'Shop',
+  secStats: 'Statistik',
+  statsTitle: 'Statistik',
+  statsRowSub: 'Woche, Kategorien, Verlauf, Fehler',
+  subBadges: 'Deine Medaillen',
+  subCards: 'Ein Trick je Aufgabentyp',
+  subLeague: 'Deine Stufe und alle Ligen',
+  chestReady: 'Truhe bereit',
+  badgesEmpty: 'Noch keine Orden – deine erste perfekte Runde bringt einen.',
+  cardsEmpty: 'Noch keine Trick-Karten – übe einen Aufgabentyp, bis er sicher sitzt.',
+  shopNext: 'Als Nächstes: {name} für {price}\u00a0XP',
+  shopAllOwned: 'Alles Kaufbare gehört dir.',
   tabsLabel: 'Ansicht',
-  tabLeague: 'Liga',
   tabBadges: 'Orden',
-  tabCards: 'Karten',
   // Ligen
   league_bronze: 'Bronze',
   league_silver: 'Silber',
@@ -104,10 +120,8 @@ export const rewards = {
   newCard: 'Trick-Karte freigeschaltet',
   more: '+{n} weitere',
   // Einstiege
-  introToast: 'Neu: Ligen, Orden & Trick-Karten – schau unter Fortschritt → Erfolge.',
+  introToast: 'Neu: Ligen, Orden & Trick-Karten – schau unter Erfolge.',
   introAction: 'Ansehen',
-  rowTitle: 'Erfolge',
-  rowSub: '{badges} Orden · {cards} Karten',
   learnCardOpen: 'Trick-Karte freigeschaltet',
   learnCardLocked: 'Trick-Karte: Skill {score} / {needed}',
 } as const;

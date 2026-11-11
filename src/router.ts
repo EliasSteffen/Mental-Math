@@ -5,6 +5,7 @@ import { renderCase } from './views/case.ts'; // v9 C
 import { caseById } from './core/cases/index.ts'; // v9 C
 import { renderDuel } from './views/duel.ts'; // v9 I
 import { renderQuests } from './views/quests.ts'; // v10 Q
+import { renderRace, renderRaceReihum } from './views/race/index.ts'; // v12 R1
 import { renderParallel } from './views/parallel/index.ts';
 import { renderCustom } from './views/custom.ts';
 import { isValidMode } from './core/modes.ts';
@@ -24,7 +25,10 @@ import { isChallengeId } from './core/challenge.ts';
 import { onLangChange, t } from './i18n/index.ts';
 import { setTitle } from './ui/title.ts';
 import { modeName } from './core/modes.ts';
-import { initShell, setPrimaryAction, setShell, type TabId } from './ui/shell.ts';
+import { initShell, setPrimaryAction, setShell } from './ui/shell.ts';
+import { LAST_TAB_KEY, lastTabHash, shellOf, type ShellState, type TabId } from './core/nav.ts'; // v11 N
+import { mountAccountButton, paintSidebarProfile } from './ui/account-button.ts'; // v11 N
+import { maybeShowNavHint } from './ui/nav-hint.ts'; // v11 T
 import { onLayoutChange } from './ui/viewport.ts';
 import { renderCrash } from './ui/crash.ts';
 
@@ -80,6 +84,8 @@ type Route =
   | { name: 'placement' }
   | { name: 'duel'; d: string | null } // v9 I
   | { name: 'quests' } // v10 Q
+  | { name: 'race' } // v12 R1: Übersicht
+  | { name: 'race-reihum' } // v12 R1: ein Gerät reihum (Fokus-Modus)
   | { name: 'train'; mode: string; n: number | null; intro: boolean; estimate: boolean; custom: CustomRange | null };
 
 /** Alte Pfade (Lesezeichen, PWA-Start) → neue; die Query (z. B. ?tab=) bleibt erhalten (E6). */
@@ -150,6 +156,7 @@ function parseRoute(): Route {
   if (p0 === 'wettbewerbe') return { name: 'compete', query };
   if (p0 === 'einstufung') return { name: 'placement' };
   if (p0 === 'quests') return { name: 'quests' }; // v10 Q
+  if (p0 === 'rennen') return p1 === 'reihum' ? { name: 'race-reihum' } : { name: 'race' }; // v12 R1
   if (p0 === 'duell') return { name: 'duel', d: query.get('d') }; // v9 I
   if (p0 === 'rangliste') return { name: 'board', board: parseBoardQuery(query) };
   if (p0 === 'challenge' && isChallengeId(p1)) return { name: 'challenge', id: p1 };
@@ -165,17 +172,30 @@ function parseRoute(): Route {
   return { name: 'today' };
 }
 
-/** Tab einer Route; null = Fokus-Modus (Training, Ketten, Parallel). „Eigenes“ (Einstellungen) gehört zu Heute. */
-function tabOf(route: Route): TabId | null {
-  switch (route.name) {
-    case 'today': case 'custom': case 'quests': return 'today'; // v10 Q: quests
-    case 'case': return route.id ? null : 'today'; // v9 C: Auswahl mit Tableiste, Spiel im Fokus-Modus
-    case 'compete': case 'board': case 'challenge': case 'duel': return 'compete';
-    case 'learn': return 'learn';
-    case 'progress': case 'achievements': return 'progress'; // v9 J
-    case 'profile': return 'profile';
-    default: return null;
-  }
+/**
+ * Tab und Shell-Zustand einer Route (v11 N, Zuordnung in core/nav.ts): vier Tabs; Profil = Modal-Seite ohne Tab;
+ * Training, Ketten, Parallel = Fokus-Modus. „Eigenes“ gehört zu Heute, Statistik zu Erfolge.
+ */
+function shellFor(route: Route): ShellState {
+  return shellOf(route.name, { caseId: route.name === 'case' ? route.id : null });
+}
+const tabOf = (route: Route): TabId | null => shellFor(route).tab;
+
+/** Startseite eines Tabs (Profil-Knopf oben rechts): Heute, Lernen-Liste, Erfolge-Übersicht, Wettkampf. */
+function isTabStart(route: Route): boolean {
+  return route.name === 'today' || route.name === 'compete' || (route.name === 'learn' && !route.id) || (route.name === 'achievements' && !route.tab);
+}
+
+function readLastTab(): string | null {
+  try { return sessionStorage.getItem(LAST_TAB_KEY); } catch { return null; }
+}
+
+/** Hash des zuletzt gezeigten Tabs (Ziel von „Schließen“ im Profil). */
+export function lastTabTarget(): string { return lastTabHash(readLastTab()); }
+
+function rememberTab(route: Route): void {
+  if (!tabOf(route)) return;
+  try { sessionStorage.setItem(LAST_TAB_KEY, location.hash || '#/'); } catch { /* Speicher gesperrt: Schließen führt zu Heute */ }
 }
 
 /**
@@ -195,7 +215,7 @@ function scrollKey(route: Route): string | null {
 
 function routeTitle(route: Route): string | null {
   switch (route.name) {
-    case 'progress': return t('analyse.title');
+    case 'progress': return t('rewards.statsTitle'); // v11: Statistik unter Erfolge
     case 'achievements': return t('rewards.title'); // v9 J
     case 'profile': return t('settings.title');
     case 'learn': return t('lernen.title');
@@ -208,6 +228,7 @@ function routeTitle(route: Route): string | null {
     case 'challenge': return t('compete.title');
     case 'duel': return t('duel.title'); // v9 I
     case 'quests': return t('quests.title'); // v10 Q
+    case 'race': case 'race-reihum': return t('race.title'); // v12 R1
     case 'placement': return t('placement.title');
     case 'train': return modeName(route.mode);
     default: return t('settings.routeTraining');
@@ -229,6 +250,8 @@ function draw(route: Route): void {
   else if (route.name === 'placement') renderPlacement();
   else if (route.name === 'duel') renderDuel(route.d); // v9 I
   else if (route.name === 'quests') renderQuests(); // v10 Q
+  else if (route.name === 'race') renderRace(); // v12 R1
+  else if (route.name === 'race-reihum') renderRaceReihum(); // v12 R1
   else if (route.name === 'train') renderTrain(route.mode, { n: route.n, intro: route.intro, estimate: route.estimate, custom: route.custom });
   else renderHome();
 }
@@ -277,11 +300,19 @@ function withTransition(from: TabId | null | undefined, to: TabId | null, update
   }
 }
 
+let navHintTimer: ReturnType<typeof setTimeout> | null = null;
+function scheduleNavHint(focus: boolean): void {
+  if (navHintTimer !== null) clearTimeout(navHintTimer);
+  navHintTimer = setTimeout(() => { navHintTimer = null; try { maybeShowNavHint(focus); } catch { /* Hinweis ist nebensächlich */ } }, 900);
+}
+
 export function render({ keepScroll = false }: RenderOptions = {}): void {
   canonicalize();
   const route = parseRoute();
-  const tab = tabOf(route);
+  const shell = shellFor(route);
+  const tab = shell.tab;
   const key = scrollKey(route);
+  const wasModal = document.body.classList.contains('is-modal');
   const prevKey = shownKey;
   // Position der verlassenen Tab-Seite merken
   if (prevKey !== null && prevKey !== key) scrollByKey.set(prevKey, window.scrollY);
@@ -290,7 +321,10 @@ export function render({ keepScroll = false }: RenderOptions = {}): void {
   withTransition(shownTab, tab, () => {
     runCleanup();
     setTitle(routeTitle(route));
-    setShell(tab);
+    setShell(tab, { modal: shell.modal });
+    app.classList.toggle('modal-enter', shell.modal && !wasModal);
+    paintSidebarProfile();
+    rememberTab(route);
     setPrimaryAction(null);
     app.replaceChildren();
     // Für seitenspezifische Layouts ab Tablet-Breite (public/css/layout.css)
@@ -306,6 +340,10 @@ export function render({ keepScroll = false }: RenderOptions = {}): void {
       setPrimaryAction(null);
       renderCrash(app, e, location.hash || '#/', () => rerender());
     }
+    // v11 N: Profil-Knopf (Liga-Emblem) in den Titel der Tab-Startseiten; nicht bei der Fehlerkarte
+    if (isTabStart(route) && !app.querySelector('.crash')) mountAccountButton(app);
+    // v11 T: einmaliger Hinweis nach dem Update – erst kurz nach dem Zeichnen (Dialoge/Rundgang-Ende haben dann ihren Stand)
+    scheduleNavHint(tab === null && !shell.modal);
     // Für den Start-Wächter (public/js/boot-guard.js): Die App hat gezeichnet
     document.documentElement.dataset['booted'] = '1';
     const y = keepY ?? (key !== null && key !== prevKey ? (scrollByKey.get(key) ?? 0) : 0);

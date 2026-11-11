@@ -1,6 +1,6 @@
-// Namespace 'analyse' (Deutsch) – Tab „Fortschritt“; Schlüssel ohne Präfix, Zugriff über t('analyse.key')
+// Namespace 'analyse' (Deutsch) – Seite „Statistik“ (unter Erfolge); Schlüssel ohne Präfix, Zugriff über t('analyse.key')
 export const analyse = {
-  title: 'Fortschritt',
+  title: 'Statistik',
   sub: 'Letzte 7 Tage',
   // Fokus-Karte
   focusLabel: 'Dein Fokus diese Woche',

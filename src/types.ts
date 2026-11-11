@@ -139,7 +139,7 @@ export interface Attempt {
 }
 
 /** Runden außerhalb von #/train (zählen fürs Tagesziel, v9) */
-export type ExtraSessionMode = 'chain' | 'parallel' | `case:${string}`;
+export type ExtraSessionMode = 'chain' | 'parallel' | 'race' | `case:${string}`; // v12 R1: Raketen-Rennen
 
 export interface Session {
   id: string;

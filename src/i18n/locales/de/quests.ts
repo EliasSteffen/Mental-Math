@@ -49,9 +49,9 @@ export const quests = {
   revealTitle: '{tier}-Truhe',
   revealXp: '+{xp} XP',
   revealFreeze: '1 Streak-Freeze',
-  revealFreezeFull: 'Dein Freeze-Vorrat ist voll – dafür gibt es 500 XP extra.',
+  revealFreezeFull: 'Dein Freeze-Vorrat ist voll – dafür gibt es {xp} XP extra.',
   revealFrame: 'Rahmen „Truhe“ für dein Emblem',
-  revealFrameOwned: 'Den Rahmen hast du schon – dafür gibt es 1.000 XP extra.',
+  revealFrameOwned: 'Den Rahmen hast du schon – dafür gibt es {xp} XP extra.',
   revealOk: 'Toll',
   // Ergebnis-Zeilen
   lineDone: 'Quest erledigt: {title}',
