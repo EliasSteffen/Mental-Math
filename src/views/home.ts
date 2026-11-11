@@ -18,7 +18,8 @@ import { accountEnabled, onAccountChange } from '../features/account.ts';
 import { cachedResult, pendingAttempt, rankedAvailable } from '../features/challenge.ts';
 import { locale, t } from '../i18n/index.ts';
 import type { Recommendation } from '../types.ts';
-import { dateLine, daypart, heroPlan, timeGap, type HeroPlan, type TimeGap } from './home-data.ts';
+import { dateLine, daypart, goalDots, heroExample, heroPlan, timeGap, type HeroExample, type HeroPlan, type TimeGap } from './home-data.ts';
+import { levelFor } from '../core/scoring.ts'; // v9 H
 
 const GREETING = { morning: 'home.greetMorning', day: 'home.greetDay', evening: 'home.greetEvening' } as const;
 
@@ -46,12 +47,29 @@ function timeBar(gap: TimeGap): HTMLElement {
       labelled(t('home.timeYours'), fmtSeconds(gap.medianMs))));
 }
 
+/** v9 H: Beispielaufgabe in großen Zahlen oder Typnamen der Runde; füllt die Leerfläche der Karte. */
+function exampleBlock(ex: HeroExample | null): HTMLElement | null {
+  if (!ex) return null;
+  return h('span', { class: 'today-example' },
+    h('span', { class: 'today-example-label' }, ex.kind === 'task' ? t('home.exampleLabel') : t('home.exampleNames')),
+    ex.kind === 'task'
+      ? h('span', { class: 'today-example-task num' }, ex.prompt)
+      : h('span', { class: 'today-example-names' }, ...ex.names.map((n) => h('span', { class: 'today-example-name' }, n))));
+}
+
+/** v9 H: Tagesziel als Punkte (●●○), Beschriftung für Screenreader. */
+function goalDotsEl(dots: { filled: number; total: number }, done: number, goal: number): HTMLElement {
+  return h('span', {
+    class: 'today-goal', role: 'img', 'aria-label': t(goal === 1 ? 'home.goalDotsAriaOne' : 'home.goalDotsAria', { done, goal }),
+  }, ...Array.from({ length: dots.total }, (_, i) => h('span', { class: `today-goal-dot${i < dots.filled ? ' is-on' : ''}`, 'aria-hidden': 'true' })));
+}
+
 /**
  * Empfehlung als eine große, antippbare Karte (Link auf den Plan): Titel („Kategorie · Subtyp“), Ablauf, darunter der
  * Zeit-Balken (E9) oder der Grund, unten „Jetzt üben · ca. N min“. Beim Erststart begrüßt sie statt „Noch nie geübt“.
  * Nur <span> im Link (keine verschachtelten Bedienelemente).
  */
-function hero(rec: Recommendation, plan: HeroPlan, gap: TimeGap | null, fresh: boolean): HTMLAnchorElement {
+function hero(rec: Recommendation, plan: HeroPlan, gap: TimeGap | null, fresh: boolean, example: HTMLElement | null, goal: HTMLElement): HTMLAnchorElement {
   const sub = rec.subtype ? SUBTYPES[rec.subtype] : undefined;
   const catName = sub ? CATEGORIES.find((c) => c.id === sub.category)?.name : undefined;
   // Geschützte Bindestriche: „2-stellig × 1-stellig“ bricht nicht mitten im Wort um
@@ -62,9 +80,10 @@ function hero(rec: Recommendation, plan: HeroPlan, gap: TimeGap | null, fresh: b
   const reason = fresh && rec.kind === 'new' ? t('home.firstReason') : rec.reason;
   return h('a', { class: 'card hero today-hero press', href: plan.href },
     h('span', { class: 'today-hero-head' },
-      h('span', { class: 'today-hero-label' }, t('home.recLabel')),
+      h('span', { class: 'today-hero-top' }, h('span', { class: 'today-hero-label' }, t('home.recLabel')), goal), // v9 H
       h('span', { class: 'today-hero-title' }, title),
       h('span', { class: 'today-hero-sub' }, planText)),
+    example, // v9 H
     gap ? timeBar(gap) : h('span', { class: 'today-insight' }, h('span', { class: 'today-insight-text is-quiet' }, reason)),
     h('span', { class: 'btn primary cta is-full today-hero-go' },
       icon('play', 20),
@@ -119,6 +138,13 @@ export function renderHome(): void {
     enabledCategories: settings.enabledCategories,
   });
   const fresh = attempts.length === 0;
+  // v9 H: tagesstabiles Beispiel und Tagesziel-Punkte
+  const example = exampleBlock(
+    heroExample(rec, {
+      dayKey: dayKey(now), level: rec.subtype ? levelFor(rec.subtype, attempts, settings.difficulty) : 2,
+      reviewSubtypes: dueReviews(reviews, now).map((r) => r.subtype), enabledCategories: settings.enabledCategories,
+    }));
+  const goal = goalDotsEl(goalDots(habit.todayRounds, habit.goalRounds), habit.todayRounds, habit.goalRounds);
   const gap = timeGap(attempts, rec.subtype);
   const stats = categoryStats(attempts);
   const daily = getDailyResults()[dayKey(now)];
@@ -196,7 +222,7 @@ export function renderHome(): void {
       largeTitle(t(GREETING[daypart(new Date(now).getHours())]), dateLine(now, locale())),
       statusLine({ todayRounds: habit.todayRounds, goalRounds: habit.goalRounds, streak: habit.streak, freezes: habit.freezes, startHint: true })),
     h('div', { class: 'today-main' },
-      hero(rec, plan, gap, fresh),
+      hero(rec, plan, gap, fresh, example, goal),
       h('nav', { class: `today-tiles${tiles.length % 2 ? ' is-odd' : ''}`, 'aria-label': t('home.otherTitle') }, ...tiles)),
     more,
   ]);

@@ -189,4 +189,17 @@ export const settings = {
   // v9 A
   autoAdvance: 'Bei richtiger Antwort automatisch weiter',
   autoAdvanceHint: 'Nach einer richtigen Antwort geht es kurz danach von selbst weiter. Bei Fehlern bleibt die Lösung stehen, bis du tippst.',
+  // v9 H: Spielerkarte
+  cardTitle: 'Spielerkarte',
+  cardLevel: 'Level {n}',
+  cardXp: '{into} / {needed} XP',
+  cardXpAria: 'Fortschritt zum nächsten Level',
+  cardStreak: 'Serie (aktuell / beste)',
+  cardFreezes: 'Freezes',
+  cardBadges: 'Orden',
+  cardCards: 'Trick-Karten',
+  cardSolved: 'Gelöste Aufgaben',
+  cardRounds: 'Runden',
+  cardAccuracy: 'Genauigkeit',
+  cardBestDaily: 'Beste Daily',
 } as const;

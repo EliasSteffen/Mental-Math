@@ -28,6 +28,8 @@ const TAB_KEY = 'mm.achievementsTab';
 /** Champion-Status (Paket K): bis dahin nie gesetzt, die Seite zeigt nur die Erklärung. */
 let championProvider: () => ChampionInfo | null = () => null;
 export function setChampionProvider(fn: () => ChampionInfo | null): void { championProvider = fn; }
+/** v9 H: aktueller Champion-Status (Spielerkarte im Profil); null, solange Paket K nichts liefert. */
+export function championInfo(): ChampionInfo | null { return championProvider(); }
 
 function loadTab(): AchievementTab {
   try {
