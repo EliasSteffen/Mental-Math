@@ -40,10 +40,21 @@ export interface HabitInfo {
   freezes: number;
   /** Mit einem Freeze überbrückte Tage der laufenden Serie */
   frozenDays: string[];
+  /** v10: reparierte Tage der laufenden Serie */
+  repairedDays: string[];
+  /**
+   * v10: Die Serie ist gestern gerissen (verpasst, kein Freeze, nicht repariert) – lost = Länge davor.
+   * Heute lässt sie sich reparieren (src/features/comeback.ts); null = nichts gerissen.
+   */
+  broken: { day: string; lost: number } | null;
 }
 
 export function habitInfo(o: {
   sessions: readonly { ts: number }[]; activity: Activity; goalRounds: number; now?: number;
+  /** v10: zusätzliche Freezes (gekauft oder aus Truhen) – Zeitpunkte; zählen ab ihrem Tag, Vorrat höchstens MAX_FREEZES */
+  boughtFreezes?: readonly number[];
+  /** v10: reparierte Tage (YYYY-MM-DD) – gelten als überbrückt, ohne Freeze und ohne Serientag */
+  repairedDays?: readonly string[];
 }): HabitInfo {
   const now = o.now ?? Date.now();
   const goal = Math.max(1, Math.floor(o.goalRounds) || DEFAULT_GOAL_ROUNDS);
@@ -65,20 +76,36 @@ export function habitInfo(o: {
     if (streak > best) best = streak;
   };
 
-  // Ab dem ersten aktiven Tag (höchstens 730 Tage zurück) bis gestern; ein verpasster Tag verbraucht einen Freeze
+  // v10: zusätzliche Freezes je Tag, reparierte Tage
+  const bought: Record<string, number> = {};
+  for (const ts of o.boughtFreezes ?? []) if (Number.isFinite(ts)) { const k = dayKey(ts); bought[k] = (bought[k] ?? 0) + 1; }
+  const repairedSet = new Set(o.repairedDays ?? []);
+  const addBought = (k: string): void => { if (bought[k]) freezes = Math.min(MAX_FREEZES, freezes + bought[k]); };
+  let repaired: string[] = [];
+  let broken: HabitInfo['broken'] = null;
+
+  // Ab dem ersten aktiven Tag (höchstens 730 Tage zurück) bis gestern; ein verpasster Tag wird repariert,
+  // verbraucht einen Freeze oder beendet die Serie
   let started = false;
   for (let off = -MAX_DAYS; off <= -1; off++) {
     const k = keyAt(now, off);
+    addBought(k);
     if (active(k)) { started = true; count(); continue; }
     if (!started) continue;
+    if (repairedSet.has(k)) { repaired.push(k); continue; }
     if (freezes > 0) { freezes -= 1; frozen.push(k); continue; }
-    streak = 0; sinceFreeze = 0; frozen = [];
+    if (off === -1 && streak > 0) broken = { day: k, lost: streak };
+    streak = 0; sinceFreeze = 0; frozen = []; repaired = [];
   }
   // Heute: aktiv zählt, leer bricht nichts
+  addBought(todayKey);
   const todayRounds = rounds[todayKey] ?? 0;
   const kept = active(todayKey);
   if (kept) count();
-  return { todayRounds, goalRounds: goal, todayDone: todayRounds >= goal, kept, streak, best, freezes, frozenDays: frozen };
+  return {
+    todayRounds, goalRounds: goal, todayDone: todayRounds >= goal, kept, streak, best, freezes, frozenDays: frozen,
+    repairedDays: repaired, broken,
+  };
 }
 
 /** Heatmap-Stufe nach Runden/Ziel (0 = keine, 1 < ½, 2 < 1, 3 < 2, 4 ≥ 2 × Ziel). */

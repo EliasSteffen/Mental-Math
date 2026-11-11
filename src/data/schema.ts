@@ -19,6 +19,9 @@ export const DEFAULT_SETTINGS: Settings = {
   autoAdvance: true, // v9 A
   duelName: '', // v9 I
   league: null, badges: {}, cards: {}, // v9 J
+  // v10
+  xp: { earned: 0, seen: 0, bonus: 0, spent: 0 }, purchases: {}, frame: '', freezesBought: [], streakRepairs: [], comebackDays: [],
+  questLog: {}, chests: {}, lpSeen: -1,
 };
 
 export const DEFAULT_PARALLEL_STATS: ParallelStats = { nextStart: 2, bestChains: 0, bestCorrectStreak: 0, rounds: 0 };
@@ -45,7 +48,7 @@ export function isValidSession(x: unknown): x is Session {
 }
 
 /** Gültige Theme-Einstellungen (Reihenfolge wie im Profil). */
-export const THEME_SETTINGS: readonly ThemeSetting[] = ['system', 'paper', 'night', 'oled', 'aurora', 'neon'];
+export const THEME_SETTINGS: readonly ThemeSetting[] = ['system', 'paper', 'night', 'oled', 'aurora', 'neon', 'sunset', 'sand', 'ocean'];
 const TIMER_DISPLAYS: readonly TimerDisplay[] = ['calm', 'precise', 'off'];
 const KEYPAD_SIDES: ReadonlyArray<Settings['keypadSide']> = ['left', 'center', 'right'];
 
@@ -94,6 +97,60 @@ export function normalizeCards(v: unknown): Settings['cards'] {
   return out;
 }
 
+/* ---------- v10: Motivation (docs/PLAN-v10-motivation.md) ---------- */
+
+const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
+const XP_MAX = 1_000_000_000;
+const okId = (id: unknown): id is string => typeof id === 'string' && id.length > 0 && id.length <= 48;
+
+/** XP-Konto: ganze Zahlen 0 … 10⁹, sonst 0. */
+export function normalizeXp(v: unknown): Settings['xp'] {
+  const o = isObj(v) ? v : {};
+  const n = (x: unknown): number => (isInt(x, 0, XP_MAX) ? x : 0);
+  return { earned: n(o.earned), seen: n(o.seen), bonus: n(o.bonus), spent: n(o.spent) };
+}
+
+/** Artikel-ID → Zeitpunkt (höchstens 100). */
+export function normalizePurchases(v: unknown): Settings['purchases'] {
+  const out: Settings['purchases'] = {};
+  if (!isObj(v)) return out;
+  for (const [id, ts] of Object.entries(v).slice(0, 100)) if (okId(id) && isNum(ts)) out[id] = ts;
+  return out;
+}
+
+/** Endliche Zeitpunkte, aufsteigend, höchstens die letzten 50. */
+export function normalizeStamps(v: unknown): number[] {
+  return Array.isArray(v) ? v.filter(isNum).sort((a, b) => a - b).slice(-50) : [];
+}
+
+/** Tage (YYYY-MM-DD), eindeutig, aufsteigend, höchstens die letzten 60. */
+export function normalizeDays(v: unknown): string[] {
+  return Array.isArray(v) ? [...new Set(v.filter((d): d is string => typeof d === 'string' && DAY_RE.test(d)))].sort().slice(-60) : [];
+}
+
+/** Quest-Protokoll: höchstens die letzten 14 Tage, je höchstens 5 IDs. */
+export function normalizeQuestLog(v: unknown): Settings['questLog'] {
+  const out: Settings['questLog'] = {};
+  if (!isObj(v)) return out;
+  const ids = (x: unknown): string[] => (Array.isArray(x) ? [...new Set(x.filter(okId))].slice(0, 5) : []);
+  for (const day of Object.keys(v).filter((k) => DAY_RE.test(k)).sort().slice(-14)) {
+    const e = v[day];
+    if (isObj(e)) out[day] = { picks: ids(e.picks), done: ids(e.done) };
+  }
+  return out;
+}
+
+/** Wochentruhen: Montag → Stufe 1–3, höchstens die letzten 12 Wochen. */
+export function normalizeChests(v: unknown): Settings['chests'] {
+  const out: Settings['chests'] = {};
+  if (!isObj(v)) return out;
+  for (const week of Object.keys(v).filter((k) => DAY_RE.test(k)).sort().slice(-12)) {
+    const tier = v[week];
+    if (isInt(tier, 1, 3)) out[week] = tier;
+  }
+  return out;
+}
+
 /**
  * Beliebige gespeicherte/importierte/synchronisierte Einstellungen → gültige Settings.
  * Fehlende Felder kommen aus den Defaults; Theme wird migriert; fehlende `timerDisplay` folgt dem alten
@@ -118,6 +175,11 @@ export function normalizeSettings(raw: unknown): Settings {
     autoAdvance: typeof s.autoAdvance === 'boolean' ? s.autoAdvance : DEFAULT_SETTINGS.autoAdvance, // v9 A
     duelName: typeof s.duelName === 'string' ? Array.from(s.duelName.replace(/[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u2028-\u202e\u2060-\u206f\ufeff]/g, ' ').trim()).slice(0, 24).join('') : '', // v9 I: ≤ 24 Zeichen, ohne Steuerzeichen
     league: normalizeLeague(s.league), badges: normalizeBadges(s.badges), cards: normalizeCards(s.cards), // v9 J
+    // v10
+    xp: normalizeXp(s.xp), purchases: normalizePurchases(s.purchases), frame: okId(s.frame) ? s.frame : '',
+    freezesBought: normalizeStamps(s.freezesBought), streakRepairs: normalizeDays(s.streakRepairs),
+    comebackDays: normalizeDays(s.comebackDays), questLog: normalizeQuestLog(s.questLog), chests: normalizeChests(s.chests),
+    lpSeen: isInt(s.lpSeen, -1, 1000) ? s.lpSeen : -1,
   };
 }
 

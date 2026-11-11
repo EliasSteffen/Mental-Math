@@ -43,6 +43,9 @@ export const common: Record<keyof typeof De, string> = {
   themeOled: 'OLED',
   themeAurora: 'Aurora',
   themeNeon: 'Neon',
+  themeSunset: 'Sunset',
+  themeSand: 'Sand',
+  themeOcean: 'Deep sea',
   // Sheets, focus mode, controls
   close: 'Close',
   exitFocus: 'Quit',

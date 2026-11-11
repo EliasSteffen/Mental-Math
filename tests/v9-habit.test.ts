@@ -21,7 +21,7 @@ test('roundsByDay zählt Sessions je lokalem Tag', () => {
 
 test('heute leer, nichts gespielt: Serie 0, nicht gesichert', () => {
   const h = info([]);
-  assert.deepEqual(h, { todayRounds: 0, goalRounds: 3, todayDone: false, kept: false, streak: 0, best: 0, freezes: 0, frozenDays: [] });
+  assert.deepEqual(h, { todayRounds: 0, goalRounds: 3, todayDone: false, kept: false, streak: 0, best: 0, freezes: 0, frozenDays: [], repairedDays: [], broken: null });
 });
 
 test('eine Runde hält die Serie, das Ziel ist der Vorsatz', () => {

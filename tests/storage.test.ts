@@ -66,6 +66,8 @@ test('Defaults, alte Daten werden ergänzt (In-Memory)', () => {
     autoAdvance: true, // v9 A
     duelName: '', // v9 I
     league: null, badges: {}, cards: {}, // v9 J
+    xp: { earned: 0, seen: 0, bonus: 0, spent: 0 }, purchases: {}, frame: '', freezesBought: [], streakRepairs: [], comebackDays: [], // v10
+    questLog: {}, chests: {}, lpSeen: -1,
   });
   assert.deepEqual(getReviews(), {});
   assert.deepEqual(getActivity(), {});

@@ -15,6 +15,9 @@ export interface StateInput {
   /** v9 B: Runden zählen fürs Tagesziel und die Serie; fehlt `sessions`, gilt die alte Minuten-Logik */
   sessions?: readonly { ts: number }[];
   goalRounds?: number;
+  /** v10: zusätzliche Freezes und reparierte Tage */
+  boughtFreezes?: readonly number[];
+  repairedDays?: readonly string[];
 }
 
 /** Was die Erinnerungen brauchen – nicht mehr. */
@@ -34,7 +37,10 @@ export function buildReminderState(o: StateInput, now: number = Date.now()): Rem
   };
   if (!o.sessions || o.goalRounds === undefined) return base;
   // Alte Felder bleiben gefüllt (todayMin = echte Minuten, goalMin = Altwert); goalDone/streak folgen den Runden
-  const habit = habitInfo({ sessions: o.sessions, activity: o.activity, goalRounds: o.goalRounds, now });
+  const habit = habitInfo({
+    sessions: o.sessions, activity: o.activity, goalRounds: o.goalRounds, now,
+    boughtFreezes: o.boughtFreezes, repairedDays: o.repairedDays,
+  });
   return {
     ...base, goalDone: habit.todayDone, streak: habit.streak,
     todayRounds: habit.todayRounds, goalRounds: habit.goalRounds, kept: habit.kept,

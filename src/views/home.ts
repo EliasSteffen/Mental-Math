@@ -6,7 +6,7 @@ import { CATEGORIES, SUBTYPES, activeCategories } from '../core/catalog.ts';
 import { categoryStats } from '../core/scoring.ts';
 import { dueReviews } from '../core/review.ts';
 import { dayKey, recommendation } from '../core/progress.ts';
-import { habitInfo } from '../core/habit.ts'; // v9 B
+import { currentHabit } from '../features/habit.ts'; // v9 B, v10
 import { fmtSeconds } from '../core/numbers.ts';
 import { getActivity, getAttempts, getDailyResults, getReviews, getSessions, getSettings } from '../data/storage.ts';
 import { app, appendChildren, h } from '../ui/dom.ts';
@@ -20,6 +20,10 @@ import { locale, t } from '../i18n/index.ts';
 import type { Recommendation } from '../types.ts';
 import { dateLine, daypart, goalDots, heroExample, heroPlan, timeGap, type HeroExample, type HeroPlan, type TimeGap } from './home-data.ts';
 import { levelFor } from '../core/scoring.ts'; // v9 H
+import { currentGoals } from '../features/goals.ts'; // v10 F
+import { nextGoalLine } from '../ui/goals.ts'; // v10 F
+import { questsView } from '../features/quests.ts'; // v10 Q
+import { comebackCard } from './comeback-card.ts'; // v10 C
 
 const GREETING = { morning: 'home.greetMorning', day: 'home.greetDay', evening: 'home.greetEvening' } as const;
 
@@ -130,7 +134,7 @@ export function renderHome(): void {
   const attempts = getAttempts();
   const reviews = getReviews();
   const settings = getSettings();
-  const habit = habitInfo({ sessions: getSessions(), activity: getActivity(), goalRounds: settings.dailyGoalRounds, now }); // v9 B
+  const habit = currentHabit(now); // v9 B, v10: mit gekauften Freezes und Reparaturen
   const rec = recommendation(attempts, reviews, now, { enabledCategories: settings.enabledCategories });
   const plan = heroPlan(rec, {
     sessionLength: settings.sessionLength || 10,
@@ -146,6 +150,7 @@ export function renderHome(): void {
     }));
   const goal = goalDotsEl(goalDots(habit.todayRounds, habit.goalRounds), habit.todayRounds, habit.goalRounds);
   const gap = timeGap(attempts, rec.subtype);
+  const nextGoal = currentGoals(1, now)[0] ?? null; // v10 F
   const stats = categoryStats(attempts);
   const daily = getDailyResults()[dayKey(now)];
 
@@ -165,6 +170,14 @@ export function renderHome(): void {
       icon: 'calendar', label: t('home.dailyChallenge'), sub: t('home.dailySub'), href: '#/train/daily',
       value: daily ? `${daily.correct}/${daily.n}` : t('home.dailyOpen'), accent: !daily,
     });
+  // v10 Q: Quests des Tages (3) und Wochenstand
+  const qv = questsView(now);
+  const questTile = tile({
+    icon: 'star', label: t('quests.tileLabel'), href: '#/quests',
+    sub: qv.doneToday >= 3 ? t('quests.tileSubDone') : t('quests.tileSub', { n: qv.stars }),
+    value: qv.ready ? t('quests.chestReady') : t('quests.tileValue', { done: qv.doneToday }),
+    accent: qv.ready > 0 || qv.doneToday < 3,
+  });
   // Anmeldung kommt beim Start oft erst nach dem ersten Bild: dann die Daily-Kachel umstellen
   if (accountEnabled()) addCleanup(onAccountChange(() => rerender({ keepScroll: true })));
 
@@ -193,6 +206,7 @@ export function renderHome(): void {
   const tiles: HTMLElement[] = [
     needsPlacement ? tile({ icon: 'target', label: t('home.placementTitle'), sub: t('home.placementSub'), value: t('home.placementValue'), accent: true, href: '#/einstufung' }) : null,
     dailyTile,
+    questTile, // v10 Q
     tile({ icon: 'grid', label: t('home.mixedShort'), sub: t('home.mixedSub'), href: '#/train/all' }),
     tile({ icon: 'plus-minus', label: t('home.categories'), sub: t('home.categoriesSub'), onClick: openCategories, phoneOnly: true }),
     tile({ icon: 'link', label: t('home.moreModes'), sub: t('home.moreModesShort'), onClick: openModes, phoneOnly: true }),
@@ -215,13 +229,22 @@ export function renderHome(): void {
   // Seite passt auf einen Bildschirm (CSS: .screen.is-today, ohne Scrollen auf dem Telefon)
   app.classList.add('is-today');
   document.body.classList.add('is-today');
-  addCleanup(() => { app.classList.remove('is-today'); document.body.classList.remove('is-today'); });
+  // v10 C: Comeback-/Reparatur-Karte über der Empfehlung; mit Karte darf Heute scrollen
+  const comeback = comebackCard(now, plan.href, habit.todayRounds);
+  if (comeback) { app.classList.add('has-comeback'); document.body.classList.add('has-comeback'); }
+  addCleanup(() => {
+    app.classList.remove('is-today', 'has-comeback'); document.body.classList.remove('is-today', 'has-comeback');
+  });
 
   appendChildren(app, [
     h('div', { class: 'today-head' },
       largeTitle(t(GREETING[daypart(new Date(now).getHours())]), dateLine(now, locale())),
-      statusLine({ todayRounds: habit.todayRounds, goalRounds: habit.goalRounds, streak: habit.streak, freezes: habit.freezes, startHint: true })),
+      // v10 F: Status und „Nächstes Ziel“ in einem Block (am breiten Layout nebeneinander)
+      h('div', { class: 'today-head-meta' },
+        statusLine({ todayRounds: habit.todayRounds, goalRounds: habit.goalRounds, streak: habit.streak, freezes: habit.freezes, startHint: true }),
+        nextGoal ? nextGoalLine(nextGoal) : null)),
     h('div', { class: 'today-main' },
+      comeback,
       hero(rec, plan, gap, fresh, example, goal),
       h('nav', { class: `today-tiles${tiles.length % 2 ? ' is-odd' : ''}`, 'aria-label': t('home.otherTitle') }, ...tiles)),
     more,

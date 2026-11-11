@@ -20,11 +20,13 @@ import { cardRarity } from '../core/cards.ts';
 import { isTablet } from '../ui/viewport.ts';
 import { championAvailable, championCount, championInfo as cachedChampionInfo, onChampionChange, syncLeague } from '../features/league-sync.ts'; // v9 K
 import { addCleanup } from '../router.ts'; // v9 K
+import { activeFrame } from '../features/shop.ts'; // v10 P
+import { shopView } from './shop.ts'; // v10 P
 import { t } from '../i18n/index.ts';
 
-export type AchievementTab = 'liga' | 'orden' | 'karten';
-export const ACHIEVEMENT_TABS: readonly AchievementTab[] = ['liga', 'orden', 'karten'];
-const TAB_LABEL = { liga: 'rewards.tabLeague', orden: 'rewards.tabBadges', karten: 'rewards.tabCards' } as const;
+export type AchievementTab = 'liga' | 'orden' | 'karten' | 'shop';
+export const ACHIEVEMENT_TABS: readonly AchievementTab[] = ['liga', 'orden', 'karten', 'shop']; // v10 P: Shop
+const TAB_LABEL = { liga: 'rewards.tabLeague', orden: 'rewards.tabBadges', karten: 'rewards.tabCards', shop: 'shop.tab' } as const;
 const TAB_KEY = 'mm.achievementsTab';
 
 /** Champion-Status (Paket K): standardmäßig aus dem Zwischenspeicher von league-sync. */
@@ -59,7 +61,7 @@ function heroCard(v: View, champion: ChampionInfo | null): HTMLElement {
   const name = shownChampion ? t('rewards.championRank', { rank: shownChampion.rank }) : tierName(v.tier);
   return card([
     h('div', { class: 'ach-hero' },
-      leagueEmblem({ tier: v.tier, size: 84, champion: shownChampion, labelled: false }),
+      leagueEmblem({ tier: v.tier, size: 84, champion: shownChampion, labelled: false, frame: activeFrame() }),
       h('div', { class: 'ach-hero-text' },
         h('h2', { class: 'ach-hero-name' }, name),
         h('p', { class: 'ach-hero-rating num' }, t('rewards.rating', { n: fmt(v.rating, 0) })))),
@@ -169,7 +171,7 @@ export function renderAchievements(tabIn: string | null = null): void {
   const v = rewardView();
   const initial: AchievementTab = ACHIEVEMENT_TABS.find((x) => x === tabIn) ?? loadTab();
   const build = (tab: AchievementTab): HTMLElement =>
-    tab === 'orden' ? badgesView(v) : tab === 'karten' ? cardsView(v) : leagueView(v, championProvider());
+    tab === 'orden' ? badgesView(v) : tab === 'karten' ? cardsView(v) : tab === 'shop' ? shopView(v.tier) : leagueView(v, championProvider());
   let current: AchievementTab = initial; // v9 K
   const panel = h('div', { class: 'ach-panel' }, build(initial));
   const switcher = segmented<AchievementTab>({

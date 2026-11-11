@@ -5,7 +5,7 @@ import { SUBTYPES } from '../../core/catalog.ts';
 import { getMethod } from '../../core/methods.ts';
 import { modeName } from '../../core/modes.ts';
 import { dayKey } from '../../core/progress.ts';
-import { habitInfo } from '../../core/habit.ts'; // v9 B
+import { currentHabit } from '../../features/habit.ts'; // v9 B, v10
 import { confetti } from '../../ui/charts.ts'; // v9 B
 import { roundRecap, type RoundRecap } from '../../core/recap.ts'; // v9 A
 import { updateProgressRewards } from '../../features/rewards.ts'; // v9 J
@@ -33,6 +33,12 @@ import { shareCardButton } from '../../ui/share-card.ts';
 import { duelOutcome, type DuelStats } from '../../core/duel-link.ts'; // v9 I
 import { openDuelShare } from '../../features/duel.ts'; // v9 I
 import { startNewDuel } from '../duel.ts'; // v9 I
+import { xpView } from '../../features/xp.ts'; // v10 F
+import { currentGoals } from '../../features/goals.ts'; // v10 F
+import { nextGoalLine } from '../../ui/goals.ts'; // v10 F
+import { leagueEmblem, tierName } from '../../ui/league-badge.ts'; // v9 J, v10 F
+import { tierInfo, tierProgress } from '../../core/league.ts'; // v10 F
+import type { NextGoal } from '../../core/next-goal.ts'; // v10 F
 
 /** Gegebene Antwort als Text (Auswahl-Option oder Zahl mit Einheit, wie evaluate() sie gewertet hat). */
 function givenText(r: TrainResult): string {
@@ -74,8 +80,28 @@ function newBestCard(nb: NonNullable<RoundRecap['newBest']>): HTMLElement {
   });
 }
 
-/** Skill-Zeile und Level-Karte (v9 A): ruhige Zeilen mit Balken, ohne Effekte. */
-function recapBlock(r: RoundRecap): HTMLElement {
+/** Liga-Zeile (v10 F): Emblem und Stufe, LP-Änderung, darunter „412 / 450 LP bis Gold III“ und der Balken. */
+function leagueRow(lp: RoundRecap['lp']): HTMLElement {
+  const { tier, after, delta } = lp;
+  const info = tierInfo(tier);
+  const emblem = leagueEmblem({ tier, size: 26, labelled: false });
+  if (info.next === null) {
+    // Meister: kein nächster Schritt, nur der Stand
+    return h('div', { class: 'recap-row recap-league' },
+      h('p', { class: 'recap-line' }, h('span', { class: 'recap-label recap-league-name' }, emblem, t('goals.masterLine', { name: tierName(tier), rating: after }))),
+      progressBar(100, { decorative: true }));
+  }
+  const change = delta > 0 ? t('goals.lpGain', { n: delta }) : delta < 0 ? t('goals.lpLoss', { n: -delta }) : null;
+  return h('div', { class: 'recap-row recap-league' },
+    h('p', { class: 'recap-line' },
+      h('span', { class: 'recap-label recap-league-name' }, emblem, tierName(tier)),
+      change ? h('span', { class: `recap-value num${delta > 0 ? ' is-good' : ' is-quiet'}` }, change) : null),
+    h('p', { class: 'recap-sub num' }, t('rewards.toNext', { rating: after, next: info.next, name: tierName(tier + 1) })),
+    progressBar(tierProgress(tier, after).fraction * 100, { decorative: true }));
+}
+
+/** Skill-Zeile, Level-Karte (v9 A, Level aus dem XP-Konto), Liga-Zeile (v10 F) und zuletzt das nächste Ziel (v10 F). */
+function recapBlock(r: RoundRecap, goal: NextGoal | null): HTMLElement {
   const lv = r.level;
   const rows: Array<HTMLElement | null> = [];
   if (r.skill) {
@@ -93,6 +119,8 @@ function recapBlock(r: RoundRecap): HTMLElement {
       h('span', { class: 'recap-value num' }, t('recap.xpGained', { n: lv.gained }))),
     progressBar((lv.into / lv.needed) * 100, { label: t('recap.levelProgress', { into: lv.into, needed: lv.needed }) }),
     lv.levelUp ? h('p', { class: 'recap-up' }, t('recap.levelUp', { level: lv.level })) : null));
+  rows.push(leagueRow(r.lp));
+  if (goal) rows.push(nextGoalLine(goal));
   return h('section', { class: 'recap' }, ...rows);
 }
 
@@ -218,6 +246,7 @@ export function showResult(ctx: TrainCtx): void {
 
   // v9 A: Stand vor dieser Runde (für die Bilanz), bevor die Runde gespeichert wird
   const sessionsBefore = getSessions();
+  const leagueTier = getSettings().league?.tier ?? null; // v10 F: Liga-Stufe vor dieser Runde (für die LP-Zeile)
   addSession({ id: ctx.sessionId, ts: ctx.startedAt, mode, n, correct, points: ctx.points, avgTimeMs: Math.round(avg) });
   if (ctx.ranked) {
     showRankedResult(ctx, { n, correct, totalMs, avg });
@@ -288,22 +317,29 @@ export function showResult(ctx: TrainCtx): void {
   }
 
   const attemptsAfter = getAttempts();
+  const settings = getSettings();
+  // v9 B: Runden heute (die eben gespeicherte Runde zählt mit); erreicht genau diese Runde das Ziel → Zeile, ggf. Konfetti
+  const habit = currentHabit(); // v10: mit gekauften Freezes und Reparaturen
+  const goalHit = habit.todayRounds === habit.goalRounds && dayKey(ctx.startedAt) === dayKey(Date.now());
+  if (goalHit && settings.celebrated !== dayKey(Date.now())) {
+    setSettings({ celebrated: dayKey(Date.now()) });
+    if (settings.confetti === true) confetti();
+  }
+  // v10 F: XP-Konto vor den Belohnungen (diese Runde inkl.) und danach (Geschenke dieser Runde inkl.)
+  const xpRound = xpView().lifetime;
+  const rewards = n ? rewardBlock(updateProgressRewards()) : null; // v9 J: Aufstieg, Orden, Karten dieser Runde
+  // Bilanz erst nach den Belohnungen: Liga, Orden und XP sind dann gespeichert
   const recap = roundRecap({
     mode, n, correct, avgMs: avg,
     assistedAny: attemptsAfter.some((a) => a.sessionId === ctx.sessionId && a.assisted === true),
     sessionsBefore,
     attemptsBefore: attemptsAfter.filter((a) => a.sessionId !== ctx.sessionId),
     attemptsAfter,
+    xp: { before: xpRound - ctx.points, after: xpView().lifetime },
+    leagueTier,
   });
-  const settings = getSettings();
-  // v9 B: Runden heute (die eben gespeicherte Runde zählt mit); erreicht genau diese Runde das Ziel → Zeile, ggf. Konfetti
-  const habit = habitInfo({ sessions: getSessions(), activity: getActivity(), goalRounds: settings.dailyGoalRounds });
-  const goalHit = habit.todayRounds === habit.goalRounds && dayKey(ctx.startedAt) === dayKey(Date.now());
-  if (goalHit && settings.celebrated !== dayKey(Date.now())) {
-    setSettings({ celebrated: dayKey(Date.now()) });
-    if (settings.confetti === true) confetti();
-  }
-  const rewards = n ? rewardBlock(updateProgressRewards()) : null; // v9 J: Aufstieg, Orden, Karten dieser Runde
+  const goal = currentGoals(1)[0] ?? null; // v10 F: Zeile am Ende der Bilanz
+  const habitNow = currentHabit(); // v10 C: nach den Belohnungen (eine Reparatur durch Runden verlängert die Serie)
   const ins = roundInsight(results);
   const tasksText = n === 1 ? t('train.tasksOne') : t('train.tasksMany', { n });
 
@@ -326,9 +362,9 @@ export function showResult(ctx: TrainCtx): void {
       duelBox, // v9 I
       recap.newBest ? newBestCard(recap.newBest) : null,
       ins ? insightCard(ins) : null,
-      statusLine({ todayRounds: habit.todayRounds, goalRounds: habit.goalRounds, streak: habit.streak, freezes: habit.freezes }),
+      statusLine({ todayRounds: habitNow.todayRounds, goalRounds: habitNow.goalRounds, streak: habitNow.streak, freezes: habitNow.freezes }),
       goalHit ? h('p', { class: 'goal-reached rise' }, icon('check', 16), t('common.goalReached')) : null,
-      n ? recapBlock(recap) : null,
+      n ? recapBlock(recap, goal) : null,
       rewards,
       n ? group({ title: t('train.tasks'), meta: wrongRows.length ? t('train.wrongFirst') : undefined },
         list([...wrongRows, toggle, ...rightRows])) : null),

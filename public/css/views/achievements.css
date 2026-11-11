@@ -111,6 +111,9 @@
   .reward-row .row-lead { width:34px; justify-content:center; }
   .reward-row.is-good .row-label { color:var(--good); font-weight:var(--weight-semibold); }
   .reward-row.is-quiet .row-label { color:var(--muted); }
+  /* v10: Symbol einer Erweiterungszeile */
+  .reward-icon { display:inline-flex; align-items:center; justify-content:center; width:30px; height:30px; border-radius:50%; background:var(--accent-soft); color:var(--accent-text); }
+  .reward-row.is-good .reward-icon { background:var(--good-soft); color:var(--good); }
   .reward-more {
     display:inline-flex; align-items:center; gap:2px; align-self:flex-end; min-height:var(--hit-min); padding-inline:var(--space-2);
     font-size:var(--text-sm); font-weight:var(--weight-semibold); color:var(--accent-text);

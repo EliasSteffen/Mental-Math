@@ -3,6 +3,7 @@ import type { Attempt, DailyResult, Level, Session, SubtypeId } from '../types.t
 import { badgeTiers, effectiveTiers, mergeBadges, type BadgeId, type BadgeInput, type BadgeTier, type StoredBadges } from './badges.ts';
 import { CARD_IDS, mergeCards, unlockedCards } from './cards.ts';
 import { advanceLeague, leagueRating, type LeagueState } from './league.ts';
+import type { IconName } from '../ui/charts.ts';
 
 /** Gespeicherter Stand (die drei synchronisierten Einstellungen) */
 export interface RewardStore {
@@ -27,6 +28,19 @@ export interface RewardEvents {
   demoted?: { from: number; to: number };
   badges: Array<{ id: BadgeId; tier: 1 | 2 | 3 }>;
   cards: SubtypeId[];
+  /** v10: Zeilen der Erweiterungen (Quests, Comeback, Reparatur, LP – features/rewards.ts → addRewardHook) */
+  extra?: ExtraRewardLine[];
+}
+
+/** v10: Ergebniszeile einer Erweiterung. order sortiert innerhalb der Erweiterungen (klein zuerst). */
+export interface ExtraRewardLine {
+  id: string;
+  order: number;
+  icon: IconName;
+  label: string;
+  sub?: string;
+  href?: string;
+  tone: 'good' | 'quiet';
 }
 
 export interface RewardResult {
@@ -92,14 +106,16 @@ export function currentBadgeTiers(history: RewardHistory, store: RewardStore, pe
 export type RewardLine =
   | { kind: 'league'; from: number; to: number; up: boolean }
   | { kind: 'badge'; id: BadgeId; tier: 1 | 2 | 3 }
-  | { kind: 'card'; id: SubtypeId };
+  | { kind: 'card'; id: SubtypeId }
+  | { kind: 'extra'; line: ExtraRewardLine };
 
-export const MAX_REWARD_LINES = 3;
+export const MAX_REWARD_LINES = 4;
 
-/** Alle Zeilen in Anzeigereihenfolge: Aufstieg, Orden, Karten, Abstieg (dezent, zuletzt). */
+/** Alle Zeilen in Anzeigereihenfolge: Aufstieg, Erweiterungen (v10), Orden, Karten, Abstieg (dezent, zuletzt). */
 export function rewardLines(events: RewardEvents): RewardLine[] {
   const lines: RewardLine[] = [];
   if (events.promoted) lines.push({ kind: 'league', from: events.promoted.from, to: events.promoted.to, up: true });
+  for (const line of [...(events.extra ?? [])].sort((a, b) => a.order - b.order)) lines.push({ kind: 'extra', line });
   for (const b of events.badges) lines.push({ kind: 'badge', id: b.id, tier: b.tier });
   for (const id of events.cards) lines.push({ kind: 'card', id });
   if (events.demoted) lines.push({ kind: 'league', from: events.demoted.from, to: events.demoted.to, up: false });

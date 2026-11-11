@@ -152,7 +152,7 @@ export interface Session {
 }
 
 /** 'system' folgt prefers-color-scheme (→ 'paper' oder 'night'). Alte Werte: 'pastel' → 'paper' (Migration in schema.ts). */
-export type ThemeSetting = 'system' | 'paper' | 'night' | 'oled' | 'aurora' | 'neon';
+export type ThemeSetting = 'system' | 'paper' | 'night' | 'oled' | 'aurora' | 'neon' | 'sunset' | 'sand' | 'ocean'; // v10 P: sunset, sand, ocean aus dem Shop
 export type Theme = Exclude<ThemeSetting, 'system'>;
 /** Zeitanzeige im Training: Linie ohne Zahlen, Sekunden/Punkte/Level oder nichts. Gemessen wird immer. */
 export type TimerDisplay = 'calm' | 'precise' | 'off';
@@ -220,7 +220,32 @@ export interface Settings {
   badges: Record<string, { tier: 1 | 2 | 3; ts: number }>;
   /** Freigeschaltete Trick-Karten: Aufgabentyp → Zeitpunkt */
   cards: Record<string, number>;
+  // v10 (synchronisiert) – Motivation: XP-Konto, Shop, Comeback/Reparatur, Quests (docs/PLAN-v10-motivation.md)
+  /**
+   * XP-Konto (src/core/xp.ts): earned = aufsummierte XP aus Aufgaben (sinkt nie, auch wenn alte Versuche wegfallen),
+   * seen = Aufgaben-XP beim letzten Abgleich, bonus = geschenkte XP (Quests, Truhen, Comeback), spent = ausgegeben.
+   */
+  xp: XpLedger;
+  /** Gekaufte oder gewonnene Dinge (Themes, Rahmen): Artikel-ID → Zeitpunkt */
+  purchases: Record<string, number>;
+  /** Gewählter Emblem-Rahmen (Artikel-ID, '' = keiner) */
+  frame: string;
+  /** Zusätzliche Freezes (gekauft oder aus Truhen): Zeitpunkte, ältester zuerst */
+  freezesBought: number[];
+  /** Reparierte Serientage (YYYY-MM-DD) */
+  streakRepairs: string[];
+  /** Tage mit gutgeschriebenem Comeback-Bonus (YYYY-MM-DD) */
+  comebackDays: string[];
+  /** Tagesquests: Tag (YYYY-MM-DD) → gezogene Quests (picks) und gutgeschriebene (done) */
+  questLog: Record<string, { picks: string[]; done: string[] }>;
+  /** Wochentruhen: Montag der Woche (YYYY-MM-DD) → höchste geöffnete Stufe 1–3 */
+  chests: Record<string, number>;
+  /** Liga-Wertung bei der letzten Auswertung (−1 = unbekannt) – Grundlage für „+N LP“ */
+  lpSeen: number;
 }
+
+/** XP-Konto (v10, src/core/xp.ts) */
+export interface XpLedger { earned: number; seen: number; bonus: number; spent: number }
 
 export interface ReviewItem { box: number; dueAt: number; lastTs: number }
 export type Reviews = Record<SubtypeId, ReviewItem>;

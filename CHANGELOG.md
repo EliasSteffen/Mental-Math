@@ -4,6 +4,17 @@ Alle nennenswerten Änderungen an Mental Math. Format nach [Keep a Changelog](ht
 
 <!-- Automatisch erzeugt mit `npm run changelog` aus src/releases.ts – nicht von Hand bearbeiten. -->
 
+## [2.2.0] - 2026-11-11
+
+### Shop, Quests & Comeback
+
+- Neu: der Shop unter Fortschritt → Erfolge. Tausche deine XP gegen Streak-Freezes, drei neue Themes (Abendrot, Sand, Tiefsee) und Rahmen für dein Liga-Emblem. Dein Level sinkt dabei nie.
+- Neu: jeden Tag drei Quests – leicht, mittel und schwer – mit XP als Belohnung. Jede erledigte Quest ist ein Stern; bei 5, 10 und 15 Sternen öffnest du die Wochentruhe in Bronze, Silber oder Gold.
+- Schön, dass du wieder da bist: Nach ein paar Tagen Pause wartet eine leichte Aufwärmrunde mit Comeback-Bonus.
+- Serie gerissen? Am nächsten Tag holst du sie zurück – mit drei Runden oder mit XP.
+- Nach jeder Runde siehst du die gewonnenen Ligapunkte und wie weit es bis zur nächsten Stufe ist. Auf Heute steht dein nächstes Ziel, zum Beispiel „Noch 36 LP bis Gold I“.
+- Behoben: Wer mehr als 5.000 Aufgaben gelöst hatte, konnte Level verlieren. Dein Level zählt jetzt alle je verdienten XP.
+
 ## [2.1.0] - 2026-11-11
 
 ### Ligen, Orden & Mini-Cases

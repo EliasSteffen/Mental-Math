@@ -24,6 +24,8 @@ export interface ProfileCardData {
   /** 0–100, null ohne Versuche */
   accuracy: number | null;
   bestDaily: { correct: number; n: number } | null;
+  /** v10 P: ausgebbares XP-Guthaben (null, wenn `xp` nicht übergeben wurde) */
+  xpBalance: number | null;
 }
 
 /** Beste Daily: höchster Anteil richtig, bei Gleichstand mehr Punkte. */
@@ -42,6 +44,11 @@ export function profileCardData(o: {
   activity: Activity;
   dailyResults: Readonly<Record<string, DailyResult>>;
   goalRounds: number;
+  /** v10: zusätzliche Freezes und reparierte Tage (Einstellungen) */
+  boughtFreezes?: readonly number[];
+  repairedDays?: readonly string[];
+  /** v10 P: Level und Guthaben aus dem XP-Konto (xpView()); ohne Angabe wie bisher aus den Versuchen */
+  xp?: { level: number; into: number; needed: number; balance: number };
   /** Liga-Stufe 0–15 (rewardView().tier) */
   tier: number;
   /** wirksame Ordensstufen (rewardView().badges) */
@@ -50,8 +57,11 @@ export function profileCardData(o: {
   cards: Readonly<Record<string, number>>;
   now?: number;
 }): ProfileCardData {
-  const xp = xpInfo([...o.attempts]);
-  const habit = habitInfo({ sessions: o.sessions, activity: o.activity, goalRounds: o.goalRounds, now: o.now });
+  const xp = o.xp ?? xpInfo([...o.attempts]);
+  const habit = habitInfo({
+    sessions: o.sessions, activity: o.activity, goalRounds: o.goalRounds, now: o.now,
+    boughtFreezes: o.boughtFreezes, repairedDays: o.repairedDays,
+  });
   const answered = o.attempts.filter((a) => a.errorType !== 'skip');
   const correct = answered.filter((a) => a.correct).length;
   return {
@@ -63,5 +73,6 @@ export function profileCardData(o: {
     solved: correct, rounds: o.sessions.length,
     accuracy: answered.length ? Math.round((correct / answered.length) * 100) : null,
     bestDaily: bestDaily(o.dailyResults),
+    xpBalance: o.xp ? o.xp.balance : null,
   };
 }

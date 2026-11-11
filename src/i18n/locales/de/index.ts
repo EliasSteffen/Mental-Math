@@ -20,5 +20,9 @@ import { recap } from './recap.ts'; // v9 A
 import { cases } from './cases.ts'; // v9 C
 import { duel } from './duel.ts'; // v9 I
 import { rewards } from './rewards.ts'; // v9 J
+import { goals } from './goals.ts'; // v10 F
+import { shop } from './shop.ts'; // v10 P
+import { quests } from './quests.ts'; // v10 Q
+import { comeback } from './comeback.ts'; // v10 C
 
-export const dict = { tour, common, home, train, parallel, chain, custom, analyse, lernen, settings, release, core, account, sol, onboarding, guide, compete, placement, recap, cases, duel, rewards } as const;
+export const dict = { tour, common, home, train, parallel, chain, custom, analyse, lernen, settings, release, core, account, sol, onboarding, guide, compete, placement, recap, cases, duel, rewards, goals, shop, quests, comeback } as const;

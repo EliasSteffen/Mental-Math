@@ -32,6 +32,7 @@ import { showBreathe } from './breathe.ts';
 import { showResult } from './result.ts';
 import { duelTasks, type DuelBase } from '../../core/duel-link.ts'; // v9 I
 import { loadDuel, type DuelOpponent } from '../../features/duel.ts'; // v9 I
+import { warmupPlan } from '../../core/comeback.ts'; // v10 C
 import { t } from '../../i18n/index.ts';
 
 export interface TrainResult { task: Task; given: number | null; ev: Evaluation; timeMs: number }
@@ -164,9 +165,10 @@ export function renderTrain(modeIn: Mode, { n: nOverride = null, intro: introIn 
   const strict = ranked !== null || placement !== null;
   const timed = strict ? true : settings.timer !== false;
   const intro = strict ? false : introIn;
-  const display: TimerDisplay = settings.timerDisplay ?? 'calm';
-  const precise = display === 'precise';
   let mode: Mode = ranked ? ranked.mode : placement ? 'placement' : modeIn === 'challenge' || modeIn === 'placement' ? 'all' : modeIn;
+  // v10 C: Aufwärmrunde ohne Zeitdruck-Anzeige (nur die ruhige Zeitlinie)
+  const display: TimerDisplay = mode === 'warmup' ? 'calm' : settings.timerDisplay ?? 'calm';
+  const precise = display === 'precise';
   let notice: string | null = null;
   const today = dayKey(Date.now());
 
@@ -181,11 +183,15 @@ export function renderTrain(modeIn: Mode, { n: nOverride = null, intro: introIn 
   } else if (mode === 'duel') {
     const d = loadDuel(); // v9 I
     if (d) { fixedTasks = duelTasks(d.base); duelCtx = d; } else { mode = 'all'; notice = t('duel.none'); }
+  } else if (mode === 'warmup') {
+    // v10 C: 5 leichte Aufgaben aus den stärksten Themen
+    const wf = noRepeat();
+    fixedTasks = warmupPlan(getAttempts(), settings.enabledCategories).map((slot) => wf.next(() => generate(slot.subtype, Math.random, { level: slot.level })));
   } else if (mode === 'custom' && !custom) {
     mode = 'all';
     notice = t('train.noRange');
   }
-  const fixedMode = strict || mode === 'daily' || mode === 'retry' || mode === 'custom' || mode === 'duel';
+  const fixedMode = strict || mode === 'daily' || mode === 'retry' || mode === 'custom' || mode === 'duel' || mode === 'warmup';
   const sessionLength = placement ? placement.max : fixedTasks ? fixedTasks.length : mode === 'daily' ? 15 : nOverride || settings.sessionLength || 10;
   const est = !strict && (estimate || settings.estimateMode === true) && !fixedMode;
   // Einstufung: nächste Aufgabe ergibt sich aus den bisherigen Antworten
@@ -496,7 +502,7 @@ export function renderTrain(modeIn: Mode, { n: nOverride = null, intro: introIn 
   const begin = (): void => { if (intro) showIntro(); else showTask(); };
 
   // Atempause (E19): nicht bei Daily, Wiederholung der Fehler und kurzen Review-Runden
-  const breathe = !strict && settings.breathe === true && mode !== 'daily' && mode !== 'retry' && mode !== 'duel' && !(mode === 'review' && sessionLength < 3);
+  const breathe = !strict && settings.breathe === true && mode !== 'daily' && mode !== 'retry' && mode !== 'duel' && mode !== 'warmup' && !(mode === 'review' && sessionLength < 3);
   if (breathe) {
     const withIntro = intro && Boolean(SUBTYPES[mode] && getMethod(mode));
     const tasks = sessionLength === 1 ? t('train.tasksOne') : t('train.tasksMany', { n: sessionLength });

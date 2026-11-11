@@ -7,10 +7,14 @@
 @import "views/train.css";
 @import "views/progress.css";
 @import "views/achievements.css";
+@import "views/shop.css"; /* v10 P */
 @import "views/learn.css";
 @import "views/profile.css";
 @import "views/play.css";
 @import "views/compete.css";
 @import "views/duel.css"; /* v9 I */
+@import "views/quests.css"; /* v10 Q */
+@import "views/comeback.css"; /* v10 C */
 @import "views/tour.css";
+@import "views/goals.css"; /* v10 F */
 @import "exhibit.css";

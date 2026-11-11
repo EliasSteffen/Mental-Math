@@ -11,6 +11,15 @@ import { rewardView } from '../features/rewards.ts';
 import { t } from '../i18n/index.ts';
 
 function lineRow(line: RewardLine): HTMLElement {
+  // v10: Zeile einer Erweiterung (Quests, Comeback, Reparatur, LP)
+  if (line.kind === 'extra') {
+    const x = line.line;
+    return row({
+      leading: h('span', { class: 'reward-icon', 'aria-hidden': 'true' }, icon(x.icon, 22)),
+      label: x.label, sub: x.sub, href: x.href,
+      class: x.tone === 'good' ? 'reward-row is-good' : 'reward-row is-quiet',
+    });
+  }
   if (line.kind === 'league') {
     const name = tierName(line.to);
     return row({
