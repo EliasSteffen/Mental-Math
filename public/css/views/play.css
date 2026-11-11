@@ -125,11 +125,11 @@
   /* ---------- iPad: Spielmodi in Tablet-Größe, Parallel-Karten nutzen die Breite ---------- */
   @media (min-width: 720px) and (min-height: 641px) {
     .play-caption { font-size:var(--text-md); }
-    .play-answer { width:min(100%, 340px); height:88px; padding:0 var(--space-5); border-radius:var(--radius-lg); font-size:48px; }
+    .play-answer { width:min(100%, 340px); height:88px; padding:0 var(--space-5); border-radius:var(--radius-lg); font-size:calc(48px * var(--type-scale-cap, 1)); }
     .play-answer.is-compact { width:160px; height:56px; font-size:var(--text-xl); }
     .play-cards { --play-card-h:208px; width:100%; max-width:760px; gap:var(--space-4); }
     .play-card { padding:var(--space-4); }
-    .play-card-main { font-size:56px; }
+    .play-card-main { font-size:calc(56px * var(--type-scale-cap, 1)); }
     .play-fields { max-width:480px; }
     .play-field { min-height:72px; }
   }
