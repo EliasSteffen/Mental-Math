@@ -42,6 +42,13 @@ export interface ReminderState {
   weak: string[];
   /** Zeitpunkt der Meldung (ms) */
   at: number;
+  // v9 B: optional (ältere Clients melden sie nicht; die Felder darüber bleiben Pflicht und gefüllt)
+  /** Runden an `day` */
+  todayRounds?: number;
+  /** Tagesziel in Runden */
+  goalRounds?: number;
+  /** Serie an `day` gesichert (≥ 1 Runde) */
+  kept?: boolean;
 }
 
 /** Geplante Zeitpunkte je Art (ms, UTC) */
@@ -121,7 +128,14 @@ export function parseState(raw: unknown): ReminderState | null {
   const weakIds = (Array.isArray(weak) ? weak : [])
     .filter((w): w is string => typeof w === 'string' && w.length <= 40 && SUBTYPE_RE.test(w))
     .slice(0, 3);
-  return { day, todayMin, goalMin, goalDone, streak, reviewsDue, nextReviewAt: next, weak: weakIds, at };
+  const out: ReminderState = { day, todayMin, goalMin, goalDone, streak, reviewsDue, nextReviewAt: next, weak: weakIds, at };
+  // v9 B: optionale Felder; Ungültiges wird verworfen statt den ganzen Stand abzulehnen
+  const todayRounds = nonNegInt(raw.todayRounds, 100);
+  const goalRounds = nonNegInt(raw.goalRounds, 100);
+  if (todayRounds !== null) out.todayRounds = todayRounds;
+  if (goalRounds !== null && goalRounds >= 1) out.goalRounds = goalRounds;
+  if (typeof raw.kept === 'boolean') out.kept = raw.kept;
+  return out;
 }
 
 /** Gültige IANA-Zeitzone (laut Intl), sonst 'UTC'. */
@@ -217,8 +231,10 @@ export function goalDoneToday(state: ReminderState | null, today: string): boole
 /** Serie, die heute noch zu retten ist (0 = keine oder schon gesichert). */
 export function streakAtRisk(state: ReminderState | null, today: string): number {
   if (!state) return 0;
-  if (state.day === today) return state.goalDone ? 0 : state.streak;
-  if (state.day === shiftDay(today, -1)) return state.goalDone ? state.streak : 0;
+  // v9 B: `kept` (≥ 1 Runde) sichert die Serie; ältere Stände nutzen das Ziel (`goalDone`)
+  const safe = state.kept ?? state.goalDone;
+  if (state.day === today) return safe ? 0 : state.streak;
+  if (state.day === shiftDay(today, -1)) return safe ? state.streak : 0;
   return 0;
 }
 

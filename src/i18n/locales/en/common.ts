@@ -83,4 +83,12 @@ export const common: Record<keyof typeof De, string> = {
   crashCopied: 'Error report copied',
   crashReset: 'Clear app cache and reload',
   crashResetHelp: 'Loads the app fresh from the server. Training data and account stay.',
+  // v9 B: daily goal in rounds, streak, freeze
+  roundsOfGoal: '{done} / {goal} rounds',
+  roundsOfGoalOne: '{done} / {goal} round',
+  streakRun: '{n} in a row',
+  freezeAria: '{n} streak freezes',
+  freezeOneAria: '{n} streak freeze',
+  startHint: 'Start your streak today',
+  goalReached: 'Daily goal reached',
 };

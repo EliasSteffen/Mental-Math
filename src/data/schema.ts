@@ -15,6 +15,7 @@ export const DEFAULT_SETTINGS: Settings = {
   lastStoreCheck: 0, updateNotifiedVersion: '', updateNotifiedAt: 0, reviewAskedVersion: '', reviewAskedAt: 0,
   onboardingDone: false,
   placement: null,
+  dailyGoalRounds: 3, // v9 B
 };
 
 export const DEFAULT_PARALLEL_STATS: ParallelStats = { nextStart: 2, bestChains: 0, bestCorrectStreak: 0, rounds: 0 };
@@ -76,6 +77,9 @@ export function normalizeSettings(raw: unknown): Settings {
     confetti: typeof s.confetti === 'boolean' ? s.confetti : DEFAULT_SETTINGS.confetti,
     onboardingDone: s.onboardingDone === true,
     placement: normalizePlacement(s.placement),
+    // v9 B: ganze Zahl 1–10
+    dailyGoalRounds: typeof s.dailyGoalRounds === 'number' && Number.isInteger(s.dailyGoalRounds) && s.dailyGoalRounds >= 1 && s.dailyGoalRounds <= 10
+      ? s.dailyGoalRounds : DEFAULT_SETTINGS.dailyGoalRounds,
   };
 }
 

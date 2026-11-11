@@ -30,7 +30,7 @@ export const tour = {
   chIpad: 'Auf dem iPad',
   start: 'Kopfrechnen fürs Case Interview. Ich zeige dir, wie es funktioniert. Alles hier sind Beispieldaten.',
   todayHero: 'Jeden Tag schlägt dir die App vor, was dich gerade am weitesten bringt.',
-  todayStatus: 'Hier siehst du dein Tagesziel und wie lange deine Serie schon läuft.',
+  todayStatus: 'Hier siehst du, wie viele Runden du heute geschafft hast und wie lange deine Serie schon läuft.',
   todayTiles: 'Die Daily ist für alle gleich. „Gemischt“ fragt quer durch alle Themen.',
   todayMore: 'Oder du wählst selbst: einzelne Kategorien, Kettenrechnen, Schätzen oder eigene Zahlenbereiche.',
   taskQuestion: 'So sieht eine Aufgabe aus: groß, ruhig und ohne Hektik.',

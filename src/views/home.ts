@@ -5,9 +5,10 @@
 import { CATEGORIES, SUBTYPES, activeCategories } from '../core/catalog.ts';
 import { categoryStats } from '../core/scoring.ts';
 import { dueReviews } from '../core/review.ts';
-import { dayKey, recommendation, streakInfo } from '../core/progress.ts';
+import { dayKey, recommendation } from '../core/progress.ts';
+import { habitInfo } from '../core/habit.ts'; // v9 B
 import { fmtSeconds } from '../core/numbers.ts';
-import { getActivity, getAttempts, getDailyResults, getReviews, getSettings } from '../data/storage.ts';
+import { getActivity, getAttempts, getDailyResults, getReviews, getSessions, getSettings } from '../data/storage.ts';
 import { app, appendChildren, h } from '../ui/dom.ts';
 import { icon, largeTitle, list, masteryMark, masteryOf, row, statusLine, type IconName } from '../ui/kit.ts';
 import { openSheet, type SheetHandle } from '../ui/sheet.ts';
@@ -110,8 +111,7 @@ export function renderHome(): void {
   const attempts = getAttempts();
   const reviews = getReviews();
   const settings = getSettings();
-  const goalMin = settings.dailyGoalMin || 15;
-  const st = streakInfo(getActivity(), goalMin * 60000, now);
+  const habit = habitInfo({ sessions: getSessions(), activity: getActivity(), goalRounds: settings.dailyGoalRounds, now }); // v9 B
   const rec = recommendation(attempts, reviews, now, { enabledCategories: settings.enabledCategories });
   const plan = heroPlan(rec, {
     sessionLength: settings.sessionLength || 10,
@@ -192,7 +192,7 @@ export function renderHome(): void {
   appendChildren(app, [
     h('div', { class: 'today-head' },
       largeTitle(t(GREETING[daypart(new Date(now).getHours())]), dateLine(now, locale())),
-      statusLine({ todayMin: Math.floor(st.todayMs / 60000), goalMin, streak: st.current })),
+      statusLine({ todayRounds: habit.todayRounds, goalRounds: habit.goalRounds, streak: habit.streak, freezes: habit.freezes, startHint: true })),
     h('div', { class: 'today-main' },
       hero(rec, plan, gap, fresh),
       h('nav', { class: `today-tiles${tiles.length % 2 ? ' is-odd' : ''}`, 'aria-label': t('home.otherTitle') }, ...tiles)),

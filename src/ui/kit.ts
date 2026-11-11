@@ -204,18 +204,30 @@ export function kpis(items: Array<{ label: string; value: string }>): HTMLDListE
   return el;
 }
 
-/** Status Line: Mini-Ring, „9 / 15 min heute“, optional „· 4 Tage Serie“ (nur > 0) und „· +86 XP“. */
-export function statusLine(o: { todayMin: number; goalMin: number; streak?: number; xp?: number }): HTMLElement {
-  const today = Math.max(0, Math.round(o.todayMin));
-  const goal = Math.max(0, Math.round(o.goalMin));
+/**
+ * Status Line (v9 B): Mini-Ring = Runden/Ziel, „1 / 3 Runden heute“, optional Flamme + „N in Folge“ (nur > 0),
+ * Schneeflocke + Freezes (nur > 0), „+86 XP“ und – nur Heute, ohne Serie und Runden – „Starte heute deine Serie“.
+ */
+export function statusLine(o: {
+  todayRounds: number; goalRounds: number; streak?: number; freezes?: number; xp?: number; startHint?: boolean;
+}): HTMLElement {
+  const today = Math.max(0, Math.round(o.todayRounds));
+  const goal = Math.max(1, Math.round(o.goalRounds));
   const parts: Child[] = [
-    miniRing(goal > 0 ? today / goal : 0),
-    withNum(t('common.statusToday'), t('common.minOfGoal', { done: today, goal })),
+    miniRing(today / goal),
+    withNum(t('common.statusToday'), t(goal === 1 ? 'common.roundsOfGoalOne' : 'common.roundsOfGoal', { done: today, goal })),
   ];
   if (o.streak !== undefined && o.streak > 0) {
     parts.push(dot(),
       h('span', { class: 'status-streak' }, icon('flame', 16)),
-      withNum(t(o.streak === 1 ? 'common.streakOne' : 'common.streakMany'), String(o.streak)));
+      withNum(t('common.streakRun'), String(o.streak)));
+  } else if (o.startHint && today === 0) {
+    parts.push(dot(), h('span', null, t('common.startHint')));
+  }
+  if (o.freezes !== undefined && o.freezes > 0) {
+    const label = t(o.freezes === 1 ? 'common.freezeOneAria' : 'common.freezeAria', { n: o.freezes });
+    parts.push(dot(), h('span', { class: 'status-freeze', role: 'img', 'aria-label': label, title: label },
+      icon('snowflake', 16), h('span', { class: 'num status-strong' }, String(o.freezes))));
   }
   if (o.xp !== undefined) parts.push(dot(), withNum(t('common.xpGain'), `${o.xp >= 0 ? '+' : ''}${o.xp}`));
   return h('p', { class: 'status-line' }, ...parts);

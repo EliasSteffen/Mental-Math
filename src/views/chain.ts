@@ -4,7 +4,8 @@ import type { ChainTask, Level } from '../types.ts';
 import { chainTask, chainStepLabel } from '../core/chain.ts';
 import { applyOp } from '../core/parallel.ts';
 import { fmt } from '../core/numbers.ts';
-import { getChainBest, setChainBest } from '../data/storage.ts';
+import { addSession, getChainBest, setChainBest } from '../data/storage.ts';
+import { newId } from '../data/ids.ts';
 import { app, h, appendChildren, type Child } from '../ui/dom.ts';
 import { setCleanup, go } from '../router.ts';
 import { bindResultKeys } from '../ui/modal.ts';
@@ -40,6 +41,7 @@ export function renderChain(): void {
   let streak = 0;
   let timer: number | null = null;
   let unbindKeys: (() => void) | null = null;
+  let askedAt = Date.now(); // v9 B: Beginn der Eingabe (für die Runde)
 
   const stop = (): void => {
     if (timer !== null) { clearTimeout(timer); timer = null; }
@@ -114,6 +116,7 @@ export function renderChain(): void {
   }
 
   function ask(task: ChainTask): void {
+    askedAt = Date.now();
     const input = answerInput(t('chain.resultAria'));
     const answer = answerDock({
       input,
@@ -139,6 +142,8 @@ export function renderChain(): void {
     const newBest = ok && streak > prev;
     if (newBest) setChainBest(level, streak);
     answerFx(ok);
+    // v9 B: Jede Kette ist eine Runde und zählt fürs Tagesziel (keine Attempts: Skills bleiben unberührt)
+    addSession({ id: newId(), ts: Date.now(), mode: 'chain', n: 1, correct: ok ? 1 : 0, points: ok ? 100 * level : 0, avgTimeMs: Math.max(0, Date.now() - askedAt) });
 
     const state = ok ? 'good' : given === null ? 'skip' : 'bad';
     const result = fmt(task.result);

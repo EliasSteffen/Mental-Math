@@ -158,9 +158,9 @@ function trainingGroup(s: Settings): HTMLElement {
   });
 
   const goal = stepper({
-    label: t('settings.dailyGoal'), value: s.dailyGoalMin, min: 5, max: 60, step: 5, help: t('settings.dailyGoalHelp'),
-    format: (n) => t('settings.minutes', { n }),
-    onChange: (n) => save({ dailyGoalMin: n }),
+    label: t('settings.dailyGoal'), value: s.dailyGoalRounds, min: 1, max: 10, step: 1, help: t('settings.dailyGoalHelp'),
+    format: (n) => t(n === 1 ? 'settings.roundsNOne' : 'settings.roundsN', { n }), // v9 B: Runden statt Minuten
+    onChange: (n) => save({ dailyGoalRounds: n }),
   });
 
   // Alte Werte (z. B. 30) bleiben wählbar, bis man umstellt
@@ -973,7 +973,7 @@ interface Section {
 const SECTIONS: readonly Section[] = [
   {
     id: 'training', icon: 'target', title: 'settings.training', intro: 'settings.introTraining',
-    summary: (s) => [t(DIFF_LABEL[s.difficulty]), t('settings.minutes', { n: s.dailyGoalMin }), t('settings.summaryTasks', { n: s.sessionLength })].join(' · '),
+    summary: (s) => [t(DIFF_LABEL[s.difficulty]), t(s.dailyGoalRounds === 1 ? 'settings.roundsNOne' : 'settings.roundsN', { n: s.dailyGoalRounds }), t('settings.summaryTasks', { n: s.sessionLength })].join(' · '),
     body: (s) => [trainingGroup(s)],
   },
   {
