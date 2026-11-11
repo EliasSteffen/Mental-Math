@@ -20,6 +20,7 @@ import { locale, t } from '../i18n/index.ts';
 import type { Recommendation } from '../types.ts';
 import { dateLine, daypart, goalDots, heroExample, heroPlan, timeGap, type HeroExample, type HeroPlan, type TimeGap } from './home-data.ts';
 import { levelFor } from '../core/scoring.ts'; // v9 H
+import { comebackCard } from './comeback-card.ts'; // v10 C
 
 const GREETING = { morning: 'home.greetMorning', day: 'home.greetDay', evening: 'home.greetEvening' } as const;
 
@@ -215,13 +216,19 @@ export function renderHome(): void {
   // Seite passt auf einen Bildschirm (CSS: .screen.is-today, ohne Scrollen auf dem Telefon)
   app.classList.add('is-today');
   document.body.classList.add('is-today');
-  addCleanup(() => { app.classList.remove('is-today'); document.body.classList.remove('is-today'); });
+  // v10 C: Comeback-/Reparatur-Karte über der Empfehlung; mit Karte darf Heute scrollen
+  const comeback = comebackCard(now, plan.href, habit.todayRounds);
+  if (comeback) { app.classList.add('has-comeback'); document.body.classList.add('has-comeback'); }
+  addCleanup(() => {
+    app.classList.remove('is-today', 'has-comeback'); document.body.classList.remove('is-today', 'has-comeback');
+  });
 
   appendChildren(app, [
     h('div', { class: 'today-head' },
       largeTitle(t(GREETING[daypart(new Date(now).getHours())]), dateLine(now, locale())),
       statusLine({ todayRounds: habit.todayRounds, goalRounds: habit.goalRounds, streak: habit.streak, freezes: habit.freezes, startHint: true })),
     h('div', { class: 'today-main' },
+      comeback,
       hero(rec, plan, gap, fresh, example, goal),
       h('nav', { class: `today-tiles${tiles.length % 2 ? ' is-odd' : ''}`, 'aria-label': t('home.otherTitle') }, ...tiles)),
     more,
