@@ -19,7 +19,7 @@ const quiet = (over: Partial<GoalInput> = {}): GoalInput => ({
   badges: { input: badgeInput(), tiers: {} },
   cardSkills: [],
   xp: { level: 1, into: 0, needed: 500 },
-  habit: { todayRounds: 0, goalRounds: 3 },
+  habit: { todayRounds: 3, goalRounds: 3 }, // Tagesziel erreicht: kein Ersatz-Ziel
   ...over,
 });
 
@@ -46,8 +46,13 @@ test('Liga-Grenze: Stufe bereits erreicht oder Fortschritt 0 zählt nicht', () =
   assert.deepEqual(nextGoals(quiet({ rating: 400, tier: tierIndex(400) }), 5).filter((g) => g.kind === 'league'), []);
 });
 
-test('Tagesziel: 0 und erreicht fallen weg, Teilfortschritt zählt', () => {
-  assert.deepEqual(nextGoals(quiet({ habit: { todayRounds: 0, goalRounds: 3 } }), 5), []);
+test('Tagesziel: erreicht fällt weg, Teilfortschritt zählt, 0 nur als Ersatz ohne andere Ziele', () => {
+  const [fresh, ...rest] = nextGoals(quiet({ habit: { todayRounds: 0, goalRounds: 3 } }), 5);
+  assert.equal(fresh?.kind, 'goal', 'neuer Tag ohne anderes Ziel: Tagesziel als Anstoß');
+  assert.equal(fresh?.remaining, 3);
+  assert.deepEqual(rest, []);
+  const withOther = nextGoals(quiet({ habit: { todayRounds: 0, goalRounds: 3 }, xp: { level: 2, into: 400, needed: 1000 } }), 5);
+  assert.deepEqual(withOther.map((g) => g.kind), ['level'], 'gibt es ein angefangenes Ziel, kein Ersatz');
   assert.deepEqual(nextGoals(quiet({ habit: { todayRounds: 3, goalRounds: 3 } }), 5), []);
   const [g] = nextGoals(quiet({ habit: { todayRounds: 1, goalRounds: 3 } }), 5);
   assert.ok(g);

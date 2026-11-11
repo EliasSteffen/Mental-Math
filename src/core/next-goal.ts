@@ -117,6 +117,7 @@ function goalGoal(i: GoalInput): NextGoal | null {
 
 /**
  * Nächste Ziele, größter Fortschritt zuerst. Nur Schritte mit 0 < Fortschritt < 1 zählen (Anfang und Erreichtes fallen weg);
+ * gibt es keinen, bleibt das noch offene Tagesziel als Anstoß;
  * bei Gleichstand gilt GOAL_ORDER. `max` begrenzt die Zahl (Heute und Ergebnis zeigen eines).
  */
 export function nextGoals(input: GoalInput, max = 2): NextGoal[] {
@@ -129,6 +130,11 @@ export function nextGoals(input: GoalInput, max = 2): NextGoal[] {
   const goal = goalGoal(input);
   if (goal) all.push(goal);
   const open = all.filter((g) => g.progress > 0 && g.progress < 1 && g.remaining > 0);
+  // Neuer Tag ohne Teilfortschritt: das Tagesziel bleibt als Anstoß sichtbar (statt einer leeren Zeile)
+  if (!open.length) {
+    const goal = all.find((g) => g.kind === 'goal' && g.remaining > 0 && g.progress < 1);
+    return goal ? [goal] : [];
+  }
   open.sort((a, b) => b.progress - a.progress || GOAL_ORDER.indexOf(a.kind) - GOAL_ORDER.indexOf(b.kind));
   return open.slice(0, Math.max(0, Math.floor(max)));
 }
