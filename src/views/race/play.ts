@@ -15,7 +15,7 @@ import { h, svg } from '../../ui/dom.ts';
 import { button, focusHead } from '../../ui/kit.ts';
 import { dock } from '../../ui/dock.ts';
 import { numpad } from '../../ui/keypad.ts';
-import { confirmDialog, isModalOpen } from '../../ui/modal.ts';
+import { isModalOpen, openModal } from '../../ui/modal.ts';
 import { isSheetOpen } from '../../ui/sheet.ts';
 import { renderExhibit } from '../../ui/exhibit.ts';
 import { createAnswer, type AnswerControls } from '../train/answer.ts';
@@ -114,6 +114,7 @@ export function playRace(o: RacePlayOptions): RacePlayHandle {
   let index = 0;
   let phase: 'count' | 'run' | 'over' = 'count';
   let stopped = false;
+  let abortDlg: { close(): void } | null = null;
   let answer: AnswerControls | null = null;
   let answered = false;
   let curDock: HTMLElement;
@@ -137,8 +138,18 @@ export function playRace(o: RacePlayOptions): RacePlayHandle {
   const head = focusHead({
     closeLabel: t('race.abort'),
     onClose: () => {
-      void confirmDialog(t('race.abortText'), { title: t('race.abortTitle'), confirmLabel: t('race.abortConfirm'), danger: true })
-        .then((yes) => { if (yes && !stopped) { stop(); o.onExit(); } });
+      if (abortDlg || stopped) return;
+      // Die Zeit läuft weiter; endet das Rennen hinter dem Dialog, schließt end() ihn.
+      let yes = false;
+      abortDlg = openModal({
+        title: t('race.abortTitle'),
+        body: h('p', null, t('race.abortText')),
+        actions: [
+          { label: t('settings.cancel') },
+          { label: t('race.abortConfirm'), danger: true, onClick: () => { yes = true; } },
+        ],
+        onClose: () => { abortDlg = null; if (yes && !stopped) { stop(); o.onExit(); } },
+      });
     },
     ...(o.title ? { title: o.title } : {}),
     children: [h('span', { class: 'race-head-gap' }), score, clk.el],
@@ -260,6 +271,7 @@ export function playRace(o: RacePlayOptions): RacePlayHandle {
     if (phase === 'over') return;
     phase = 'over';
     answer = null;
+    abortDlg?.close();
     const finalMs = Math.min(durationMs, Math.round(performance.now() - startPerf));
     paintTrack(finalMs, true);
     clk.set(0, true);
@@ -301,6 +313,7 @@ export function playRace(o: RacePlayOptions): RacePlayHandle {
   function stop(): void {
     if (stopped) return;
     stopped = true;
+    abortDlg?.close();
     cancelAnimationFrame(raf);
     if (tick !== null) { clearInterval(tick); tick = null; }
     for (const id of timers) clearTimeout(id);
