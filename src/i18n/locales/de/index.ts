@@ -22,5 +22,6 @@ import { duel } from './duel.ts'; // v9 I
 import { rewards } from './rewards.ts'; // v9 J
 import { goals } from './goals.ts'; // v10 F
 import { shop } from './shop.ts'; // v10 P
+import { quests } from './quests.ts'; // v10 Q
 
-export const dict = { tour, common, home, train, parallel, chain, custom, analyse, lernen, settings, release, core, account, sol, onboarding, guide, compete, placement, recap, cases, duel, rewards, goals, shop } as const;
+export const dict = { tour, common, home, train, parallel, chain, custom, analyse, lernen, settings, release, core, account, sol, onboarding, guide, compete, placement, recap, cases, duel, rewards, goals, shop, quests } as const;
