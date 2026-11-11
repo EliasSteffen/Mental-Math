@@ -26,10 +26,10 @@ await initStorage();
 setPlacement(getSettings().placement?.theta ?? null);
 onChange(() => setPlacement(getSettings().placement?.theta ?? null));
 
-// Einführung nur bei Neuinstallation – vor maybeShowWhatsNew() entscheiden, das dabei lastSeenVersion setzt.
-// Beide schließen sich aus: „Was ist neu?“ bleibt bei Neuinstallationen stumm (merkt sich nur die Version).
-const { onboardingDone, lastSeenVersion } = getSettings();
-const firstRun = shouldShowOnboarding({ onboardingDone, lastSeenVersion, attempts: getAttempts().length });
+// Einführung, bis der Nutzer im Dialog gewählt hat (onboardingDone) – unabhängig von „Was ist neu?“. Bei Neuinstallationen
+// bleibt maybeShowWhatsNew() stumm (merkt sich nur die Version).
+const { onboardingDone } = getSettings();
+const firstRun = shouldShowOnboarding({ onboardingDone, attempts: getAttempts().length });
 
 /** Startschritt ausführen; ein Fehler darf die übrigen Schritte nicht verhindern (sonst bleibt die Seite leer). */
 const safely = (label: string, fn: () => unknown): void => {

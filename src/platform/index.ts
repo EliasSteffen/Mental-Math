@@ -97,6 +97,14 @@ export async function shareImage(blob: Blob, fileName: string, text: string): Pr
   }
 }
 
+/**
+ * mailto:-Link (Feedback, v9 F) öffnen: im Browser die Mail-App; in der App übergibt die WebView mailto: an das System
+ * (native.ts fängt nur http(s) ab). Die Seite bleibt dabei stehen.
+ */
+export function openMailto(url: string): void {
+  location.href = url;
+}
+
 /** Notfall „App-Cache leeren“: Website ohne alten Service-Worker-Stand neu laden; in der App nur neu laden. */
 export function resetAppCache(): Promise<void> {
   if (isNative()) { location.reload(); return Promise.resolve(); }
