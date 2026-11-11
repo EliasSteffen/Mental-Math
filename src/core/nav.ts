@@ -7,7 +7,8 @@ export type RouteName =
   | 'today' | 'progress' | 'profile' | 'achievements' | 'learn' | 'chain' | 'case' | 'parallel' | 'custom'
   | 'compete' | 'board' | 'challenge' | 'placement' | 'duel' | 'quests' | 'train'
   | 'race' | 'race-reihum' // v12 R1: Raketen-Rennen (Übersicht, „Reihum“ im Fokus-Modus)
-  | 'race-group'; // v12 R2: Geister-Rennen einer Gruppe (Fokus-Modus)
+  | 'race-group' // v12 R2: Geister-Rennen einer Gruppe (Fokus-Modus)
+  | 'race-live'; // v12 R3: Live-Rennen (Fokus-Modus)
 
 export interface ShellState {
   /** Aktiver Tab; null = kein Tab */

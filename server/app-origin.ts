@@ -17,6 +17,7 @@ export async function withAppCors(req: Request, next: () => Promise<Response>): 
   if (!isAppOrigin(req)) return next();
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: { ...CORS_HEADERS, Vary: 'Origin' } });
   const res = await next();
+  if (res.status === 101) return res; // WebSocket-Upgrade (Live-Rennen): die Antwort darf nicht kopiert werden
   // Kopie, weil die Header der Antwort unveränderlich sein können
   const out = new Response(res.body, res);
   for (const [k, v] of Object.entries(CORS_HEADERS)) out.headers.set(k, v);

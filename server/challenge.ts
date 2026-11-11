@@ -23,6 +23,8 @@ import { _resetRaceState, createRpcRaceStore, handleRace } from './race.ts'; // 
 import type { RaceStore } from './race.ts'; // v12 R2
 import { challengeChecks, durableLimiter, memoryLimiter } from './rate-limit.ts';
 import type { DoNamespace, RateLimiter } from './rate-limit.ts';
+import { TICKET_PATH_RE, raceTicketRoute } from './race-ticket.ts'; // v12 R3
+import type { RaceInfo } from '../src/core/race-room.ts'; // v12 R3 (TODO(v12-merge): aus race-api.ts)
 
 const BASE = '/api/challenge';
 const MAX_BODY = 16_384;
@@ -53,6 +55,8 @@ export interface ChallengeDeps {
   league?: LeagueStore; // v9 K
   /** Statt der SQL-Funktionen aus 008_races.sql (Tests) */
   race?: RaceStore; // v12 R2
+  /** Live-Rennen (v12 R3): Rennen samt Mitgliedschaft; die Hauptsession verdrahtet beim Merge `RaceStore.info` von R2 */
+  raceInfo?: (raceId: string, userId: string) => Promise<{ race: RaceInfo; member: boolean } | null>;
 }
 
 type ErrorCode =
@@ -467,6 +471,7 @@ export async function handleChallenge(req: Request, env: ChallengeEnv, deps: Cha
   try {
     ctx.userId = await userOf(req, verify);
     if (req.headers.get('Authorization') && !ctx.userId) return fail('unauthorized');
+    if (req.method === 'POST' && TICKET_PATH_RE.test(path)) { const r = await raceTicketRoute({ path, userId: ctx.userId, now, key: env.AUTH_JWT_KEY, info: deps.raceInfo ?? ((id, u) => ctx.race.info(id, u)), name: async (u) => (await ctx.store.profile(u))?.displayName ?? null }); return json(r.status, r.body); } // v12 R3
     if (path.startsWith('/race/')) { // v12 R2: Raketen-Rennen (Geister, Live-Zeiten)
       const r = await handleRace({ store: ctx.race, userId: ctx.userId, now, random: ctx.random, body: () => readBody(req) }, req.method, path, url.searchParams); // v12 R2
       if (r) return json(r.status, r.body); // v12 R2

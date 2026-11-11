@@ -115,7 +115,7 @@ export interface RaceBoardRow { rank: number; name: string; me: boolean; correct
 **Ablauf**:
 1. Host im Gruppen-Sheet: „Live-Rennen“ → `POST /race/create { kind: 'live', config }` → Lobby `#/rennen/<id>/live`.
 2. Mitglieder sehen im Gruppen-Sheet/Wettkampf „Live-Rennen offen – beitreten“ (Abfrage `GET /race/list`), Link teilbar.
-3. Verbindung: `POST /race/:id/ticket` → kurzlebiges, signiertes Ticket (60 s, HMAC mit `AUTH_JWT_KEY`, enthält userId, Name, raceId) → WebSocket `wss://…/api/race/live/<id>?t=<ticket>`; das Durable Object prüft das Ticket (Schlüssel als Worker-Secret).
+3. Verbindung: `POST /race/:id/ticket` → kurzlebiges, signiertes Ticket (60 s, HMAC mit `AUTH_JWT_KEY`, enthält userId, Name, raceId) → WebSocket `wss://…/api/race/live/<id>?t=<ticket>`; die Pages Function prüft das Ticket (sie hat `AUTH_JWT_KEY`) und gibt die geprüfte Identität (Nutzer, Name, Dauer) in internen Headern an das Durable Object weiter – der Worker hat keine öffentliche Adresse (`workers_dev = false`), das Durable Object darf den Headern trauen und braucht **kein Secret**. Das Ticket trägt zusätzlich `d` (Dauer in s, vom Server aus der Rennkonfiguration).
 4. **Lobby**: Liste der Verbundenen; Host tippt „Start“ (ab 2 Spielern) → Server setzt `starts_at = jetzt + 5 s` (`POST /race/:id/go`), Durable Object sendet `start { startsAt }` an alle → synchroner Countdown nach Serverzeit (Uhrversatz per `ping/pong` ausgleichen).
 5. **Rennen**: Clients senden je Antwort `{ i, ok, ms }` (nur Anzeige), das Durable Object verteilt Positionen gebündelt (≤ 5 × pro Sekunde); `RaceOpponents` liefert sie live.
 6. **Ende**: nach Dauer + 3 s sendet das Durable Object `end`; jeder Client gibt seine Antworten wie R2 ab; Ergebnis-Bildschirm zeigt das Podest, sobald alle (oder nach 10 s die Vorhandenen) abgegeben haben.
@@ -124,11 +124,11 @@ export interface RaceBoardRow { rank: number; name: string; me: boolean; correct
 
 **Kern** `src/core/race-room.ts` (DOM-frei, im Worker **und** in Tests genutzt): Zustandsautomat Lobby → Countdown → Läuft → Ende mit Nachrichten-Typen und Prüfungen (nur Host startet, ≥ 2 Spieler, Nachrichten nach Ende ignoriert, Positionen monoton). Tests `tests/v12-race-room.test.ts`; Ticket-Signatur/Prüfung `tests/v12-race-ticket.test.ts`.
 
-**Doku**: README-Abschnitt „Live-Rennen (einmalig einrichten)“: Worker deployen (Workflow „Deploy Race Room“ bzw. `npx wrangler deploy --config workers/race-room/wrangler.toml`), Secret setzen, Binding `RACE_ROOM` im Pages-Projekt (Production und Preview), neu deployen.
+**Doku**: README-Abschnitt „Live-Rennen (einmalig einrichten)“: Worker deployen (Workflow „Deploy Race Room“ bzw. `npx wrangler deploy --config workers/race-room/wrangler.toml`), Binding `RACE_ROOM` im Pages-Projekt (Production und Preview), neu deployen.
 
 ## 4a. Was der Product Owner einmalig tun muss
 1. `sql/008_races.sql` im Supabase-SQL-Editor ausführen (nach 006/007).
-2. Live: Worker „mental-math-race-room“ deployen, Secret für die Ticket-Prüfung setzen, Binding `RACE_ROOM` anlegen, neu deployen.
+2. Live: Worker „mental-math-race-room“ deployen (Workflow „Deploy Race Room“), Binding `RACE_ROOM` im Pages-Projekt anlegen (Production und Preview), neu deployen. Kein Secret nötig.
 Ohne 1 bzw. 2 sind die Gruppen- bzw. Live-Rennen ausgeblendet; „Reihum“ funktioniert immer.
 
 ## 5. Integration (Hauptsession)

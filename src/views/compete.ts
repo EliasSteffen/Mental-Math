@@ -30,6 +30,7 @@ import { boardList } from './leaderboard.ts';
 import { duelCard } from './duel.ts'; // v9 I
 import { raceCard } from './race/index.ts'; // v12 R1
 import { groupRacesBlock, raceSheetRow } from './race/group.ts'; // v12 R2
+import { liveRaceButton } from './race/live.ts'; // v12 R3
 import { challengeTitle, errorText, notice, participantsText, profileForm, stateValue, whenLine } from './compete-ui.ts';
 
 /** So viele Plätze zeigt die Vorschau der Tagesrangliste ab 720 px. */
@@ -263,6 +264,7 @@ function groupSheet(g: GroupInfo): void {
       h('p', { class: 'compete-code-value num' }, g.code),
       h('p', { class: 'prof-sheet-text' }, g.members === 1 ? t('compete.groupMembersOne') : t('compete.groupMembers', { n: g.members }))),
     invite,
+    liveRaceButton(g, closeSheet), // v12 R3
     list([
       row({ icon: 'trophy', label: t('compete.groupBoard'), href: `#/rangliste?group=${g.id}`, onClick: closeSheet }),
       row({ icon: 'bars', label: t('compete.groupWeek'), href: `#/rangliste?tab=week&group=${g.id}`, onClick: closeSheet }),
