@@ -4,6 +4,8 @@ Stand: 2026-11-11 · **umgesetzt in 2.2.0** (Pakete P, C, F, Q) · Basis war `de
 
 Wunsch des Product Owners (2026-11-11): „XP bekommt einen Sinn“, „Comeback und Serie reparieren“, „sichtbarer Fortschritt“, „Tagesquests und Wochentruhen“. Keine Freundesliste, ruhiges Design bleibt.
 
+> **Nachtrag 2.3.0 (Wirtschaft neu abgestimmt):** Die Preise und Belohnungen unten waren zu günstig – Sammler hatten nach wenigen Tagen alles. Neu: Freeze 6.000; Themes 40.000 / 60.000 / 90.000; Rahmen 30.000 / 75.000 / 150.000; Quests 300 / 600 / 1.000 XP; Truhen 2.000–3.000 / 5.000–7.000 (+ Freeze, sonst +3.000) / 10.000–15.000 (+ Rahmen, sonst +5.000); Comeback +1.000; Serien-Reparatur 12.000 XP. Ziel: alle Sammelobjekte für fleißige Spieler in rund 7 Wochen, für gelegentliche in mehreren Monaten; ein Freeze kostet etwa einen Spieltag. Werte in `src/core/shop.ts`, `src/core/quests.ts`, `src/core/comeback.ts`.
+
 | Paket | Inhalt | Modell |
 |---|---|---|
 | **P** | XP-Shop: Freezes, neue Themes, Emblem-Rahmen; Guthaben überall sichtbar | sonnet |

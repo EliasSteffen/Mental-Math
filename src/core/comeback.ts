@@ -6,9 +6,9 @@ import { dayKey } from './progress.ts';
 import { levelFor, subtypeStats } from './scoring.ts';
 
 export const COMEBACK_MIN_DAYS = 3; // so lange weg (letzter aktiver Tag vor heute ≤ heute − 3)
-export const COMEBACK_XP = 300;
+export const COMEBACK_XP = 1000;
 export const REPAIR_ROUNDS = 3; // Runden heute insgesamt (1 hält heute, 2 reparieren gestern)
-export const REPAIR_XP = 2000; // oder so viele XP einsetzen
+export const REPAIR_XP = 12000; // oder so viele XP einsetzen (teurer als zwei Freezes: vorbeugen lohnt sich)
 export const REPAIR_MIN_STREAK = 3; // nur Serien ab 3 Tagen
 export const REPAIR_COOLDOWN_DAYS = 30; // höchstens eine Reparatur in 30 Tagen
 export const WARMUP_TASKS = 5;
