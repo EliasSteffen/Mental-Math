@@ -6,9 +6,10 @@ const DATE = '2026-10-30';
 export const RELEASES: Release[] = [
   {
     version: '2.3.0', date: '2026-11-11',
-    title: { de: 'Neu sortiert', en: 'Neatly reorganized' },
+    title: { de: 'Neu sortiert & Raketen-Rennen', en: 'Reorganized & rocket race' },
     tour: 'v2',
     highlights: [
+      { de: 'Neu: das Raketen-Rennen. Reihum auf einem Gerät bekommen alle dieselben Aufgaben – wer in 30 bis 120 Sekunden am meisten richtig löst, fliegt am höchsten. Danach Zeitraffer und Podest. Du findest es unter Wettkampf und auf Heute unter „Weitere Modi“.', en: 'New: the rocket race. Taking turns on one device, everyone gets the same tasks – whoever solves the most in 30 to 120 seconds flies highest. Then a time-lapse and a podium. Find it under Compete and on Today under “More modes”.' },
       { de: 'Vier Tabs: Heute, Lernen, Erfolge und Wettkampf. Profil und Einstellungen findest du jetzt hinter deinem Liga-Emblem oben rechts, auf dem iPad unten in der Seitenleiste. „Schließen“ bringt dich zurück, wo du warst.', en: 'Four tabs: Today, Learn, Achievements and Compete. Your profile and settings now sit behind your league emblem at the top right, on iPad at the bottom of the sidebar. “Close” takes you back to where you were.' },
       { de: 'Aus Fortschritt wird Erfolge: Spielerkarte, Quests, Liga, Orden, Trick-Karten und Shop auf einen Blick. Deine Statistik findest du unter Erfolge → Statistik.', en: 'Progress becomes Achievements: player card, quests, league, badges, trick cards and shop at a glance. Your statistics are under Achievements → Statistics.' },
       { de: 'Heute hat eine eigene Kachel für den Mini-Case. Wer neu ist, bekommt den Einstufungstest gleich als Empfehlung.', en: 'Today has its own tile for the mini case. If you are new, the placement test is suggested right away.' },

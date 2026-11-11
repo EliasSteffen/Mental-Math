@@ -6,8 +6,9 @@ Alle nennenswerten Änderungen an Mental Math. Format nach [Keep a Changelog](ht
 
 ## [2.3.0] - 2026-11-11
 
-### Neu sortiert
+### Neu sortiert & Raketen-Rennen
 
+- Neu: das Raketen-Rennen. Reihum auf einem Gerät bekommen alle dieselben Aufgaben – wer in 30 bis 120 Sekunden am meisten richtig löst, fliegt am höchsten. Danach Zeitraffer und Podest. Du findest es unter Wettkampf und auf Heute unter „Weitere Modi“.
 - Vier Tabs: Heute, Lernen, Erfolge und Wettkampf. Profil und Einstellungen findest du jetzt hinter deinem Liga-Emblem oben rechts, auf dem iPad unten in der Seitenleiste. „Schließen“ bringt dich zurück, wo du warst.
 - Aus Fortschritt wird Erfolge: Spielerkarte, Quests, Liga, Orden, Trick-Karten und Shop auf einen Blick. Deine Statistik findest du unter Erfolge → Statistik.
 - Heute hat eine eigene Kachel für den Mini-Case. Wer neu ist, bekommt den Einstufungstest gleich als Empfehlung.
