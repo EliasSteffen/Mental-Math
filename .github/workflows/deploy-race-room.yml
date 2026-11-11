@@ -1,0 +1,41 @@
+# Deployt den Worker mit dem Durable Object für Live-Rennen (workers/race-room).
+# Getrennt vom Pages-Deploy: Der API-Token braucht zusätzlich „Account · Workers Scripts · Edit“ (siehe README → Live-Rennen).
+name: Deploy Race Room
+
+on:
+  push:
+    branches: [release]
+    paths:
+      - workers/race-room/**
+      - src/core/race-room.ts
+      - server/race-live.ts
+      - server/race-ticket.ts
+      - .github/workflows/deploy-race-room.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-race-room
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: node --test tests/v12-race-room.test.ts
+      - uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: workers/race-room
+          wranglerVersion: '4.156.0'
+          command: deploy

@@ -208,6 +208,22 @@ Pages Functions können keine eigenen Durable Objects definieren. Deshalb stellt
 3. Binding anlegen: *Workers & Pages → mental-math → Settings → Bindings → Add → Durable Object*, Variable `RATE_LIMITER`, Namespace `mental-math-rate-limiter_RateLimiter` – für Production (und bei Bedarf Preview), danach neu deployen.
 4. Optional zusätzlich: eine WAF-Rate-Limiting-Regel für `/api/` auf der Zone `elias-steffen.de` (Free Plan: 1 Regel, 10-Sekunden-Fenster).
 
+### Live-Rennen (einmalig einrichten)
+
+Live-Rennen in Gruppen (Raketen-Rennen, Lobby, gemeinsamer Countdown, Raketen der anderen in Echtzeit) brauchen einen WebSocket-Treffpunkt. Wie beim Rate-Limit stellt ein kleiner Worker (`workers/race-room`, Name `mental-math-race-room`, ohne öffentliche Route) das Durable Object `RaceRoom` bereit, eine Instanz je Rennen. Es ist nur Treffpunkt und Taktgeber (Lobby, Startzeit, Positionen); gewertet wird wie bei Geister-Rennen über `POST /api/challenge/race/:id/finish`. Ablauf: Die App holt per `POST /api/challenge/race/:id/ticket` ein 60 Sekunden gültiges, mit `AUTH_JWT_KEY` signiertes Ticket (nur Mitglieder, nur Live-Rennen), verbindet sich mit `wss://…/api/race/live/<id>?t=<ticket>`, und die Pages Function `functions/api/race/live` prüft das Ticket und reicht den Upgrade an das Durable Object weiter. Weil der Worker nur über das Binding erreichbar ist, vertraut das Durable Object den Headern dieser Function – **er braucht kein eigenes Secret**.
+
+1. API-Token mit **Account · Workers Scripts · Edit** (wie beim Rate-Limit; Dashboard → *My Profile → API Tokens*).
+2. Worker deployen: *Actions → Deploy Race Room → Run workflow* (läuft danach automatisch bei Änderungen unter `workers/race-room/`), oder lokal:
+
+   ```bash
+   npx wrangler deploy --config workers/race-room/wrangler.toml
+   ```
+
+3. Binding anlegen: *Workers & Pages → mental-math → Settings → Bindings → Add → Durable Object*, Variable `RACE_ROOM`, Namespace `mental-math-race-room_RaceRoom` – für Production **und** Preview, danach neu deployen. `AUTH_JWT_KEY` ist schon gesetzt (Konto-Anmeldung).
+4. Voraussetzung sind außerdem die Gruppen-Rennen (`sql/008_races.sql`, Paket R2).
+
+Ohne Worker bzw. Binding antwortet `/api/race/live/` mit `503 unavailable`, die App blendet „Live-Rennen“ aus; Geister-Rennen und „Reihum“ funktionieren weiter.
+
 ## Erinnerungen (Push-Benachrichtigungen)
 
 Unter *Profil → Erinnerungen* (Liga-Emblem oben rechts, auf dem iPad „Profil“ in der Seitenleiste) schaltet man Push-Benachrichtigungen pro Gerät ein. Ein Konto ist dafür nicht nötig.
@@ -374,6 +390,7 @@ ios/                        ← Xcode-Projekt der iOS-App (Capacitor), eigene Pl
 capacitor.config.json       ← App-ID, Name, WebView-Optionen
 sql/                        ← Supabase-SQL der App (Trainingsdaten, Push + Cron, Challenges)
 workers/rate-limiter/       ← Worker mit dem Durable Object RateLimiter (eigener Deploy-Workflow)
+workers/race-room/          ← Worker mit dem Durable Object RaceRoom für Live-Rennen (eigener Deploy-Workflow)
 tests/                      ← node --test (*.test.ts)
 docs/                       ← SPEC, ARCHITECTURE, PLAN-*
 .github/workflows/deploy.yml  ← CI/CD: Tests + Build + Deploy auf Cloudflare Pages (PR- und develop-Vorschau, Produktion mit Release-Gate, Live-Update-Manifest)
