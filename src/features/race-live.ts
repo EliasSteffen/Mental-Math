@@ -1,6 +1,7 @@
 // Live-Rennen im Client (v12 R3): schlanke API-Aufrufe (Anlegen, Start, Abgabe, Ticket), WebSocket zum Rennraum mit Uhrabgleich
 // und Wiederverbinden, Gegner-Raketen aus den Live-Positionen. Die Regeln des Raums stehen in src/core/race-room.ts.
-// TODO(v12-merge): createLiveRace/getRaceInfo/goLive/submitAnswers auf src/features/race-sync.ts (R2) umstellen.
+// Eigene schlanke Aufrufe statt race-sync.ts: `go` liest die Startzeit auch aus `409 already`, die Abgabe braucht das Ergebnis
+// sofort (Podest) statt der Offline-Outbox der Geister-Rennen. Routen und Formen wie PLAN-v12 §3a.
 import type { RaceConfig, RaceOpponents, RaceRun } from '../core/race.ts';
 import {
   clockOffset, parseServerMsg, type ClientMsg, type ClockSample, type PositionRow, type RaceBoardRow, type RaceInfo,
@@ -13,7 +14,7 @@ import { ChallengeError, type ChallengeErrorCode } from './challenge.ts';
 const TIMEOUT_MS = 15_000;
 const KNOWN: readonly string[] = [
   'invalid', 'unauthorized', 'not_found', 'closed', 'not_member', 'no_profile', 'full', 'too_many', 'rate_limited', 'server_error',
-  'unavailable',
+  'unavailable', 'already', 'no_run', 'not_started',
 ];
 
 /* ---------- HTTP (Routen aus PLAN-v12 §3a) ---------- */

@@ -4,7 +4,7 @@
 // als JWT durchgeht). Geprüft wird es von der Pages Function functions/api/race/live (server/race-live.ts); das Durable Object
 // im Worker vertraut den von ihr gesetzten Headern, weil der Worker nur über das Pages-Binding erreichbar ist (workers_dev = false).
 // WebCrypto: läuft in Cloudflare Workers/Pages und Node ≥ 20.
-import type { RaceInfo } from '../src/core/race-room.ts'; // TODO(v12-merge): aus race-api.ts
+import type { RaceInfo } from '../src/core/race-api.ts';
 
 /** Gültigkeit eines Tickets (nur für den Verbindungsaufbau nötig) */
 export const TICKET_TTL_MS = 60_000;

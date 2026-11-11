@@ -6,7 +6,7 @@ import type { TicketClaims, TicketRoute } from '../server/race-ticket.ts';
 import { RACE_HEADERS, handleRaceLive } from '../server/race-live.ts';
 import type { RaceLiveEnv, RoomStub } from '../server/race-live.ts';
 import { _resetChallengeState, handleChallenge } from '../server/challenge.ts';
-import type { Rpc } from '../server/challenge-store.ts';
+import { DbError, type Rpc } from '../server/challenge-store.ts';
 import type { RaceInfo } from '../src/core/race-room.ts';
 
 const KEY = 'k'.repeat(48);
@@ -105,8 +105,10 @@ describe('Route POST /race/:id/ticket', () => {
 });
 
 describe('Einhängen in /api/challenge', () => {
+  // race_get fehlt wie ohne SQL 008 (R2-Store über RPC) → 503 unavailable
   const rpc: Rpc = (fn) => {
     if (fn === 'challenge_profile_get' || fn.includes('profile')) return Promise.resolve([{ display_name: 'Anna', listed: true }]);
+    if (fn === 'race_get') return Promise.reject(new DbError('42883'));
     return Promise.resolve([]);
   };
   const call = (deps: Parameters<typeof handleChallenge>[2], auth = true): Promise<Response> =>
@@ -114,7 +116,7 @@ describe('Einhängen in /api/challenge', () => {
       new Request('https://x.test/api/challenge/race/race-abc/ticket', { method: 'POST', headers: auth ? { Authorization: 'Bearer token-of-user-1-xxxxxxxx' } : {} }),
       { AUTH_JWT_KEY: KEY }, { rpc, verify: (tk) => Promise.resolve(tk === 'token-of-user-1-xxxxxxxx' ? 'u1' : null), now: () => NOW, ...deps });
 
-  it('ohne R2-Store → 503 unavailable; mit Store → Ticket; ohne Anmeldung → 401', async () => {
+  it('ohne SQL 008 → 503 unavailable; mit Store → Ticket; ohne Anmeldung → 401', async () => {
     _resetChallengeState();
     const none = await call({});
     assert.equal(none.status, 503);

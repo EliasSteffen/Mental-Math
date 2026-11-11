@@ -7,20 +7,7 @@ import { RACE_DURATIONS, RACE_GRACE_MS, RACE_MAX_TASKS, cleanRaceName, type Race
 
 /* ---------- Typen aus der Schnittstelle R2 ↔ R3 (PLAN-v12 §3a) ---------- */
 
-// TODO(v12-merge): aus race-api.ts
-export type RaceKind = 'ghost' | 'live';
-// TODO(v12-merge): aus race-api.ts
-export type RunStatus = 'none' | 'running' | 'finished' | 'expired' | 'flagged';
-// TODO(v12-merge): aus race-api.ts
-export interface RaceInfo {
-  id: string; groupId: string; createdBy: string; createdByName: string; kind: RaceKind; config: RaceConfig; seed: number;
-  createdAt: string; startsAt: string | null; endsAt: string;
-}
-// TODO(v12-merge): aus race-api.ts
-export interface RaceBoardRow {
-  rank: number; name: string; me: boolean; correct: number; wrong: number; lastOkMs: number; status: RunStatus;
-  steps: Array<[number, 0 | 1]>;
-}
+export type { RaceBoardRow, RaceInfo, RaceKind, RunStatus } from './race-api.ts';
 
 /* ---------- Konstanten ---------- */
 

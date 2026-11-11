@@ -19,12 +19,12 @@ import { DbError, createRpcChallengeStore, supabaseRpc } from './challenge-store
 import type { AttemptRow, BoardRow, ChallengeRow, ChallengeStore, Rpc } from './challenge-store.ts';
 import { createRpcLeagueStore, getChampions, parseChampionCount, putLeague } from './league.ts'; // v9 K
 import type { LeagueStore } from './league.ts'; // v9 K
-import { _resetRaceState, createRpcRaceStore, handleRace } from './race.ts'; // v12 R2
+import { _resetRaceState, createRpcRaceStore, handleRace, isRaceMissing } from './race.ts'; // v12 R2, R3
 import type { RaceStore } from './race.ts'; // v12 R2
 import { challengeChecks, durableLimiter, memoryLimiter } from './rate-limit.ts';
 import type { DoNamespace, RateLimiter } from './rate-limit.ts';
 import { TICKET_PATH_RE, raceTicketRoute } from './race-ticket.ts'; // v12 R3
-import type { RaceInfo } from '../src/core/race-room.ts'; // v12 R3 (TODO(v12-merge): aus race-api.ts)
+import type { RaceInfo } from '../src/core/race-api.ts'; // v12 R3
 
 const BASE = '/api/challenge';
 const MAX_BODY = 16_384;
@@ -471,7 +471,12 @@ export async function handleChallenge(req: Request, env: ChallengeEnv, deps: Cha
   try {
     ctx.userId = await userOf(req, verify);
     if (req.headers.get('Authorization') && !ctx.userId) return fail('unauthorized');
-    if (req.method === 'POST' && TICKET_PATH_RE.test(path)) { const r = await raceTicketRoute({ path, userId: ctx.userId, now, key: env.AUTH_JWT_KEY, info: deps.raceInfo ?? ((id, u) => ctx.race.info(id, u)), name: async (u) => (await ctx.store.profile(u))?.displayName ?? null }); return json(r.status, r.body); } // v12 R3
+    if (req.method === 'POST' && TICKET_PATH_RE.test(path)) { // v12 R3: Ticket fürs Live-Rennen, Rennen aus dem R2-Store
+      try { // v12 R3
+        const r = await raceTicketRoute({ path, userId: ctx.userId, now, key: env.AUTH_JWT_KEY, info: deps.raceInfo ?? ((id, u) => ctx.race.info(id, u)), name: async (u) => (await ctx.store.profile(u))?.displayName ?? null }); // v12 R3
+        return json(r.status, r.body); // v12 R3
+      } catch (e) { if (isRaceMissing(e)) return json(503, { error: { code: 'unavailable' } }); throw e; } // v12 R3: SQL 008 fehlt
+    } // v12 R3
     if (path.startsWith('/race/')) { // v12 R2: Raketen-Rennen (Geister, Live-Zeiten)
       const r = await handleRace({ store: ctx.race, userId: ctx.userId, now, random: ctx.random, body: () => readBody(req) }, req.method, path, url.searchParams); // v12 R2
       if (r) return json(r.status, r.body); // v12 R2

@@ -303,8 +303,9 @@ describe('Gruppen-Rennen: Server', () => {
 
   it('unbekannte Race-Pfade und Methoden → wie bisher not_found/method', async () => {
     const race = await make(1);
+    // POST /race/:id/ticket gehört seit dem Merge mit R3 dem Live-Rennen (tests/v12-race-ticket.test.ts)
     assert.equal((await call('GET', `/race/${race.id}/ticket`, { user: 1 })).status, 404);
-    assert.equal((await call('POST', `/race/${race.id}/ticket`, { user: 1 })).status, 404);
+    assert.equal((await call('POST', `/race/${race.id}/nope`, { user: 1 })).status, 404);
     assert.equal((await call('GET', '/race/create', { user: 1 })).status, 404);
     assert.equal((await call('GET', '/race/', { user: 1 })).status, 404);
   });
