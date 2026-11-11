@@ -20,6 +20,8 @@ import { locale, t } from '../i18n/index.ts';
 import type { Recommendation } from '../types.ts';
 import { dateLine, daypart, goalDots, heroExample, heroPlan, timeGap, type HeroExample, type HeroPlan, type TimeGap } from './home-data.ts';
 import { levelFor } from '../core/scoring.ts'; // v9 H
+import { currentGoals } from '../features/goals.ts'; // v10 F
+import { nextGoalLine } from '../ui/goals.ts'; // v10 F
 
 const GREETING = { morning: 'home.greetMorning', day: 'home.greetDay', evening: 'home.greetEvening' } as const;
 
@@ -146,6 +148,7 @@ export function renderHome(): void {
     }));
   const goal = goalDotsEl(goalDots(habit.todayRounds, habit.goalRounds), habit.todayRounds, habit.goalRounds);
   const gap = timeGap(attempts, rec.subtype);
+  const nextGoal = currentGoals(1, now)[0] ?? null; // v10 F
   const stats = categoryStats(attempts);
   const daily = getDailyResults()[dayKey(now)];
 
@@ -220,7 +223,10 @@ export function renderHome(): void {
   appendChildren(app, [
     h('div', { class: 'today-head' },
       largeTitle(t(GREETING[daypart(new Date(now).getHours())]), dateLine(now, locale())),
-      statusLine({ todayRounds: habit.todayRounds, goalRounds: habit.goalRounds, streak: habit.streak, freezes: habit.freezes, startHint: true })),
+      // v10 F: Status und „Nächstes Ziel“ in einem Block (am breiten Layout nebeneinander)
+      h('div', { class: 'today-head-meta' },
+        statusLine({ todayRounds: habit.todayRounds, goalRounds: habit.goalRounds, streak: habit.streak, freezes: habit.freezes, startHint: true }),
+        nextGoal ? nextGoalLine(nextGoal) : null)),
     h('div', { class: 'today-main' },
       hero(rec, plan, gap, fresh, example, goal),
       h('nav', { class: `today-tiles${tiles.length % 2 ? ' is-odd' : ''}`, 'aria-label': t('home.otherTitle') }, ...tiles)),
