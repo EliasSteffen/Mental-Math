@@ -210,6 +210,13 @@ export interface Settings {
   // v9 A
   /** Nach einer richtigen Antwort kurz danach automatisch weiter */
   autoAdvance: boolean;
+  // v9 J (synchronisiert)
+  /** Liga: aktuelle Stufe 0–15 (Bronze I … Meister), höchste je erreichte und Zeitpunkt der letzten Änderung; null = noch nicht ausgewertet */
+  league: { tier: number; peak: number; ts: number } | null;
+  /** Orden: höchste je erreichte Stufe (1–3) je Orden-ID */
+  badges: Record<string, { tier: 1 | 2 | 3; ts: number }>;
+  /** Freigeschaltete Trick-Karten: Aufgabentyp → Zeitpunkt */
+  cards: Record<string, number>;
 }
 
 export interface ReviewItem { box: number; dueAt: number; lastTs: number }

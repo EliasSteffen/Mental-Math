@@ -143,3 +143,24 @@
     --focus-max:480px;
   }
 }
+
+@layer tokens {
+  /* ---------- Ligen und Seltenheit (v9 J): je Theme ≥ 3:1 zu Fläche und Hintergrund ---------- */
+  :root {
+    --league-bronze:#9C5B25; --league-silver:#6B7684; --league-gold:#9A7000; --league-platinum:#2B7F91;
+    --league-diamond:#2F6FCB; --league-master:#7E45BD; --league-champion:#BE3455;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme]) {
+      --league-bronze:#D9935A; --league-silver:#B4BDC9; --league-gold:#E3B341; --league-platinum:#5CC3D6;
+      --league-diamond:#6FA3F0; --league-master:#B98AF0; --league-champion:#F0708D;
+    }
+  }
+  :root[data-theme="night"], :root[data-theme="oled"], :root[data-theme="aurora"], :root[data-theme="neon"] {
+    --league-bronze:#D9935A; --league-silver:#B4BDC9; --league-gold:#E3B341; --league-platinum:#5CC3D6;
+    --league-diamond:#6FA3F0; --league-master:#B98AF0; --league-champion:#F0708D;
+  }
+  :root {
+    --rarity-common:var(--muted); --rarity-rare:var(--league-diamond); --rarity-epic:var(--league-master);
+  }
+}

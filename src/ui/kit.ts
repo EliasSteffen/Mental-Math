@@ -6,6 +6,7 @@
 import { appendChildren, h, svg, type Child } from './dom.ts';
 import { icon as iconFromSet, type IconName } from './charts.ts';
 import { t } from '../i18n/index.ts';
+import { masteryLevel } from '../core/mastery.ts'; // v9 J
 
 export type { IconName } from './charts.ts';
 export type Mastery = 'full' | 'half' | 'empty';
@@ -458,10 +459,7 @@ export function steps(items: readonly Child[]): HTMLOListElement {
 
 /** Meisterung aus dem Score (E8): ≥ 70 voll, 40–69 halb, sonst (auch ohne Daten) leer. */
 export function masteryOf(score: number | null | undefined): Mastery {
-  if (typeof score !== 'number' || !Number.isFinite(score)) return 'empty';
-  if (score >= 70) return 'full';
-  if (score >= 40) return 'half';
-  return 'empty';
+  return masteryLevel(score); // v9 J: Schwellen in core/mastery.ts
 }
 
 /** Meisterungs-Punkt 10 × 10 (voll, halb, leer), Farbe --accent, aria-hidden. */

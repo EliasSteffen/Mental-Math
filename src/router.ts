@@ -12,6 +12,7 @@ import { renderHome } from './views/home.ts';
 import { renderTrain } from './views/train/index.ts';
 import { renderLernen } from './views/lernen.ts';
 import { renderAnalyse } from './views/progress.ts';
+import { renderAchievements } from './views/achievements.ts'; // v9 J
 import { renderSettings } from './views/settings.ts';
 import { renderCompete } from './views/compete.ts';
 import { renderChallenge } from './views/challenge.ts';
@@ -65,6 +66,7 @@ type Route =
   | { name: 'today' }
   | { name: 'progress' }
   | { name: 'profile'; section: string | null }
+  | { name: 'achievements'; tab: string | null } // v9 J
   | { name: 'learn'; id: string | null; guide: boolean }
   | { name: 'chain' }
   | { name: 'case'; id: string | null } // v9 C: null = Auswahl, 'random' = Zufall
@@ -132,6 +134,7 @@ function parseRoute(): Route {
   const p1 = parts[1];
   if (p0 === 'fortschritt') return { name: 'progress' };
   if (p0 === 'profil') return { name: 'profile', section: p1 ?? null };
+  if (p0 === 'erfolge') return { name: 'achievements', tab: p1 ?? null }; // v9 J
   if (p0 === 'lernen') {
     const id = p1 && Object.hasOwn(SUBTYPES, p1) ? p1 : null;
     return { name: 'learn', id, guide: id !== null && parts[2] === 'schritte' };
@@ -163,7 +166,7 @@ function tabOf(route: Route): TabId | null {
     case 'case': return route.id ? null : 'today'; // v9 C: Auswahl mit Tableiste, Spiel im Fokus-Modus
     case 'compete': case 'board': case 'challenge': return 'compete';
     case 'learn': return 'learn';
-    case 'progress': return 'progress';
+    case 'progress': case 'achievements': return 'progress'; // v9 J
     case 'profile': return 'profile';
     default: return null;
   }
@@ -174,7 +177,7 @@ function tabOf(route: Route): TabId | null {
  * Training und geführtes Lernen bleiben bewusst außen vor: Neu zeichnen würde die laufende Runde abbrechen.
  */
 function redrawsOnLayout(route: Route): boolean {
-  return route.name === 'progress' || route.name === 'profile' || (route.name === 'learn' && !route.guide);
+  return route.name === 'progress' || route.name === 'achievements' || route.name === 'profile' || (route.name === 'learn' && !route.guide);
 }
 
 /** Schlüssel für die gemerkte Scroll-Position (nur Tab-Seiten; Lernen-Liste, -Detail und -Schritte getrennt). */
@@ -187,6 +190,7 @@ function scrollKey(route: Route): string | null {
 function routeTitle(route: Route): string | null {
   switch (route.name) {
     case 'progress': return t('analyse.title');
+    case 'achievements': return t('rewards.title'); // v9 J
     case 'profile': return t('settings.title');
     case 'learn': return t('lernen.title');
     case 'chain': return t('settings.routeChain');
@@ -204,6 +208,7 @@ function routeTitle(route: Route): string | null {
 
 function draw(route: Route): void {
   if (route.name === 'progress') renderAnalyse();
+  else if (route.name === 'achievements') renderAchievements(route.tab); // v9 J
   else if (route.name === 'learn') renderLernen(route.id, route.guide);
   else if (route.name === 'profile') renderSettings(route.section);
   else if (route.name === 'chain') renderChain();
