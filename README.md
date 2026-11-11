@@ -208,6 +208,22 @@ Pages Functions können keine eigenen Durable Objects definieren. Deshalb stellt
 3. Binding anlegen: *Workers & Pages → mental-math → Settings → Bindings → Add → Durable Object*, Variable `RATE_LIMITER`, Namespace `mental-math-rate-limiter_RateLimiter` – für Production (und bei Bedarf Preview), danach neu deployen.
 4. Optional zusätzlich: eine WAF-Rate-Limiting-Regel für `/api/` auf der Zone `elias-steffen.de` (Free Plan: 1 Regel, 10-Sekunden-Fenster).
 
+### Live-Rennen (einmalig einrichten)
+
+Live-Rennen in Gruppen (Raketen-Rennen, Lobby, gemeinsamer Countdown, Raketen der anderen in Echtzeit) brauchen einen WebSocket-Treffpunkt. Wie beim Rate-Limit stellt ein kleiner Worker (`workers/race-room`, Name `mental-math-race-room`, ohne öffentliche Route) das Durable Object `RaceRoom` bereit, eine Instanz je Rennen. Es ist nur Treffpunkt und Taktgeber (Lobby, Startzeit, Positionen); gewertet wird wie bei Geister-Rennen über `POST /api/challenge/race/:id/finish`. Ablauf: Die App holt per `POST /api/challenge/race/:id/ticket` ein 60 Sekunden gültiges, mit `AUTH_JWT_KEY` signiertes Ticket (nur Mitglieder, nur Live-Rennen), verbindet sich mit `wss://…/api/race/live/<id>?t=<ticket>`, und die Pages Function `functions/api/race/live` prüft das Ticket und reicht den Upgrade an das Durable Object weiter. Weil der Worker nur über das Binding erreichbar ist, vertraut das Durable Object den Headern dieser Function – **er braucht kein eigenes Secret**.
+
+1. API-Token mit **Account · Workers Scripts · Edit** (wie beim Rate-Limit; Dashboard → *My Profile → API Tokens*).
+2. Worker deployen: *Actions → Deploy Race Room → Run workflow* (läuft danach automatisch bei Änderungen unter `workers/race-room/`), oder lokal:
+
+   ```bash
+   npx wrangler deploy --config workers/race-room/wrangler.toml
+   ```
+
+3. Binding anlegen: *Workers & Pages → mental-math → Settings → Bindings → Add → Durable Object*, Variable `RACE_ROOM`, Namespace `mental-math-race-room_RaceRoom` – für Production **und** Preview, danach neu deployen. `AUTH_JWT_KEY` ist schon gesetzt (Konto-Anmeldung).
+4. Voraussetzung sind außerdem die Gruppen-Rennen (`sql/008_races.sql`, Paket R2).
+
+Ohne Worker bzw. Binding antwortet `/api/race/live/` mit `503 unavailable`, die App blendet „Live-Rennen“ aus; Geister-Rennen und „Reihum“ funktionieren weiter.
+
 ## Erinnerungen (Push-Benachrichtigungen)
 
 Unter *Profil → Erinnerungen* (Liga-Emblem oben rechts, auf dem iPad „Profil“ in der Seitenleiste) schaltet man Push-Benachrichtigungen pro Gerät ein. Ein Konto ist dafür nicht nötig.
@@ -332,13 +348,19 @@ Die Liga (Bronze I … Meister) berechnet jedes Gerät aus dem eigenen Können (
 
 **Schutz gegen Manipulation:** Die Wertung kommt vom Gerät und lässt sich nicht beweisen. Deshalb gilt: der Server prüft Bereich und Stufe (`tier` muss zur Wertung passen); höchstens 150 LP Zuwachs pro Berliner Tag gegenüber dem Tagesstart (die erste Meldung zählt ab 0, Bestandsnutzer mit hoher Wertung steigen also über einige Tage ein; Abstieg gilt sofort); Champion zählt nur mit Wertung ≥ 780 (Meister), einer Meldung in den letzten 30 Tagen und mindestens 3 beendeten **gewerteten** Dailys in diesen 30 Tagen (die der Server selbst prüft und bewertet); bei Gleichstand gewinnt, wer die Wertung früher erreicht hat. Namen erscheinen nur bei Zustimmung („Anonym“ sonst, die eigene Zeile zeigt den eigenen Namen). Moderation: `delete from public.league_scores where user_id = '…';` nimmt ein Konto aus der Liste (es meldet sich beim nächsten Mal wieder an; dauerhaft per `update public.challenge_attempts set status = 'flagged' …`, dann fehlen die gewerteten Dailys).
 
+## Gruppen-Rennen (einmalig einrichten)
+
+Das **Raketen-Rennen** (`#/rennen`) hat drei Spielweisen: „Reihum“ (ein Gerät, ohne Konto, läuft immer), **Geister-Rennen** in Gruppen (jede und jeder spielt einmal, wann es passt, gegen die Raketen der anderen) und Live-Rennen. Ein Geister-Rennen wird im Wettkampf-Tab über die Gruppe angelegt (Gruppe → „Raketen-Rennen“, offen 1 h / 24 h / 48 h / 7 Tage, höchstens 5 offene Rennen je Gruppe). Der Server (`server/race.ts`, Routen `/api/challenge/race/*`) erzeugt die Aufgaben aus dem Seed, wertet jede Abgabe mit derselben Bewertung wie im Training neu und speichert nur die Zeitleiste. Er verwirft Antworten nach Dauer + 3 s, markiert unplausible Läufe (richtige Antwort unter 250 ms, Zeiten nicht aufsteigend, später datiert als Zeit verging) als `flagged` (zählt nicht in der Rangliste) und lässt je Person genau einen Lauf zu.
+
+**Einrichten (einmalig):** `sql/008_races.sql` im Supabase-SQL-Editor ausführen, nach `sql/006_challenges.sql` (idempotent, rein hinzufügend, nur `service_role`; legt `public.races`, `public.race_runs` und die Funktionen `race_*` an). Weitere Variablen braucht es nicht. Solange das SQL fehlt, antwortet der Server mit `503 unavailable` und die App blendet die Gruppen-Rennen aus – Vorschau und Produktion teilen dieselbe Datenbank. Beendete Rennen werden rund 120 Tage nach ihrem Ende beim Anlegen eines neuen Rennens gelöscht.
+
 ## Daten
 
 Fortschritt und Statistiken liegen lokal in IndexedDB. Ohne Konto bleibt alles auf dem Gerät, es gibt kein Tracking. Mit Konto (Passkey) werden die Trainingsdaten über Supabase zwischen deinen Geräten synchronisiert. In den Einstellungen lassen sich die Daten als JSON exportieren, importieren oder löschen.
 
 **Wiederherstellungscode:** Beim Anlegen des Kontos zeigt die App einmalig einen Code (20 Zeichen). Wer alle Passkeys verliert, legt damit unter *Einstellungen → Daten & Account → Passkey verloren?* einen neuen Passkey an; danach gibt es einen neuen Code. Gespeichert wird nur ein SHA-256-Hash.
 
-**Supabase-SQL (einmalig, in dieser Reihenfolge im SQL-Editor):** `packages/passkey-auth/sql/001_passkey_auth.sql`, `packages/offline-sync/sql/offline_sync_guard.sql`, `sql/002_training_data.sql`, `packages/passkey-auth/sql/003_recovery_codes.sql`, für Erinnerungen außerdem `sql/004_push.sql` und `sql/005_push_cron.sql`, für Ranglisten und Wettbewerbe `sql/006_challenges.sql`. Alle Skripte sind idempotent.
+**Supabase-SQL (einmalig, in dieser Reihenfolge im SQL-Editor):** `packages/passkey-auth/sql/001_passkey_auth.sql`, `packages/offline-sync/sql/offline_sync_guard.sql`, `sql/002_training_data.sql`, `packages/passkey-auth/sql/003_recovery_codes.sql`, für Erinnerungen außerdem `sql/004_push.sql` und `sql/005_push_cron.sql`, für Ranglisten und Wettbewerbe `sql/006_challenges.sql`, für Gruppen-Rennen `sql/008_races.sql`. Alle Skripte sind idempotent.
 
 **Update auf 1.14.0:** `packages/passkey-auth/sql/001_passkey_auth.sql` (Gnadenfrist und Wiederverwendungserkennung beim Refresh, Sitzungen höchstens 90 Tage) und `sql/002_training_data.sql` (Löschen samt Lösch-Markierung in einem Aufruf) erneut einspielen. Beide sind idempotent; ob zuerst SQL oder Server ausgerollt wird, ist egal.
 
@@ -374,6 +396,7 @@ ios/                        ← Xcode-Projekt der iOS-App (Capacitor), eigene Pl
 capacitor.config.json       ← App-ID, Name, WebView-Optionen
 sql/                        ← Supabase-SQL der App (Trainingsdaten, Push + Cron, Challenges)
 workers/rate-limiter/       ← Worker mit dem Durable Object RateLimiter (eigener Deploy-Workflow)
+workers/race-room/          ← Worker mit dem Durable Object RaceRoom für Live-Rennen (eigener Deploy-Workflow)
 tests/                      ← node --test (*.test.ts)
 docs/                       ← SPEC, ARCHITECTURE, PLAN-*
 .github/workflows/deploy.yml  ← CI/CD: Tests + Build + Deploy auf Cloudflare Pages (PR- und develop-Vorschau, Produktion mit Release-Gate, Live-Update-Manifest)

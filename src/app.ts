@@ -8,6 +8,7 @@ import { detectLang, setLang } from './i18n/index.ts';
 import { restoreAccount, watchAccountRestore } from './features/account.ts';
 import { startSync } from './features/sync.ts';
 import { watchPending } from './features/challenge.ts';
+import { watchRacePending } from './features/race-sync.ts'; // v12 R2
 import { maybeShowWhatsNew } from './features/whats-new.ts';
 import { shouldShowOnboarding } from './features/onboarding.ts';
 import { markNavHintSeen } from './core/nav-hint.ts';
@@ -17,6 +18,7 @@ import { startPush } from './platform/reminders.ts';
 import { startAppUpdateCheck } from './features/app-store.ts';
 import { watchKeyboardInset } from './ui/keyboard-inset.ts';
 import { watchTextScale } from './ui/text-scale.ts';
+import { startEdgeSwipe } from './ui/edge-swipe.ts'; // Zurück-Wisch in der iOS-App
 import { startProgressRewards } from './features/rewards.ts'; // v9 J
 import { registerQuestHooks } from './features/quests.ts'; // v10 Q
 import { registerComebackHooks } from './features/comeback.ts'; // v10 C
@@ -48,9 +50,11 @@ safely('keyboard', () => { watchKeyboardInset(); }); // Sheets und Dialoge über
 safely('activity', startActivityTracker);
 safely('platform', startPlatform);
 safely('lang', () => setLang(detectLang(getSettings().lang)));
+safely('edge-swipe', startEdgeSwipe); // vor dem Router: meldet jede gezeichnete Seite dem Plugin bzw. führt die Web-Geste
 safely('router', startRouter); // zeichnet selbst fehlertolerant (Fehlerkarte statt leerer Seite)
 safely('account', () => { void restoreAccount(); });
 safely('account-watch', () => watchAccountRestore()); // Offline-Kaltstart: Anmeldung wiederherstellen, sobald das Netz zurück ist
+safely('race', () => watchRacePending()); // v12 R2: wartende Rennen-Abgabe senden
 safely('challenge', () => watchPending()); // Gewertete Challenge: offene Abgabe senden, sobald angemeldet bzw. wieder online
 safely('sync', startSync);
 safely('push', startPush);

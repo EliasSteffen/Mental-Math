@@ -68,6 +68,24 @@ export async function appStorePlugin(): Promise<AppStorePlugin> {
   return storePlugin;
 }
 
+/** Eigenes Plugin der App (ios/App/App/MainViewController.swift, ab dem App-Build mit Zurück-Wisch-Plugin). */
+export interface SwipeBackPlugin {
+  /** Zurück-Wisch (Rand-Geste von WebKit) für die Seite path (ohne „#“, ohne Query) an/aus. */
+  set(o: { path: string; enabled: boolean }): Promise<void>;
+}
+
+let swipePlugin: SwipeBackPlugin | null = null;
+
+/** SwipeBack als schlichtes Objekt (Proxy-`then`, siehe nativeAuthPlugin). */
+export async function swipeBackPlugin(): Promise<SwipeBackPlugin> {
+  const m = await loadNative();
+  if (!swipePlugin) {
+    const p = m.registerPlugin<SwipeBackPlugin>('SwipeBack');
+    swipePlugin = { set: (o) => p.set(o) };
+  }
+  return swipePlugin;
+}
+
 /** Antwort von LiveUpdate.info(); running/null: eingebautes Bundle, sonst Ordnername (Bundle-ID). */
 export interface LiveUpdateInfo {
   /** CFBundleShortVersionString des Binarys */

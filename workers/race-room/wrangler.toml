@@ -1,0 +1,17 @@
+# Worker mit dem Durable Object RaceRoom für Live-Rennen in Gruppen (siehe README → Live-Rennen (einmalig einrichten)).
+# Deploy: GitHub-Workflow „Deploy Race Room“ oder `npx wrangler deploy --config workers/race-room/wrangler.toml`.
+name = "mental-math-race-room"
+main = "src/index.ts"
+compatibility_date = "2025-09-01"
+# Keine öffentliche *.workers.dev-Adresse: das Durable Object ist nur über das Pages-Binding RACE_ROOM erreichbar.
+# Deshalb darf es den Headern der Pages Function trauen (Ticket-Prüfung dort) und braucht kein eigenes Secret.
+workers_dev = false
+
+[[durable_objects.bindings]]
+name = "RACE_ROOM"
+class_name = "RaceRoom"
+
+# SQLite-Backend: auf dem kostenlosen Workers-Plan verfügbar
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["RaceRoom"]

@@ -24,6 +24,15 @@
     @keyframes modal-in { from { transform:translateY(32px); opacity:0; } to { transform:none; opacity:1; } }
   }
 
+  /* Zurück-Wisch vom linken Rand (ui/edge-swipe.ts, nur iOS-App): die Seite folgt dem Finger, links fällt ein leichter Schatten */
+  html.is-edge-swiping, html.is-edge-swiping body { overflow-x:hidden; }
+  #app.is-swiping { transform:translateX(var(--swipe-x, 0px)); box-shadow:-10px 0 28px -10px var(--scrim); will-change:transform; }
+  #app.is-swipe-settle { transition:transform var(--dur-enter) var(--ease-out); }
+  @media (prefers-reduced-motion: no-preference) {
+    #app.swipe-arrive { animation:swipe-arrive var(--dur-state) var(--ease-out); }
+    @keyframes swipe-arrive { from { transform:translateX(-14px); opacity:.6; } to { transform:none; opacity:1; } }
+  }
+
   /* Seitenleiste: Eintrag „Profil“ nur ab 720 px, abgesetzt am unteren Rand */
   .tabbar-profile { display:none; }
   .tab-sub { display:none; }

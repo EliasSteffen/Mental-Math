@@ -4,6 +4,17 @@ Alle nennenswerten Änderungen an Mental Math. Format nach [Keep a Changelog](ht
 
 <!-- Automatisch erzeugt mit `npm run changelog` aus src/releases.ts – nicht von Hand bearbeiten. -->
 
+## [2.4.0] - 2026-11-11
+
+### Raketen-Rennen mit deiner Gruppe
+
+- Neu: Raketen-Rennen in Gruppen. Lege im Gruppen-Fenster ein Rennen an – 30 bis 120 Sekunden, eine Kategorie oder gemischt, offen für 1 Stunde bis 7 Tage. Alle spielen dieselben Aufgaben, wann es passt, gegen die Raketen der anderen.
+- Neu: Live-Rennen. Alle warten in der Lobby, starten gemeinsam auf ein Signal und sehen die Raketen der anderen in Echtzeit steigen. Bricht die Verbindung kurz ab, verbindet sich die App von selbst neu.
+- Nach deinem Lauf siehst du Podest und Rangliste des Rennens und wer aus der Gruppe noch fehlt. Offene Rennen deiner Gruppen stehen direkt im Wettkampf-Tab, und jedes Rennen lässt sich per Link teilen.
+- Fair für alle: Jede Person fliegt ein Rennen genau einmal, und gewertet wird auf dem Server. Es zählen die richtigen Antworten, bei Gleichstand weniger Fehler.
+- Behoben: Zurück-Wischen vom linken Rand klappt in der iPhone-App jetzt auf allen Unterseiten – Profil, Shop, Orden, Statistik, Quests und Rennen. Während einer Runde oder eines Rennens bleibt es bewusst aus.
+- Außerdem: Der Knopf der Daily im Wettkampf-Tab bricht auf schmalen iPhones nicht mehr unschön um.
+
 ## [2.3.0] - 2026-11-11
 
 ### Neu sortiert & Raketen-Rennen

@@ -20,6 +20,7 @@ import { isSheetOpen } from '../../ui/sheet.ts';
 import { renderExhibit } from '../../ui/exhibit.ts';
 import { createAnswer, type AnswerControls } from '../train/answer.ts';
 import { createTrack } from './track.ts';
+import { setSwipeBackBlocked } from '../../core/swipe-back.ts';
 
 export type { RaceOpponents } from '../../core/race.ts';
 
@@ -50,8 +51,12 @@ export interface RacePlayOptions {
    * Standard: jetzt + Countdown.
    */
   startPerf?: number;
+  /** Nach jeder gewerteten Antwort (Live-Rennen schickt damit die Position an den Raum) */
+  onAnswer?(a: RaceAnswer): void;
   /** Zeit ist um (nach kurzem „Zeit!“) oder alle Aufgaben beantwortet */
   onDone(out: RaceOutcome): void;
+  /** Text der Rückfrage beim ✕ (Standard: „nicht gewertet“; Gruppen-Rennen: zählt als leerer Lauf) */
+  abortText?: string;
   /** ✕ nach Rückfrage bestätigt */
   onExit(): void;
 }
@@ -143,7 +148,7 @@ export function playRace(o: RacePlayOptions): RacePlayHandle {
       let yes = false;
       abortDlg = openModal({
         title: t('race.abortTitle'),
-        body: h('p', null, t('race.abortText')),
+        body: h('p', null, o.abortText ?? t('race.abortText')),
         actions: [
           { label: t('settings.cancel') },
           { label: t('race.abortConfirm'), danger: true, onClick: () => { yes = true; } },
@@ -209,6 +214,7 @@ export function playRace(o: RacePlayOptions): RacePlayHandle {
     const ok = given !== null && evaluate(task, given, ms).correct;
     steps.push({ ms, ok });
     answers.push({ i: index, task, given, ms, ok });
+    o.onAnswer?.({ i: index, task, given, ms, ok });
     answerFx(ok);
     if (ok) {
       correct += 1;
@@ -313,6 +319,7 @@ export function playRace(o: RacePlayOptions): RacePlayHandle {
   function stop(): void {
     if (stopped) return;
     stopped = true;
+    setSwipeBackBlocked(false);
     abortDlg?.close();
     cancelAnimationFrame(raf);
     if (tick !== null) { clearInterval(tick); tick = null; }
@@ -324,6 +331,8 @@ export function playRace(o: RacePlayOptions): RacePlayHandle {
 
   document.addEventListener('keydown', onKey);
   document.addEventListener('visibilitychange', onVisibility);
+  // Ab Countdown bis stop(): kein Zurück-Wisch (er bräche das Rennen ohne Rückfrage ab)
+  setSwipeBackBlocked(true);
   // Im Hintergrund pausiert requestAnimationFrame: der Intervall sorgt dafür, dass das Ende nicht verpasst wird
   tick = setInterval(frame, 250);
   frame();

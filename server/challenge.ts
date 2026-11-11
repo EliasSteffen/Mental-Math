@@ -19,8 +19,12 @@ import { DbError, createRpcChallengeStore, supabaseRpc } from './challenge-store
 import type { AttemptRow, BoardRow, ChallengeRow, ChallengeStore, Rpc } from './challenge-store.ts';
 import { createRpcLeagueStore, getChampions, parseChampionCount, putLeague } from './league.ts'; // v9 K
 import type { LeagueStore } from './league.ts'; // v9 K
+import { _resetRaceState, createRpcRaceStore, handleRace, isRaceMissing } from './race.ts'; // v12 R2, R3
+import type { RaceStore } from './race.ts'; // v12 R2
 import { challengeChecks, durableLimiter, memoryLimiter } from './rate-limit.ts';
 import type { DoNamespace, RateLimiter } from './rate-limit.ts';
+import { TICKET_PATH_RE, raceTicketRoute } from './race-ticket.ts'; // v12 R3
+import type { RaceInfo } from '../src/core/race-api.ts'; // v12 R3
 
 const BASE = '/api/challenge';
 const MAX_BODY = 16_384;
@@ -49,6 +53,10 @@ export interface ChallengeDeps {
   random?: () => number;
   /** Statt der SQL-Funktionen aus 007_league.sql (Tests) */
   league?: LeagueStore; // v9 K
+  /** Statt der SQL-Funktionen aus 008_races.sql (Tests) */
+  race?: RaceStore; // v12 R2
+  /** Live-Rennen (v12 R3): Rennen samt Mitgliedschaft; die Hauptsession verdrahtet beim Merge `RaceStore.info` von R2 */
+  raceInfo?: (raceId: string, userId: string) => Promise<{ race: RaceInfo; member: boolean } | null>;
 }
 
 type ErrorCode =
@@ -144,6 +152,7 @@ interface Ctx {
   userId: string | null;
   league: LeagueStore; // v9 K
   championCount: number; // v9 K
+  race: RaceStore; // v12 R2
 }
 
 /** Daily eines Tages; legt sie beim ersten Aufruf an (parallele Aufrufe: alle bekommen dieselbe). */
@@ -434,6 +443,7 @@ const limiterFor = (env: ChallengeEnv): RateLimiter =>
 export function _resetChallengeState(): void {
   memory.reset();
   tokenCache = null;
+  _resetRaceState(); // v12 R2
 }
 
 export async function handleChallenge(req: Request, env: ChallengeEnv, deps: ChallengeDeps = {}): Promise<Response> {
@@ -455,11 +465,22 @@ export async function handleChallenge(req: Request, env: ChallengeEnv, deps: Cha
   }
   const verify = deps.verify ?? verifierFor(env, deps.now ?? Date.now);
   const ctx: Ctx = { store: createRpcChallengeStore(rpc), now, random: deps.random ?? Math.random, userId: null,
-    league: deps.league ?? createRpcLeagueStore(rpc), championCount: parseChampionCount(env.CHAMPION_COUNT) };
+    league: deps.league ?? createRpcLeagueStore(rpc), championCount: parseChampionCount(env.CHAMPION_COUNT),
+    race: deps.race ?? createRpcRaceStore(rpc) }; // v12 R2
 
   try {
     ctx.userId = await userOf(req, verify);
     if (req.headers.get('Authorization') && !ctx.userId) return fail('unauthorized');
+    if (req.method === 'POST' && TICKET_PATH_RE.test(path)) { // v12 R3: Ticket fürs Live-Rennen, Rennen aus dem R2-Store
+      try { // v12 R3
+        const r = await raceTicketRoute({ path, userId: ctx.userId, now, key: env.AUTH_JWT_KEY, info: deps.raceInfo ?? ((id, u) => ctx.race.info(id, u)), name: async (u) => (await ctx.store.profile(u))?.displayName ?? null }); // v12 R3
+        return json(r.status, r.body); // v12 R3
+      } catch (e) { if (isRaceMissing(e)) return json(503, { error: { code: 'unavailable' } }); throw e; } // v12 R3: SQL 008 fehlt
+    } // v12 R3
+    if (path.startsWith('/race/')) { // v12 R2: Raketen-Rennen (Geister, Live-Zeiten)
+      const r = await handleRace({ store: ctx.race, userId: ctx.userId, now, random: ctx.random, body: () => readBody(req) }, req.method, path, url.searchParams); // v12 R2
+      if (r) return json(r.status, r.body); // v12 R2
+    } // v12 R2
     const route = `${req.method} ${path}`;
     switch (route) {
       case 'GET /today': return await today(ctx);
