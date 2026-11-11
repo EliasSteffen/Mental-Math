@@ -201,6 +201,9 @@ export interface Settings {
   onboardingDone: boolean;
   /** Ergebnis des Einstufungstests (0 = Grundlagen … 6 = Profi) und wann; null = keiner gemacht (src/core/placement.ts) */
   placement: { theta: number; ts: number } | null;
+  // v9 A
+  /** Nach einer richtigen Antwort kurz danach automatisch weiter */
+  autoAdvance: boolean;
 }
 
 export interface ReviewItem { box: number; dueAt: number; lastTs: number }

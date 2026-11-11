@@ -175,4 +175,7 @@ export const settings: Record<keyof typeof De, string> = {
   errNotList: 'Field “{field}” must be a list.',
   errBadField: 'Field “{field}” has an invalid format.',
   errSave: 'The data could not be saved (storage full?).',
+  // v9 A
+  autoAdvance: 'Continue automatically after a correct answer',
+  autoAdvanceHint: 'After a correct answer the next task follows on its own. After a mistake the solution stays until you tap.',
 };

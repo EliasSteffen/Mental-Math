@@ -200,6 +200,7 @@ function roundGroup(s: Settings): HTMLElement {
     switchRow({ label: t('settings.timer'), help: t('settings.timerHint'), checked: s.timer, onChange: onTimer }).el,
     autoFail.el,
     switchRow({ label: t('settings.autoSubmit'), help: t('settings.autoSubmitHint'), checked: s.autoSubmit, onChange: (v) => save({ autoSubmit: v }) }).el,
+    switchRow({ label: t('settings.autoAdvance'), help: t('settings.autoAdvanceHint'), checked: s.autoAdvance, onChange: (v) => save({ autoAdvance: v }) }).el, // v9 A
     switchRow({ label: t('settings.estimate'), help: t('settings.estimateHint'), checked: s.estimateMode, onChange: (v) => save({ estimateMode: v }) }).el,
     switchRow({ label: t('settings.ghost'), help: t('settings.ghostHint'), checked: s.ghost, onChange: (v) => save({ ghost: v }) }).el,
     switchRow({ label: t('settings.breathe'), help: t('settings.breatheHelp'), checked: s.breathe, onChange: (v) => save({ breathe: v }) }).el,

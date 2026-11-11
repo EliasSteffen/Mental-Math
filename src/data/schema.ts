@@ -15,6 +15,7 @@ export const DEFAULT_SETTINGS: Settings = {
   lastStoreCheck: 0, updateNotifiedVersion: '', updateNotifiedAt: 0, reviewAskedVersion: '', reviewAskedAt: 0,
   onboardingDone: false,
   placement: null,
+  autoAdvance: true, // v9 A
 };
 
 export const DEFAULT_PARALLEL_STATS: ParallelStats = { nextStart: 2, bestChains: 0, bestCorrectStreak: 0, rounds: 0 };
@@ -76,6 +77,7 @@ export function normalizeSettings(raw: unknown): Settings {
     confetti: typeof s.confetti === 'boolean' ? s.confetti : DEFAULT_SETTINGS.confetti,
     onboardingDone: s.onboardingDone === true,
     placement: normalizePlacement(s.placement),
+    autoAdvance: typeof s.autoAdvance === 'boolean' ? s.autoAdvance : DEFAULT_SETTINGS.autoAdvance, // v9 A
   };
 }
 
