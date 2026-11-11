@@ -29,18 +29,21 @@ function accountName(): string | null {
   return getProfile().displayName || st.user.username;
 }
 
+/** v11 E: Link-Ziel der Karte (Standard #/erfolge; in der Erfolge-Übersicht #/erfolge/liga). */
+export interface PlayerCardOptions { href?: string }
+
 /** Spielerkarte; tauscht sich selbst aus, wenn der Champion-Status (Paket K) später vom Server kommt – ohne rerender der Profilseite. */
-export function playerCard(): HTMLElement {
-  let el = buildPlayerCard();
+export function playerCard(o: PlayerCardOptions = {}): HTMLElement {
+  let el = buildPlayerCard(o);
   addCleanup(onChampionChange(() => {
-    const next = buildPlayerCard();
+    const next = buildPlayerCard(o);
     el.replaceWith(next);
     el = next;
   }));
   return el;
 }
 
-function buildPlayerCard(): HTMLElement {
+function buildPlayerCard(o: PlayerCardOptions): HTMLElement {
   const view = rewardView();
   const d = profileCardData({
     attempts: getAttempts(), sessions: getSessions(), activity: getActivity(), dailyResults: getDailyResults(),
@@ -54,7 +57,7 @@ function buildPlayerCard(): HTMLElement {
   const best = d.bestDaily ? `${d.bestDaily.correct}/${d.bestDaily.n}` : '–';
   // v10 P: Karte → #/erfolge (gestreckter Link), Guthaben-Zeile → Shop (eigener Link darüber, kein verschachteltes <a>)
   return h('div', { class: 'card pcard press' },
-    h('a', { class: 'pcard-top pcard-main', href: '#/erfolge', 'aria-label': `${t('settings.cardTitle')}: ${league}` },
+    h('a', { class: 'pcard-top pcard-main', href: o.href ?? '#/erfolge', 'aria-label': `${t('settings.cardTitle')}: ${league}` },
       leagueEmblem({ tier: d.tier, size: 52, champion, labelled: false, frame: activeFrame() }),
       h('span', { class: 'pcard-id' },
         name ? h('span', { class: 'pcard-name' }, name) : null,
