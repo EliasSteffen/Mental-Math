@@ -30,4 +30,10 @@ export const lernen: Record<keyof typeof De, string> = {
   aiBusy: 'AI is explaining …',
   aiUnavailable: 'AI is currently unavailable.',
   openInLearn: 'Open in Learn',
+  // v9 E – Lernkarte und Meisterung je Kategorie
+  cardTitle: 'Your learning card',
+  cardCount: '{full} of {total} task types solid · {half} in progress · {empty} open',
+  cardBarAria: '{full} solid, {half} in progress, {empty} open',
+  cardContinue: 'Continue: {name}',
+  categorySolid: '{full}/{total} solid',
 };
