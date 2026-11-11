@@ -66,6 +66,7 @@ const ICON_SET = {
   lock: [rect(5, 11, 14, 9.5, 2.5), ['path', 'M8 11V8a4 4 0 0 1 8 0v3']], // v10 P
   gift: [rect(4, 10, 16, 10, 2), rect(3, 7, 18, 3, 1), ['path', 'M12 7v13'], ['path', 'M12 7C10 7 8 6 8 4.5S10 3 12 7ZM12 7c2 0 4-1 4-2.5S14 3 12 7Z']], // v10 Q
   star: [['path', 'M12 3.5l2.6 5.4 5.9.8-4.3 4.1 1 5.9L12 16.9l-5.2 2.8 1-5.9L3.5 9.7l5.9-.8z']], // v10 Q
+  medal: [c(12, 15, 5.5), ['path', 'M8.6 10.6L6.5 3.5h4l1.5 3.2 1.5-3.2h4l-2.1 7.1'], ['path', 'M12 12.6v4.8M10.6 14.2L12 12.6']],
   trophy: [['path', 'M8 4h8v6a4 4 0 0 1-8 0z'], ['path', 'M8 6H4v1a4 4 0 0 0 4 4'], ['path', 'M16 6h4v1a4 4 0 0 1-4 4'], ['path', 'M12 14v4'], ['path', 'M8 21h8']],
 } as const satisfies Record<string, readonly IconPart[]>;
 

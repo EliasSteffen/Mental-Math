@@ -19,8 +19,8 @@ export const ONBOARDING_STEPS: readonly OnboardingStep[] = [
   { id: 'welcome', icon: 'sparkles', titleKey: 'onboarding.welcomeTitle', textKey: 'onboarding.welcomeText', tab: null },
   { id: 'today', icon: 'sun', titleKey: 'onboarding.todayTitle', textKey: 'onboarding.todayText', tab: 'today' },
   { id: 'learn', icon: 'book', titleKey: 'onboarding.learnTitle', textKey: 'onboarding.learnText', tab: 'learn' },
-  { id: 'progress', icon: 'bars', titleKey: 'onboarding.progressTitle', textKey: 'onboarding.progressText', tab: 'progress' },
-  { id: 'profile', icon: 'person', titleKey: 'onboarding.profileTitle', textKey: 'onboarding.profileText', tab: 'profile' },
+  { id: 'progress', icon: 'bars', titleKey: 'onboarding.progressTitle', textKey: 'onboarding.progressText', tab: 'achievements' },
+  { id: 'profile', icon: 'person', titleKey: 'onboarding.profileTitle', textKey: 'onboarding.profileText', tab: null },
   { id: 'placement', icon: 'target', titleKey: 'onboarding.placementTitle', textKey: 'onboarding.placementText', tab: null },
 ];
 

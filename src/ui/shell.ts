@@ -1,11 +1,12 @@
-// App-Shell (Ruhiger Fokus): Tab-Leiste mit 5 Tabs (ab 720 px Seitenleiste), schwebender Primärbutton (CTA) und Fokus-Modus.
+// App-Shell (Ruhiger Fokus): Tab-Leiste mit 4 Tabs (ab 720 px Seitenleiste), schwebender Primärbutton (CTA) und Fokus-Modus.
 // Der Router ruft vor jedem render*() setShell(...) und setPrimaryAction(null); die View setzt ihre CTA danach selbst.
 import { app } from './dom.ts';
 import { button, type IconName } from './kit.ts';
 import { getSettings } from '../data/storage.ts';
 import { onLangChange, t } from '../i18n/index.ts';
 
-export type TabId = 'today' | 'learn' | 'compete' | 'progress' | 'profile';
+import type { TabId } from '../core/nav.ts';
+export type { TabId };
 
 export interface PrimaryAction {
   label: string;
@@ -18,11 +19,11 @@ export interface PrimaryAction {
 
 /** Kanonische Adressen der Tabs (Aliase #/analyse und #/settings löst der Router auf). */
 export const TAB_HREF: Readonly<Record<TabId, string>> = {
-  today: '#/', learn: '#/lernen', compete: '#/wettbewerbe', progress: '#/fortschritt', profile: '#/profil',
+  today: '#/', learn: '#/lernen', achievements: '#/erfolge', compete: '#/wettbewerbe',
 };
 
-const TAB_LABEL: Readonly<Record<TabId, 'common.tabToday' | 'common.tabLearn' | 'common.tabCompete' | 'common.tabProgress' | 'common.tabProfile'>> = {
-  today: 'common.tabToday', learn: 'common.tabLearn', compete: 'common.tabCompete', progress: 'common.tabProgress', profile: 'common.tabProfile',
+const TAB_LABEL: Readonly<Record<TabId, 'common.tabToday' | 'common.tabLearn' | 'common.tabAchievements' | 'common.tabCompete'>> = {
+  today: 'common.tabToday', learn: 'common.tabLearn', achievements: 'common.tabAchievements', compete: 'common.tabCompete',
 };
 
 const isTabId = (x: string | undefined): x is TabId => x !== undefined && Object.hasOwn(TAB_LABEL, x);
@@ -55,14 +56,21 @@ export function initShell(): void {
 export function getShellTab(): TabId | null { return currentTab; }
 
 /**
- * Markiert den aktiven Tab (aria-current); null = Fokus-Modus: Tab-Leiste und CTA ausgeblendet, body.is-focus.
- * Setzt außerdem die Layout-Klasse von #app (.screen bzw. .focus).
+ * Markiert den aktiven Tab (aria-current). Ohne Tab und ohne `modal` = Fokus-Modus: Tab-Leiste und CTA ausgeblendet,
+ * body.is-focus. `modal` (Profil, v11): normale Seite ohne Tab-Leiste auf dem Telefon (body.is-modal), die iPad-Seitenleiste
+ * bleibt und markiert „Profil“. Setzt außerdem die Layout-Klasse von #app (.screen bzw. .focus).
  */
-export function setShell(tab: TabId | null): void {
+export function setShell(tab: TabId | null, { modal = false }: { modal?: boolean } = {}): void {
   initShell();
   currentTab = tab;
-  const focus = tab === null;
+  const focus = tab === null && !modal;
   document.body.classList.toggle('is-focus', focus);
+  document.body.classList.toggle('is-modal', modal);
+  const profileLink = document.querySelector<HTMLElement>('a.tabbar-profile');
+  if (profileLink) {
+    if (modal) profileLink.setAttribute('aria-current', 'page');
+    else profileLink.removeAttribute('aria-current');
+  }
   document.body.dataset['keypadSide'] = getSettings().keypadSide; // iPad quer: public/css/layout.css
   app.classList.toggle('screen', !focus);
   app.classList.toggle('focus', focus);

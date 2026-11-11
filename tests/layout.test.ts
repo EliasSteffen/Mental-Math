@@ -66,7 +66,7 @@ test('Tabs: index.html, Spaltenzahl und shell.ts passen zusammen', () => {
   const shell = read('../src/ui/shell.ts');
   const hrefBlock = /TAB_HREF[^=]*=\s*\{([^}]*)\}/.exec(shell)?.[1] ?? '';
   const hrefs = Object.fromEntries([...hrefBlock.matchAll(/(\w+):\s*'([^']+)'/g)].map((m) => [m[1], m[2]]));
-  assert.deepEqual(Object.keys(hrefs), ['today', 'learn', 'compete', 'progress', 'profile']);
+  assert.deepEqual(Object.keys(hrefs), ['today', 'learn', 'achievements', 'compete']);
 
   const html = read('../public/index.html');
   const links = [...html.matchAll(/<a class="tab press" href="([^"]+)" data-tab="(\w+)"/g)].map((m) => [m[2], m[1]]);
