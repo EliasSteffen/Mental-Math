@@ -54,6 +54,8 @@ export interface RacePlayOptions {
   onAnswer?(a: RaceAnswer): void;
   /** Zeit ist um (nach kurzem „Zeit!“) oder alle Aufgaben beantwortet */
   onDone(out: RaceOutcome): void;
+  /** Text der Rückfrage beim ✕ (Standard: „nicht gewertet“; Gruppen-Rennen: zählt als leerer Lauf) */
+  abortText?: string;
   /** ✕ nach Rückfrage bestätigt */
   onExit(): void;
 }
@@ -145,7 +147,7 @@ export function playRace(o: RacePlayOptions): RacePlayHandle {
       let yes = false;
       abortDlg = openModal({
         title: t('race.abortTitle'),
-        body: h('p', null, t('race.abortText')),
+        body: h('p', null, o.abortText ?? t('race.abortText')),
         actions: [
           { label: t('settings.cancel') },
           { label: t('race.abortConfirm'), danger: true, onClick: () => { yes = true; } },

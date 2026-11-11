@@ -6,6 +6,7 @@ import { RACE_OPEN_CHOICES, RACE_OPEN_DEFAULT, raceIsOpen, stepsOfRow, timeLeft 
 import type { RaceAnswerIn, RaceBoardRow, RaceInfo, RaceListItem, RaceOpen, RunStatus } from '../../core/race-api.ts';
 import { opponentsFromRuns, raceDurationMs, raceTasks, type RaceConfig, type RaceRun } from '../../core/race.ts';
 import { addSession } from '../../data/storage.ts';
+import { getAccountState } from '../../features/account.ts';
 import { challengeErrorCode } from '../../features/challenge.ts';
 import type { GroupInfo } from '../../core/challenge.ts';
 import { abandonRun, createRace, finishRun, getRace, listRaces, startRun } from '../../features/race-sync.ts';
@@ -44,6 +45,12 @@ export function raceErrorText(e: unknown): string {
 function whatText(cfg: RaceConfig): string {
   const cat = cfg.cat === 'all' ? t('race.catAll') : (CATEGORIES.find((c) => c.id === cfg.cat)?.name ?? cfg.cat);
   return `${t('race.seconds', { n: cfg.durationS })} ${cat}`;
+}
+
+/** Selbst angelegt? Dann „Dein Rennen“ statt „… fordert euch heraus“. */
+function isMine(race: RaceInfo): boolean {
+  const st = getAccountState();
+  return st.status === 'signed-in' && st.user.id === race.createdBy;
 }
 
 const nameOrSomeone = (name: string): string => name.trim() || t('race.anonymous');
@@ -267,7 +274,7 @@ export function renderRaceGroup(id: string): void {
     root.replaceChildren(
       head(),
       stage(
-        h('p', { class: 'race-hand-label' }, t('race.fromName', { name: nameOrSomeone(race.createdByName) })),
+        h('p', { class: 'race-hand-label' }, isMine(race) ? t('race.fromYou') : t('race.fromName', { name: nameOrSomeone(race.createdByName) })),
         h('h1', { class: 'race-preview-title', tabindex: '-1' }, configLine(race.config)),
         h('p', { class: 'race-hand-meta' }, leftText(race.endsAt, Date.now())),
         h('p', { class: 'race-preview-note' }, live ? t('race.previewLive') : names.length ? t('race.previewGhosts', { names: namesLine(names) }) : t('race.previewNone')),
@@ -284,7 +291,7 @@ export function renderRaceGroup(id: string): void {
     const ghosts: RaceRun[] = board.filter((r) => !r.me).map((r) => ({ name: nameOrSomeone(r.name), steps: stepsOfRow(r.steps) }));
     playing = true;
     handle = playRace({
-      root, cfg: race.config, tasks, name: t('race.you'), opponents: opponentsFromRuns(ghosts),
+      root, cfg: race.config, tasks, name: t('race.you'), opponents: opponentsFromRuns(ghosts), abortText: t('race.abortTextGroup'),
       onDone: (out) => { playing = false; submit(d, out); },
       onExit: () => { playing = false; abandonRun(id); go(COMPETE_HREF); },
     });

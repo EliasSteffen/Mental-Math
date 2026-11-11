@@ -136,7 +136,12 @@ export function renderRaceLive(raceId: string): void {
     banner.hidden = text === '';
   }
 
-  const attach = (): void => { root.append(banner); updateBanner(); };
+  // Im Rennen direkt unter der Rennbahn (verdeckt so keine Rakete), sonst oben über der Seite
+  const attach = (): void => {
+    const track = root.querySelector('.race-stage > .race-track');
+    if (track) track.after(banner); else root.append(banner);
+    updateBanner();
+  };
 
   /* ---------- einfache Bildschirme ---------- */
 

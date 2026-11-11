@@ -104,6 +104,8 @@ export const race: Record<keyof typeof De, string> = {
   you: 'You',
   anonymous: 'Someone',
   fromName: '{name} challenges you',
+  fromYou: 'Your race',
+  abortTextGroup: 'Your run then counts with 0 correct, and you can’t fly this race again.',
   previewOnce: 'Everyone plays once. Afterwards you see the standings.',
   previewGhosts: 'You race against the rockets of {names}.',
   previewNone: 'Nobody has played yet – you set the first time.',

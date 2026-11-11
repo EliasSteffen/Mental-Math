@@ -107,6 +107,8 @@ export const race = {
   anonymous: 'Jemand',
   // Rennen einer Gruppe (#/rennen/<id>)
   fromName: '{name} fordert euch heraus',
+  fromYou: 'Dein Rennen',
+  abortTextGroup: 'Dein Lauf zählt dann mit 0 richtigen, und du kannst dieses Rennen nicht noch einmal fliegen.',
   previewOnce: 'Jede und jeder spielt einmal. Danach siehst du die Rangliste.',
   previewGhosts: 'Du fliegst gegen die Raketen von {names}.',
   previewNone: 'Noch niemand hat gespielt – du legst die erste Zeit vor.',
