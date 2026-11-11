@@ -15,6 +15,13 @@ Alle nennenswerten Änderungen an Mental Math. Format nach [Keep a Changelog](ht
 - Freund herausfordern: Spiel eine Runde und schick den Link. Dein Freund bekommt dieselben Aufgaben und sieht, wer gewonnen hat – auch mit der Daily und ganz ohne Konto.
 - Außerdem: Spielerkarte im Profil, eine Lernkarte im Lernen-Tab, eine Beispielaufgabe in der Empfehlung, Schrift in der Textgröße deines iPhones, eine deutlich schneller startende Website und „Feedback senden“ unter Profil → Hilfe & Info.
 
+## [2.0.1] - 2026-11-11
+
+### Hinter den Kulissen
+
+- Updates im Hintergrund lassen sich jetzt flexibler ausliefern – damit die nächste Version reibungslos ankommt.
+- Kleine Verbesserungen und Vorbereitung auf die nächste Version.
+
 ## [2.0.0] - 2026-11-09
 
 ### Gemacht fürs iPad

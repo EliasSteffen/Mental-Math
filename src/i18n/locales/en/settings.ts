@@ -144,6 +144,7 @@ export const settings: Record<keyof typeof De, string> = {
   betaUpdates: 'Beta updates',
   betaUpdatesHelp: 'TestFlight only: new versions of the interface from development, before they reach the App Store.',
   betaUpdatesNext: 'Takes effect the next time you open the app.',
+  betaUnlocked: 'Beta updates unlocked – the switch is now in the list above.',
   deviceId: 'Device ID',
   profileId: 'Profile ID',
   // Erweitert

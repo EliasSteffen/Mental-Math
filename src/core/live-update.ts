@@ -218,9 +218,17 @@ export function isUpdate(b: { id: string; version: string }, channel: LiveChanne
   return d > 0 || (channel === 'beta' && d === 0);
 }
 
-/** Kanal: beta nur in TestFlight-Installationen und nur nach Zustimmung (App Review soll das Eingereichte sehen). */
-export function channelFor(testFlight: boolean, betaOptIn: boolean): LiveChannel {
-  return testFlight && betaOptIn ? 'beta' : 'production';
+/**
+ * Kanal: beta nur nach Zustimmung und nur in TestFlight-Installationen – oder wenn Beta auf diesem Gerät versteckt
+ * freigeschaltet wurde (7 × auf „Build“ unter Profil → Hilfe & Info). App Review sieht so immer das Eingereichte.
+ */
+export function channelFor(testFlight: boolean, betaOptIn: boolean, unlocked = false): LiveChannel {
+  return betaAllowed(testFlight, unlocked) && betaOptIn ? 'beta' : 'production';
+}
+
+/** Darf dieses Gerät Beta-Updates wählen? TestFlight immer, App-Store-Installation nur nach versteckter Freischaltung. */
+export function betaAllowed(testFlight: boolean, unlocked: boolean): boolean {
+  return testFlight || unlocked;
 }
 
 export function dueForCheck(now: number, lastCheck: number): boolean {
@@ -244,12 +252,14 @@ export interface LiveState {
   seen: Partial<Record<LiveChannel, string>>;
   /** Server verlangt die Rückkehr zum eingebauten Bundle */
   reset: boolean;
-  /** Beta-Updates gewünscht (wirkt nur in TestFlight) */
+  /** Beta-Updates gewünscht (wirkt nur, wenn betaAllowed) */
   beta: boolean;
+  /** Beta auch ohne TestFlight versteckt freigeschaltet (geräte-lokal, nie synchronisiert) */
+  unlocked: boolean;
 }
 
 export function emptyState(): LiveState {
-  return { v: 1, pending: null, trial: null, bad: [], lastCheck: 0, seen: {}, reset: false, beta: false };
+  return { v: 1, pending: null, trial: null, bad: [], lastCheck: 0, seen: {}, reset: false, beta: false, unlocked: false };
 }
 
 function parsePending(raw: unknown): PendingBundle | null {
@@ -279,6 +289,7 @@ export function parseState(raw: string | null): LiveState {
   }
   s.reset = o.reset === true;
   s.beta = o.beta === true;
+  s.unlocked = o.unlocked === true;
   return s;
 }
 

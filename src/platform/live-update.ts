@@ -8,7 +8,7 @@
 import { BUILD_INFO } from '../generated/build-info.ts';
 import { PUBLIC_CONFIG } from '../generated/public-config.ts';
 import {
-  READY_TIMEOUT_MS, bootStep, channelFor, checkStep, downloadedStep, dueForCheck, fromBase64, keepIds, parseState,
+  READY_TIMEOUT_MS, betaAllowed, bootStep, channelFor, checkStep, downloadedStep, dueForCheck, fromBase64, keepIds, parseState,
   readManifest, readyStep, sha256Hex, toBase64,
   type LiveBundle, type LiveChannel, type LiveFile, type LiveState, type Running,
 } from '../core/live-update.ts';
@@ -133,7 +133,7 @@ async function check(force: boolean): Promise<void> {
     if (!force && !dueForCheck(now, state.lastCheck)) return;
     const lu = await liveUpdatePlugin();
     const info = await lu.info();
-    const channel = channelFor(info.testFlight, state.beta);
+    const channel = channelFor(info.testFlight, state.beta, state.unlocked);
     const { url, keys } = channelConfig(channel);
     if (!url || !keys.length) return; // Not-Aus im Build: kein vertrauter Schlüssel
     save({ ...state, lastCheck: now });
@@ -262,12 +262,17 @@ export async function liveUpdateStatus(): Promise<{ info: LiveUpdateInfo; state:
   const info = await (await liveUpdatePlugin()).info();
   const state = load();
   return {
-    info, state, channel: channelFor(info.testFlight, state.beta),
-    betaAvailable: info.testFlight && PUBLIC_CONFIG.liveUpdateBetaKeys.length > 0,
+    info, state, channel: channelFor(info.testFlight, state.beta, state.unlocked),
+    betaAvailable: betaAllowed(info.testFlight, state.unlocked) && PUBLIC_CONFIG.liveUpdateBetaKeys.length > 0,
   };
 }
 
-/** Beta-Updates ein/aus (nur TestFlight); prüft danach sofort. */
+/** Beta-Updates auf diesem Gerät auch ohne TestFlight erlauben (versteckt, Profil → Hilfe & Info, 7 × „Build“). */
+export function unlockLiveUpdateBeta(): void {
+  save({ ...load(), unlocked: true });
+}
+
+/** Beta-Updates ein/aus (TestFlight oder freigeschaltet); prüft danach sofort. */
 export function setLiveUpdateBeta(on: boolean): void {
   // seen bleibt je Kanal; beim Wechsel zählt das nächste Manifest des neuen Kanals
   save({ ...load(), beta: on, pending: null });

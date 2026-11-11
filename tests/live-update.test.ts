@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { generateKeyPairSync } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import {
-  CHECK_INTERVAL_MS, LIMITS, bootStep, bundleId, channelFor, checkStep, compatible, downloadedStep, dueForCheck,
+  CHECK_INTERVAL_MS, LIMITS, betaAllowed, bootStep, bundleId, channelFor, checkStep, compatible, downloadedStep, dueForCheck,
   emptyState, fromBase64, isUpdate, keepIds, parseManifest, parseState, readManifest, readyStep, safePath, toBase64,
   verifySignature,
   type LiveBundle, type LiveFile, type LiveManifest, type LiveState,
@@ -174,6 +174,22 @@ test('channelFor: beta nur TestFlight + Zustimmung', () => {
   assert.equal(channelFor(false, true), 'production', 'App Store: nie beta');
   assert.equal(channelFor(true, false), 'production', 'TestFlight/App Review ohne Zustimmung');
   assert.equal(channelFor(true, true), 'beta');
+});
+
+test('channelFor/betaAllowed: versteckte Freischaltung erlaubt beta auch im App Store', () => {
+  assert.equal(betaAllowed(false, false), false, 'App Store ohne Freischaltung');
+  assert.equal(betaAllowed(false, true), true, 'App Store freigeschaltet');
+  assert.equal(betaAllowed(true, false), true, 'TestFlight');
+  assert.equal(channelFor(false, true, true), 'beta', 'freigeschaltet + Zustimmung');
+  assert.equal(channelFor(false, false, true), 'production', 'freigeschaltet, aber nicht gewählt');
+  assert.equal(channelFor(false, true, false), 'production', 'Zustimmung allein reicht im App Store nicht');
+});
+
+test('parseState: Freischaltung bleibt erhalten, Fremdwerte zählen nicht', () => {
+  assert.equal(emptyState().unlocked, false);
+  assert.equal(parseState(JSON.stringify({ unlocked: true })).unlocked, true);
+  assert.equal(parseState(JSON.stringify({ unlocked: 'yes' })).unlocked, false);
+  assert.equal(parseState(JSON.stringify({ beta: true })).unlocked, false, 'alter Zustand ohne Feld');
 });
 
 test('dueForCheck: höchstens alle 30 min, zurückgestellte Uhr zählt als fällig', () => {
