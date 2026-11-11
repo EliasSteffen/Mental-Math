@@ -1,6 +1,6 @@
 // Reine Helfer für „Heute“ (ohne DOM, testbar): Begrüßung, Datum, Median-Zeit (E9), Ziel und Dauer der Empfehlung (E10).
 import { CATEGORIES, SUBTYPES, activeCategories } from '../core/catalog.ts';
-import type { Attempt, CategoryId, Level, Recommendation, SubtypeId } from '../types.ts';
+import type { Attempt, CategoryId, DifficultySetting, Level, Recommendation, SubtypeId } from '../types.ts';
 import { generate } from '../core/generators/index.ts'; // v9 H
 import { mulberry32, seedFromString } from '../core/daily.ts'; // v9 H
 
@@ -190,4 +190,38 @@ export function heroExample(rec: Recommendation, o: {
 export function goalDots(done: number, goal: number): { filled: number; total: number } {
   const total = Math.min(MAX_GOAL_DOTS, Math.max(1, Math.round(goal) || 1));
   return { filled: Math.min(total, Math.max(0, Math.round(done) || 0)), total };
+}
+
+/* ---------- v11 H: Auswahl der Empfehlung, Kacheln und Sheet-Zeilen (rein, testbar) ---------- */
+
+export interface PlacementState {
+  /** Einstufungstest bereits gemacht (settings.placement gesetzt) */
+  placement: boolean;
+  difficulty: DifficultySetting;
+  attempts: number;
+}
+
+/**
+ * Was der Hero zeigt: neue Nutzer (noch kein Test, Schwierigkeit Auto, 0 Versuche) bekommen den Einstufungstest
+ * als Empfehlung, alle anderen die normale Empfehlung.
+ */
+export function heroKind(s: PlacementState): 'placement' | 'recommendation' {
+  return !s.placement && s.difficulty === 'auto' && s.attempts === 0 ? 'placement' : 'recommendation';
+}
+
+/** Eintrag „Einstufungstest“ oben im Sheet „Weitere Modi“: nur solange kein Test gemacht ist und er nicht Hero ist. */
+export function showsPlacementRow(s: PlacementState): boolean {
+  return !s.placement && heroKind(s) === 'recommendation';
+}
+
+/** Kacheln auf dem Telefon in fester Reihenfolge (drei Reihen à zwei). */
+export type PhoneTile = 'daily' | 'quests' | 'case' | 'mixed' | 'categories' | 'modes';
+export const PHONE_TILES: readonly PhoneTile[] = ['daily', 'quests', 'case', 'mixed', 'categories', 'modes'];
+
+/** Zeilen im Sheet „Weitere Modi“ (Mini-Case gehört nicht hierher, sondern in eine eigene Kachel). */
+export type ModeRow = 'placement' | 'chain' | 'parallel' | 'estimate' | 'custom';
+
+export function modeRows(o: { placementRow: boolean }): ModeRow[] {
+  const rest: ModeRow[] = ['chain', 'parallel', 'estimate', 'custom'];
+  return o.placementRow ? ['placement', ...rest] : rest;
 }

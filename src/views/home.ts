@@ -1,6 +1,6 @@
 // Tab „Heute“: passt ohne Scrollen auf einen Bildschirm. Kopf (Begrüßung, Datum, Status), die Empfehlung als
-// antippbare Karte mit „Jetzt üben“, darunter Kacheln (Daily, Gemischt, Kategorie, Weitere Modi und – solange offen –
-// Einstufung). Auf dem Telefon liegen Kategorien und weitere Modi in Sheets, ab 720 px direkt auf der Seite.
+// antippbare Karte mit „Jetzt üben“ (neue Nutzer: Einstufungstest), darunter sechs Kacheln (Daily, Quests, Mini-Case,
+// Gemischt, Kategorien, Weitere Modi). Auf dem Telefon liegen Kategorien und weitere Modi in Sheets, ab 720 px direkt auf der Seite.
 // Daten synchron (E22), Logik in home-data.ts.
 import { CATEGORIES, SUBTYPES, activeCategories } from '../core/catalog.ts';
 import { categoryStats } from '../core/scoring.ts';
@@ -18,7 +18,10 @@ import { accountEnabled, onAccountChange } from '../features/account.ts';
 import { cachedResult, pendingAttempt, rankedAvailable } from '../features/challenge.ts';
 import { locale, t } from '../i18n/index.ts';
 import type { Recommendation } from '../types.ts';
-import { dateLine, daypart, goalDots, heroExample, heroPlan, timeGap, type HeroExample, type HeroPlan, type TimeGap } from './home-data.ts';
+import {
+  dateLine, daypart, goalDots, heroExample, heroKind, heroPlan, modeRows, PHONE_TILES, showsPlacementRow, timeGap,
+  type HeroExample, type HeroPlan, type ModeRow, type PhoneTile, type TimeGap,
+} from './home-data.ts';
 import { levelFor } from '../core/scoring.ts'; // v9 H
 import { currentGoals } from '../features/goals.ts'; // v10 F
 import { nextGoalLine } from '../ui/goals.ts'; // v10 F
@@ -93,6 +96,22 @@ function hero(rec: Recommendation, plan: HeroPlan, gap: TimeGap | null, fresh: b
       icon('play', 20),
       h('span', { class: 'btn-label' }, t('home.ctaPractice')),
       h('span', { class: 'btn-meta' }, `· ${t('home.ctaMinutes', { n: plan.minutes })}`)));
+}
+
+/**
+ * Hero für neue Nutzer (H): der Einstufungstest statt einer Trainingsempfehlung. Kein Zeit-Balken, keine Beispielaufgabe;
+ * der Grund steht unter dem Titel, der Knopf führt zum Test.
+ */
+function placementHero(): HTMLAnchorElement {
+  return h('a', { class: 'card hero today-hero press', href: '#/einstufung' },
+    h('span', { class: 'today-hero-head' },
+      h('span', { class: 'today-hero-top' }, h('span', { class: 'today-hero-label' }, t('home.recLabel'))),
+      h('span', { class: 'today-hero-title' }, t('home.placementTitle'))),
+    h('span', { class: 'today-insight' }, h('span', { class: 'today-insight-text is-quiet' }, t('home.placementReason'))),
+    h('span', { class: 'btn primary cta is-full today-hero-go' },
+      icon('play', 20),
+      h('span', { class: 'btn-label' }, t('home.placementCta')),
+      h('span', { class: 'btn-meta' }, `· ${t('home.placementValue')}`)));
 }
 
 interface TileOptions {
@@ -190,27 +209,31 @@ export function renderHome(): void {
   };
   addCleanup(close);
   const modeRow = (label: string, sub: string, href: string): HTMLElement => row({ label, sub, href, onClick: close });
-  const openModes = (): void => open(t('home.moreModes'), [
-    modeRow(t('home.caseTitle'), t('home.caseSub'), '#/case'), // v9 C
-    modeRow(t('home.chainTitle'), t('home.chainSub'), '#/chain'),
-    modeRow(t('home.parallelTitle'), t('home.parallelSub'), '#/parallel'),
-    modeRow(t('home.estimateTitle'), t('home.estimateSub'), '#/train/all?est=1'),
-    modeRow(t('home.customTitle'), t('home.customSub'), '#/custom'),
-  ]);
+  const modeEntries: Record<ModeRow, () => HTMLElement> = {
+    placement: () => modeRow(t('home.placementTitle'), t('home.placementSub'), '#/einstufung'),
+    chain: () => modeRow(t('home.chainTitle'), t('home.chainSub'), '#/chain'),
+    parallel: () => modeRow(t('home.parallelTitle'), t('home.parallelSub'), '#/parallel'),
+    estimate: () => modeRow(t('home.estimateTitle'), t('home.estimateSub'), '#/train/all?est=1'),
+    custom: () => modeRow(t('home.customTitle'), t('home.customSub'), '#/custom'),
+  };
+  const openModes = (): void => open(t('home.moreModes'), modeRows({ placementRow }).map((id) => modeEntries[id]()));
   const openCategories = (): void => open(t('home.categories'), activeCategories(settings.enabledCategories).map((c) => row({
     leading: masteryMark(masteryOf(stats[c.id]?.score)), label: c.name, href: `#/train/${c.id}`, onClick: close,
   })));
 
-  // Noch keine Einstufung (neu dabei, „Auto“): kurzer Test, der die Startstufe findet
-  const needsPlacement = !settings.placement && settings.difficulty === 'auto' && attempts.length < 100;
-  const tiles: HTMLElement[] = [
-    needsPlacement ? tile({ icon: 'target', label: t('home.placementTitle'), sub: t('home.placementSub'), value: t('home.placementValue'), accent: true, href: '#/einstufung' }) : null,
-    dailyTile,
-    questTile, // v10 Q
-    tile({ icon: 'grid', label: t('home.mixedShort'), sub: t('home.mixedSub'), href: '#/train/all' }),
-    tile({ icon: 'plus-minus', label: t('home.categories'), sub: t('home.categoriesSub'), onClick: openCategories, phoneOnly: true }),
-    tile({ icon: 'link', label: t('home.moreModes'), sub: t('home.moreModesShort'), onClick: openModes, phoneOnly: true }),
-  ].filter((x): x is HTMLElement => x !== null);
+  // v11 H: Einstufungstest – neue Nutzer als Hero, sonst als Zeile oben im Sheet „Weitere Modi“ (solange kein Test)
+  const placementState = { placement: !!settings.placement, difficulty: settings.difficulty, attempts: attempts.length };
+  const placementHeroShown = heroKind(placementState) === 'placement';
+  const placementRow = showsPlacementRow(placementState);
+  const phoneTiles: Record<PhoneTile, HTMLElement> = {
+    daily: dailyTile,
+    quests: questTile, // v10 Q
+    case: tile({ icon: 'target', label: t('home.caseTitle'), sub: t('home.caseSub'), href: '#/case' }), // v11 H
+    mixed: tile({ icon: 'grid', label: t('home.mixedShort'), sub: t('home.mixedSub'), href: '#/train/all' }),
+    categories: tile({ icon: 'plus-minus', label: t('home.categories'), sub: t('home.categoriesSub'), onClick: openCategories, phoneOnly: true }),
+    modes: tile({ icon: 'link', label: t('home.moreModes'), sub: t('home.moreModesShort'), onClick: openModes, phoneOnly: true }),
+  };
+  const tiles: HTMLElement[] = PHONE_TILES.map((id) => phoneTiles[id]);
 
   // Ab 720 px stehen Kategorien und Modi direkt auf der Seite; auf dem Telefon blendet CSS den Block aus
   const more = h('div', { class: 'today-more' },
@@ -219,7 +242,6 @@ export function renderHome(): void {
       sub: t('lernen.skill', { n: stats[c.id]?.score ?? '–' }), href: `#/train/${c.id}`,
     }))),
     tileSection(t('home.moreModes'), [
-      tile({ icon: 'target', label: t('home.caseTitle'), sub: t('home.caseSub'), href: '#/case' }), // v9 C
       tile({ icon: 'link', label: t('home.chainTitle'), sub: t('home.chainSub'), href: '#/chain' }),
       tile({ icon: 'bars', label: t('home.parallelTitle'), sub: t('home.parallelSub'), href: '#/parallel' }),
       tile({ icon: 'target', label: t('home.estimateTitle'), sub: t('home.estimateSub'), href: '#/train/all?est=1' }),
@@ -245,7 +267,7 @@ export function renderHome(): void {
         nextGoal ? nextGoalLine(nextGoal) : null)),
     h('div', { class: 'today-main' },
       comeback,
-      hero(rec, plan, gap, fresh, example, goal),
+      placementHeroShown ? placementHero() : hero(rec, plan, gap, fresh, example, goal),
       h('nav', { class: `today-tiles${tiles.length % 2 ? ' is-odd' : ''}`, 'aria-label': t('home.otherTitle') }, ...tiles)),
     more,
   ]);
