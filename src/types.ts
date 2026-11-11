@@ -210,6 +210,9 @@ export interface Settings {
   // v9 A
   /** Nach einer richtigen Antwort kurz danach automatisch weiter */
   autoAdvance: boolean;
+  // v9 I
+  /** Name für „Freund herausfordern“ (höchstens 24 Zeichen) */
+  duelName: string;
 }
 
 export interface ReviewItem { box: number; dueAt: number; lastTs: number }

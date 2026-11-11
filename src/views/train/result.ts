@@ -28,6 +28,9 @@ import type { ChallengeResult } from '../../core/challenge.ts';
 import { maybeAskForReview } from '../../features/app-store.ts';
 import { buildShareCard } from '../../features/share-card.ts';
 import { shareCardButton } from '../../ui/share-card.ts';
+import { duelOutcome, type DuelStats } from '../../core/duel-link.ts'; // v9 I
+import { openDuelShare } from '../../features/duel.ts'; // v9 I
+import { startNewDuel } from '../duel.ts'; // v9 I
 
 /** Gegebene Antwort als Text (Auswahl-Option oder Zahl mit Einheit, wie evaluate() sie gewertet hat). */
 function givenText(r: TrainResult): string {
@@ -113,6 +116,22 @@ function taskRow(r: TrainResult): HTMLElement {
     ? `${fmtSeconds(r.timeMs)} · +${t('common.pointsValue', { n: r.ev.points })}`
     : r.given === null ? t('train.rowSkipped', { right }) : t('train.rowWrong', { given: givenText(r), right });
   return resultRow({ ok, label: r.task.prompt, sub, onClick: () => openTaskSheet(r) });
+}
+
+/** Vergleichskarte der Herausforderung (v9 I): „Gewonnen / Knapp verloren / Unentschieden“ mit beiden Ergebnissen. */
+function duelCard(ctx: TrainCtx, mine: DuelStats): HTMLElement | null {
+  const d = ctx.duel;
+  if (!d) return null;
+  if (!d.them) return insight({ icon: 'trophy', tone: 'accent', title: t('duel.readyTitle'), text: t('duel.readyText') });
+  const out = duelOutcome(mine, d.them);
+  const close = Math.abs(mine.c - d.them.c) <= 1;
+  const title = out === 'win' ? t('duel.win') : out === 'draw' ? t('duel.draw') : t(close ? 'duel.loseClose' : 'duel.lose');
+  const n = d.base.n;
+  return h('div', { class: 'duel-result' },
+    insight({
+      icon: 'trophy', tone: out === 'win' ? 'good' : 'accent', title,
+      text: `${t('duel.you', { correct: mine.c, n, time: fmtSeconds(mine.t) })}\n${t('duel.them', { name: d.them.name ?? t('duel.friend'), correct: d.them.c, n, time: fmtSeconds(d.them.t) })}`,
+    }));
 }
 
 /** Text der Platz-Karte zu einem (Server-)Ergebnis; null = noch nicht abgegeben (offline). */
@@ -214,6 +233,24 @@ export function showResult(ctx: TrainCtx): void {
     }, publicUrl()))
     : null;
 
+  // v9 I: Ergebnis dieser Runde für Herausforderungen (Vergleich, Revanche, Daily-Link)
+  const mine: DuelStats = { c: correct, p: ctx.points, t: totalMs };
+  const duelBox = duelCard(ctx, mine);
+  const duelBtns: HTMLElement[] = [];
+  const wide = (b: HTMLElement): HTMLElement => { b.classList.add('duel-wide'); return b; };
+  if (ctx.duel && n) {
+    const base = ctx.duel.base;
+    duelBtns.push(wide(button({
+      label: t('duel.newChallenge'), kind: 'soft', icon: 'play', onClick: () => startNewDuel(base.kind === 'set' ? base.cat : 'all'),
+    })));
+  } else if (ctx.dailyKey && n) {
+    const day = ctx.dailyKey;
+    duelBtns.push(wide(button({
+      label: t('duel.challengeFriend'), kind: 'soft', icon: 'link',
+      onClick: () => openDuelShare({ kind: 'daily', day, cat: 'all', n: 15, lvl: 2 }, mine),
+    })));
+  }
+
   // Smart Retry: falsch, übersprungen oder deutlich zu langsam – angeboten wird es nur bei Fehlern
   const weak = results.filter((r) => !r.ev.correct || r.given === null || r.timeMs > 1.5 * r.task.targetMs).map((r) => r.task);
   const retryBtn = correct < n && weak.length > 0
@@ -269,7 +306,12 @@ export function showResult(ctx: TrainCtx): void {
 
   // Überschrift bekommt den Fokus: Screenreader lesen „8 von 10 richtig“, Enter = Nochmal, Esc = Übersicht
   const title = h('h1', { class: 'train-result-title num', tabindex: '-1' }, recap.perfect ? t('recap.perfect', { n }) : t('train.resultScore', { good: correct, n }));
-  const again = button({ label: t('common.again'), kind: 'primary', full: true, onClick: () => go(ctx.restart) });
+  const again = ctx.duel && n
+    ? button({
+      label: t(ctx.duel.them ? 'duel.rematch' : 'duel.send'), kind: 'primary', full: true, icon: 'link',
+      onClick: () => ctx.duel && openDuelShare(ctx.duel.base, mine),
+    })
+    : button({ label: t('common.again'), kind: 'primary', full: true, onClick: () => go(ctx.restart) });
   root.replaceChildren(
     h('div', { class: 'stage is-start train-result' },
       h('header', { class: 'train-result-head' },
@@ -278,6 +320,7 @@ export function showResult(ctx: TrainCtx): void {
         h('p', { class: 'train-result-avg num' }, t('train.avgPerTask', { time: fmtSeconds(avg) })),
         vsLastLine(recap)),
       n ? resultSegments(results.map((r) => r.ev.correct)) : null,
+      duelBox, // v9 I
       recap.newBest ? newBestCard(recap.newBest) : null,
       ins ? insightCard(ins) : null,
       statusLine({ todayRounds: habit.todayRounds, goalRounds: habit.goalRounds, streak: habit.streak, freezes: habit.freezes }),
@@ -289,6 +332,7 @@ export function showResult(ctx: TrainCtx): void {
       h('div', { class: 'train-result-actions' },
         retryBtn,
         button({ label: t('train.done'), href: '#/' }),
+        ...duelBtns, // v9 I
         shareBtn),
       again));
 

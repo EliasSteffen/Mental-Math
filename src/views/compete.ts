@@ -23,6 +23,7 @@ import { isTablet } from '../ui/viewport.ts';
 import { publicUrl, shareText } from '../platform/index.ts';
 import { openAccountOnProfile } from './settings.ts';
 import { boardList } from './leaderboard.ts';
+import { duelCard } from './duel.ts'; // v9 I
 import { challengeTitle, errorText, notice, participantsText, profileForm, stateValue, whenLine } from './compete-ui.ts';
 
 /** So viele Plätze zeigt die Vorschau der Tagesrangliste ab 720 px. */
@@ -238,7 +239,7 @@ export function renderCompete(query: URLSearchParams): void {
   const st = getAccountState();
 
   if (!accountEnabled() || st.status === 'disabled') {
-    app.replaceChildren(head, notice(t('compete.noAccountBuild')),
+    app.replaceChildren(head, notice(t('compete.noAccountBuild')), duelCard(), // v9 I
       group(t('compete.unrankedTitle'), list([row({ icon: 'calendar', label: t('compete.practiceUnranked'), href: '#/train/daily' })])));
     return;
   }
@@ -252,7 +253,7 @@ export function renderCompete(query: URLSearchParams): void {
           h('p', { class: 'compete-text' }, t('compete.needAccount')),
           button({ label: t('compete.createAccount'), kind: 'primary', full: true, cta: false, onClick: openAccountOnProfile }),
         ], { hero: true })],
-      [boardsGroup(null),
+      [duelCard(), boardsGroup(null), // v9 I
         group(t('compete.unrankedTitle'), list([row({ icon: 'calendar', label: t('compete.practiceUnranked'), href: '#/train/daily' })]))],
     ));
     return;
@@ -271,7 +272,7 @@ export function renderCompete(query: URLSearchParams): void {
     }));
     const needName = (fn: () => void) => (): void => { if (o.profile) fn(); else nameSheet(null, username, fn); };
     app.replaceChildren(head, columns(
-      [dailyHero(o.daily), boardsGroup(o.daily.id)],
+      [dailyHero(o.daily), duelCard(), boardsGroup(o.daily.id)], // v9 I
       [
         group(t('compete.competitions'), comps.length
           ? list(comps.map((c) => challengeRow(c)))

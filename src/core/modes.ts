@@ -6,7 +6,7 @@ import type { ExtraSessionMode, Mode } from '../types.ts';
 import { caseById } from './cases/index.ts'; // v9 C
 import { CATEGORIES, SUBTYPES } from './catalog.ts';
 
-const SPECIAL = ['all', 'weak', 'review', 'daily', 'retry', 'custom', 'challenge', 'placement'] as const;
+const SPECIAL = ['all', 'weak', 'review', 'daily', 'retry', 'custom', 'challenge', 'placement', 'duel'] as const; // v9 I: duel
 
 const has = (o: object, k: string): boolean => Object.prototype.hasOwnProperty.call(o, k);
 
