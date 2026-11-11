@@ -177,4 +177,15 @@ export const compete = {
   'err.server_error': 'Der Server ist gerade nicht erreichbar.',
   'err.no_attempt': 'Kein Versuch gefunden.',
   'err.network': 'Keine Verbindung – bitte später erneut versuchen.',
+  'err.unavailable': 'Das gibt es hier gerade nicht.',
+  // Champions (v9 K)
+  championsTitle: 'Champions',
+  championsMeta: 'Die besten {n} Meister',
+  championsEmpty: 'Noch keine Champions. Es zählen Meister mit mindestens {min} gewerteten Dailys in den letzten {days} Tagen.',
+  championsRule: 'Champion wird, wer Meister ist, in den letzten {days} Tagen mindestens {min} gewertete Dailys gespielt hat und zu den besten {n} gehört.',
+  championsNeedAccount: 'Mit Konto kannst du Champion werden.',
+  championsYou: 'Du bist Champion · Platz {rank}',
+  championsYouNot: 'Du bist Meister, zählst aber noch nicht: Spiele mindestens {min} gewertete Dailys in {days} Tagen.',
+  championsYouBelow: 'Du bist Platz {rank} unter den Meistern – die besten {n} werden Champion.',
+  championsRating: '{n} LP',
 };

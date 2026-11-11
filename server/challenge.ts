@@ -17,6 +17,8 @@ import type { Task } from '../src/types.ts';
 import { readAuthConfig } from './auth.ts';
 import { DbError, createRpcChallengeStore, supabaseRpc } from './challenge-store.ts';
 import type { AttemptRow, BoardRow, ChallengeRow, ChallengeStore, Rpc } from './challenge-store.ts';
+import { createRpcLeagueStore, getChampions, parseChampionCount, putLeague } from './league.ts'; // v9 K
+import type { LeagueStore } from './league.ts'; // v9 K
 import { challengeChecks, durableLimiter, memoryLimiter } from './rate-limit.ts';
 import type { DoNamespace, RateLimiter } from './rate-limit.ts';
 
@@ -34,6 +36,8 @@ export interface ChallengeEnv {
   AUTH_RP_ID?: string;
   AUTH_ORIGINS?: string;
   RATE_LIMITER?: DoNamespace;
+  /** Anzahl der Champions (v9 K), Standard 10, 1–1000 */
+  CHAMPION_COUNT?: string;
 }
 
 export interface ChallengeDeps {
@@ -43,17 +47,19 @@ export interface ChallengeDeps {
   verify?: (token: string) => Promise<string | null>;
   now?: () => number;
   random?: () => number;
+  /** Statt der SQL-Funktionen aus 007_league.sql (Tests) */
+  league?: LeagueStore; // v9 K
 }
 
 type ErrorCode =
   | 'invalid' | 'unauthorized' | 'not_found' | 'already_played' | 'closed' | 'upcoming' | 'not_member' | 'not_owner'
   | 'name_taken' | 'name_invalid' | 'no_profile' | 'full' | 'too_many' | 'rate_limited' | 'server_error' | 'no_attempt'
-  | 'method';
+  | 'method' | 'unavailable'; // v9 K: unavailable
 
 const STATUS: Record<ErrorCode, number> = {
   invalid: 400, name_invalid: 400, unauthorized: 401, not_member: 403, not_owner: 403, not_found: 404, no_attempt: 404,
   method: 405, already_played: 409, upcoming: 409, name_taken: 409, no_profile: 409, full: 409, too_many: 409, closed: 410,
-  rate_limited: 429, server_error: 503,
+  rate_limited: 429, server_error: 503, unavailable: 503,
 };
 
 const json = (status: number, body: unknown): Response => new Response(JSON.stringify(body), { status, headers: JSON_HEADERS });
@@ -136,6 +142,8 @@ interface Ctx {
   now: number;
   random: () => number;
   userId: string | null;
+  league: LeagueStore; // v9 K
+  championCount: number; // v9 K
 }
 
 /** Daily eines Tages; legt sie beim ersten Aufruf an (parallele Aufrufe: alle bekommen dieselbe). */
@@ -446,7 +454,8 @@ export async function handleChallenge(req: Request, env: ChallengeEnv, deps: Cha
     rpc = supabaseRpc(sbUrl, key);
   }
   const verify = deps.verify ?? verifierFor(env, deps.now ?? Date.now);
-  const ctx: Ctx = { store: createRpcChallengeStore(rpc), now, random: deps.random ?? Math.random, userId: null };
+  const ctx: Ctx = { store: createRpcChallengeStore(rpc), now, random: deps.random ?? Math.random, userId: null,
+    league: deps.league ?? createRpcLeagueStore(rpc), championCount: parseChampionCount(env.CHAMPION_COUNT) };
 
   try {
     ctx.userId = await userOf(req, verify);
@@ -468,6 +477,8 @@ export async function handleChallenge(req: Request, env: ChallengeEnv, deps: Cha
       case 'POST /groups/join': return await joinGroup(ctx, await readBody(req));
       case 'POST /groups/leave': return await leaveGroup(ctx, await readBody(req));
       case 'POST /groups/compete': return await compete(ctx, await readBody(req));
+      case 'POST /league': { const r = await putLeague(ctx.league, ctx.userId, await readBody(req)); return json(r.status, r.body); } // v9 K
+      case 'GET /league/champions': { const r = await getChampions(ctx.league, ctx.userId, ctx.championCount); return json(r.status, r.body); } // v9 K
       default: return req.method === 'GET' || req.method === 'POST' ? fail('not_found') : fail('method');
     }
   } catch (e) {

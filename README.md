@@ -321,6 +321,16 @@ values ('comp-prozente-kw47', 'competition', '{"de":"Prozente-Woche","en":"Perce
 
 **Moderation:** Name ausblenden mit `update public.challenge_profiles set listed = false where lower(display_name) = lower('…');`, einen Versuch aus der Wertung nehmen mit `update public.challenge_attempts set status = 'flagged' where …;`.
 
+## Ligen & Champion
+
+Die Liga (Bronze I … Meister) berechnet jedes Gerät aus dem eigenen Können (Wertung 0–1000 LP, `src/core/league.ts`). Über Meister gibt es **Champion**: nur die besten 10 Konten aller Meister. Dafür meldet die App mit Konto ihre Wertung an `/api/challenge/league` (höchstens alle 10 Minuten, nur bei Änderung, im Hintergrund); die Top-Liste steht im Wettkampf-Tab, „Champion · Platz n“ erscheint im Liga-Emblem unter Erfolge. Ohne Konto oder ohne Netz funktioniert alles wie bisher, nur ohne Champion.
+
+**Einrichten (einmalig):** `sql/007_league.sql` im Supabase-SQL-Editor ausführen, nach `sql/006_challenges.sql` (idempotent, rein hinzufügend, nur `service_role`; legt `public.league_scores`, `league_put` und `league_champions` an). Solange das SQL fehlt, antwortet der Server mit `503 unavailable` und die App blendet Champion aus – Vorschau und Produktion teilen dieselbe Datenbank, das Ausführen betrifft beide, ältere Versionen bemerken es nicht.
+
+**Anzahl der Champions:** Pages-Variable `CHAMPION_COUNT` (optional, Standard `10`, erlaubt 1–1000; Unsinn fällt auf 10 zurück). Eine Änderung braucht nur einen neuen Deploy bzw. das Neuladen der Variable, keinen Code.
+
+**Schutz gegen Manipulation:** Die Wertung kommt vom Gerät und lässt sich nicht beweisen. Deshalb gilt: der Server prüft Bereich und Stufe (`tier` muss zur Wertung passen); höchstens 150 LP Zuwachs pro Berliner Tag gegenüber dem Tagesstart (die erste Meldung zählt ab 0, Bestandsnutzer mit hoher Wertung steigen also über einige Tage ein; Abstieg gilt sofort); Champion zählt nur mit Wertung ≥ 780 (Meister), einer Meldung in den letzten 30 Tagen und mindestens 3 beendeten **gewerteten** Dailys in diesen 30 Tagen (die der Server selbst prüft und bewertet); bei Gleichstand gewinnt, wer die Wertung früher erreicht hat. Namen erscheinen nur bei Zustimmung („Anonym“ sonst, die eigene Zeile zeigt den eigenen Namen). Moderation: `delete from public.league_scores where user_id = '…';` nimmt ein Konto aus der Liste (es meldet sich beim nächsten Mal wieder an; dauerhaft per `update public.challenge_attempts set status = 'flagged' …`, dann fehlen die gewerteten Dailys).
+
 ## Daten
 
 Fortschritt und Statistiken liegen lokal in IndexedDB. Ohne Konto bleibt alles auf dem Gerät, es gibt kein Tracking. Mit Konto (Passkey) werden die Trainingsdaten über Supabase zwischen deinen Geräten synchronisiert. In den Einstellungen lassen sich die Daten als JSON exportieren, importieren oder löschen.
