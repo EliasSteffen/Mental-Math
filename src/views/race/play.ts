@@ -20,6 +20,7 @@ import { isSheetOpen } from '../../ui/sheet.ts';
 import { renderExhibit } from '../../ui/exhibit.ts';
 import { createAnswer, type AnswerControls } from '../train/answer.ts';
 import { createTrack } from './track.ts';
+import { setSwipeBackBlocked } from '../../core/swipe-back.ts';
 
 export type { RaceOpponents } from '../../core/race.ts';
 
@@ -318,6 +319,7 @@ export function playRace(o: RacePlayOptions): RacePlayHandle {
   function stop(): void {
     if (stopped) return;
     stopped = true;
+    setSwipeBackBlocked(false);
     abortDlg?.close();
     cancelAnimationFrame(raf);
     if (tick !== null) { clearInterval(tick); tick = null; }
@@ -329,6 +331,8 @@ export function playRace(o: RacePlayOptions): RacePlayHandle {
 
   document.addEventListener('keydown', onKey);
   document.addEventListener('visibilitychange', onVisibility);
+  // Ab Countdown bis stop(): kein Zurück-Wisch (er bräche das Rennen ohne Rückfrage ab)
+  setSwipeBackBlocked(true);
   // Im Hintergrund pausiert requestAnimationFrame: der Intervall sorgt dafür, dass das Ende nicht verpasst wird
   tick = setInterval(frame, 250);
   frame();

@@ -2,7 +2,7 @@
 // Feature-Code ruft nur diese Funktionen auf; tests/platform-guard.test.ts verbietet Web-only-APIs außerhalb von src/platform/.
 import { PUBLIC_CONFIG } from '../generated/public-config.ts';
 import type { PasskeyAuthOptions } from '../vendor/auth.ts';
-import { appStorePlugin, loadNative, nativeIfLoaded, onNativeResume, startNative } from './native.ts';
+import { appStorePlugin, loadNative, nativeIfLoaded, onNativeResume, startNative, swipeBackPlugin } from './native.ts';
 import { storeVersionOf } from '../features/app-update.ts';
 import { registerSW, webHaptic, webResetAppCache, webSaveFile, webShareImage, webShareText } from './web.ts';
 import type { ShareResult } from './web.ts';
@@ -234,4 +234,26 @@ export async function fetchStoreVersion(): Promise<string | null> {
 /** App kommt zurück in den Vordergrund (nur iOS; die Website prüft beim Sichtbarwerden selbst). */
 export function onAppResume(fn: () => void): void {
   if (isNative()) onNativeResume(fn);
+}
+
+/* ---------- Zurück-Wisch (nur iOS) ---------- */
+
+/**
+ * Kennt diese App das native Plugin „SwipeBack“ (ab dem App-Build mit der neuen Regel in MainViewController.swift)?
+ * Dann entscheidet die Web-Schicht per reportSwipeBack(), und WebKit macht die Geste; sonst zeichnet src/ui/edge-swipe.ts sie.
+ */
+export function swipeBackPluginAvailable(): boolean {
+  if (!isNative()) return false;
+  const cap = (globalThis as { Capacitor?: { isPluginAvailable?: (n: string) => boolean; PluginHeaders?: ReadonlyArray<{ name?: string }> } }).Capacitor;
+  try {
+    return cap?.isPluginAvailable?.('SwipeBack') === true || (cap?.PluginHeaders?.some((p) => p.name === 'SwipeBack') ?? false);
+  } catch {
+    return false;
+  }
+}
+
+/** Dem nativen Plugin melden, ob auf der Seite path (ohne „#“) der Zurück-Wisch gelten soll. Ohne Plugin ohne Wirkung. */
+export function reportSwipeBack(path: string, enabled: boolean): void {
+  if (!swipeBackPluginAvailable()) return;
+  void swipeBackPlugin().then((p) => p.set({ path, enabled })).catch(() => undefined);
 }

@@ -34,6 +34,7 @@ import { mountAccountButton, paintSidebarProfile } from './ui/account-button.ts'
 import { maybeShowNavHint } from './ui/nav-hint.ts'; // v11 T
 import { onLayoutChange } from './ui/viewport.ts';
 import { renderCrash } from './ui/crash.ts';
+import { recordRoute, setSwipeBackBlocked } from './core/swipe-back.ts'; // Zurück-Wisch: Verlauf der Seiten
 
 /* ---------- Cleanup-Hook (aktuelle View räumt Timer/Listener auf) ---------- */
 
@@ -53,6 +54,8 @@ export function runCleanup(): void {
 export interface RenderOptions {
   /** Scroll-Position der aktuellen Seite behalten (z. B. nach einer Änderung, Sprachwechsel); sonst oben bzw. gemerkte Position */
   keepScroll?: boolean;
+  /** Seite ersetzt die vorige im Verlauf der Web-Schicht (replaceRoute) statt neu hinzuzukommen */
+  replace?: boolean;
 }
 
 /** Aktuelle Route neu zeichnen. */
@@ -61,7 +64,7 @@ export function rerender({ keepScroll = false }: RenderOptions = {}): void { ren
 /** Seite wechseln ohne Verlaufseintrag (Rundgang: „Zurück“ führt danach nicht in Demo-Seiten). */
 export function replaceRoute(hash: string): void {
   history.replaceState(history.state, '', hash);
-  render();
+  render({ replace: true });
 }
 
 export function go(hash: string): void {
@@ -319,7 +322,7 @@ function scheduleNavHint(focus: boolean): void {
   navHintTimer = setTimeout(() => { navHintTimer = null; try { maybeShowNavHint(focus); } catch { /* Hinweis ist nebensächlich */ } }, 900);
 }
 
-export function render({ keepScroll = false }: RenderOptions = {}): void {
+export function render({ keepScroll = false, replace = false }: RenderOptions = {}): void {
   canonicalize();
   const route = parseRoute();
   const shell = shellFor(route);
@@ -342,6 +345,7 @@ export function render({ keepScroll = false }: RenderOptions = {}): void {
     app.replaceChildren();
     // Für seitenspezifische Layouts ab Tablet-Breite (public/css/layout.css)
     app.dataset['view'] = route.name;
+    setSwipeBackBlocked(false); // ein Rennen setzt die Sperre beim Zeichnen neu
     shownKey = key;
     shownTab = tab;
     try {
@@ -353,6 +357,7 @@ export function render({ keepScroll = false }: RenderOptions = {}): void {
       setPrimaryAction(null);
       renderCrash(app, e, location.hash || '#/', () => rerender());
     }
+    recordRoute(location.hash, replace); // meldet auch dem Zurück-Wisch (ui/edge-swipe.ts), dass die Seite steht
     // v11 N: Profil-Knopf (Liga-Emblem) in den Titel der Tab-Startseiten; nicht bei der Fehlerkarte
     if (isTabStart(route) && !app.querySelector('.crash')) mountAccountButton(app);
     // v11 T: einmaliger Hinweis nach dem Update – erst kurz nach dem Zeichnen (Dialoge/Rundgang-Ende haben dann ihren Stand)

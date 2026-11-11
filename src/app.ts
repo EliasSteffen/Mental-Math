@@ -18,6 +18,7 @@ import { startPush } from './platform/reminders.ts';
 import { startAppUpdateCheck } from './features/app-store.ts';
 import { watchKeyboardInset } from './ui/keyboard-inset.ts';
 import { watchTextScale } from './ui/text-scale.ts';
+import { startEdgeSwipe } from './ui/edge-swipe.ts'; // Zurück-Wisch in der iOS-App
 import { startProgressRewards } from './features/rewards.ts'; // v9 J
 import { registerQuestHooks } from './features/quests.ts'; // v10 Q
 import { registerComebackHooks } from './features/comeback.ts'; // v10 C
@@ -49,6 +50,7 @@ safely('keyboard', () => { watchKeyboardInset(); }); // Sheets und Dialoge über
 safely('activity', startActivityTracker);
 safely('platform', startPlatform);
 safely('lang', () => setLang(detectLang(getSettings().lang)));
+safely('edge-swipe', startEdgeSwipe); // vor dem Router: meldet jede gezeichnete Seite dem Plugin bzw. führt die Web-Geste
 safely('router', startRouter); // zeichnet selbst fehlertolerant (Fehlerkarte statt leerer Seite)
 safely('account', () => { void restoreAccount(); });
 safely('account-watch', () => watchAccountRestore()); // Offline-Kaltstart: Anmeldung wiederherstellen, sobald das Netz zurück ist
