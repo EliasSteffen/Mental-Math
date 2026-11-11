@@ -5,6 +5,17 @@ const DATE = '2026-10-30';
 
 export const RELEASES: Release[] = [
   {
+    version: '2.4.0', date: '2026-11-11',
+    title: { de: 'Raketen-Rennen mit deiner Gruppe', en: 'Rocket races with your group' },
+    highlights: [
+      { de: 'Neu: Raketen-Rennen in Gruppen. Lege im Gruppen-Fenster ein Rennen an – 30 bis 120 Sekunden, eine Kategorie oder gemischt, offen für 1 Stunde bis 7 Tage. Alle spielen dieselben Aufgaben, wann es passt, gegen die Raketen der anderen.', en: 'New: rocket races in groups. Start a race from the group sheet – 30 to 120 seconds, one category or mixed, open for 1 hour up to 7 days. Everyone plays the same tasks whenever it suits them, against the other rockets.' },
+      { de: 'Neu: Live-Rennen. Alle warten in der Lobby, starten gemeinsam auf ein Signal und sehen die Raketen der anderen in Echtzeit steigen. Bricht die Verbindung kurz ab, verbindet sich die App von selbst neu.', en: 'New: live races. Everyone waits in the lobby, starts together on one signal and sees the other rockets climb in real time. If the connection drops for a moment, the app reconnects on its own.' },
+      { de: 'Nach deinem Lauf siehst du Podest und Rangliste des Rennens und wer aus der Gruppe noch fehlt. Offene Rennen deiner Gruppen stehen direkt im Wettkampf-Tab, und jedes Rennen lässt sich per Link teilen.', en: 'After your run you see the race podium, the standings and who in the group is still missing. Open races of your groups appear right in the Compete tab, and every race can be shared with a link.' },
+      { de: 'Fair für alle: Jede Person fliegt ein Rennen genau einmal, und gewertet wird auf dem Server. Es zählen die richtigen Antworten, bei Gleichstand weniger Fehler.', en: 'Fair for everyone: each person flies a race exactly once, and scoring happens on the server. Correct answers count, with fewer mistakes breaking a tie.' },
+      { de: 'Außerdem: Der Knopf der Daily im Wettkampf-Tab bricht auf schmalen iPhones nicht mehr unschön um.', en: 'Also: the daily challenge button in the Compete tab no longer wraps awkwardly on narrow iPhones.' },
+    ],
+  },
+  {
     version: '2.3.0', date: '2026-11-11',
     title: { de: 'Neu sortiert & Raketen-Rennen', en: 'Reorganized & rocket race' },
     tour: 'v2',

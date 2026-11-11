@@ -11,7 +11,7 @@ test('tabOf: jede Route gehört zum richtigen Tab', () => {
     learn: 'learn',
     achievements: 'achievements', progress: 'achievements',
     compete: 'compete', board: 'compete', challenge: 'compete', duel: 'compete', race: 'compete', // v12 R1
-    profile: null, chain: null, parallel: null, placement: null, train: null, 'race-reihum': null,
+    profile: null, chain: null, parallel: null, placement: null, train: null, 'race-reihum': null, 'race-group': null, 'race-live': null, // v12 R2, R3
   };
   for (const [name, tab] of Object.entries(expected)) assert.equal(tabOf(name as RouteName), tab, name);
   assert.equal(tabOf('case', { caseId: 'random' }), null, 'Mini-Case im Spiel: Fokus-Modus');
