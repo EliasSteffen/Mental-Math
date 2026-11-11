@@ -138,10 +138,13 @@ export interface Attempt {
   choices?: string[];
 }
 
+/** Runden außerhalb von #/train (zählen fürs Tagesziel, v9) */
+export type ExtraSessionMode = 'chain' | 'parallel' | `case:${string}`;
+
 export interface Session {
   id: string;
   ts: number;
-  mode: Mode;
+  mode: Mode | ExtraSessionMode;
   n: number;
   correct: number;
   points: number;
@@ -201,6 +204,9 @@ export interface Settings {
   onboardingDone: boolean;
   /** Ergebnis des Einstufungstests (0 = Grundlagen … 6 = Profi) und wann; null = keiner gemacht (src/core/placement.ts) */
   placement: { theta: number; ts: number } | null;
+  // v9 B
+  /** Tagesziel in Runden (1–10); `dailyGoalMin` bleibt für alte Clients */
+  dailyGoalRounds: number;
 }
 
 export interface ReviewItem { box: number; dueAt: number; lastTs: number }
@@ -227,7 +233,7 @@ export interface State {
 
 // ---------- Fortschritt ----------
 export interface StreakInfo { current: number; best: number; todayMs: number; goalMs: number; todayDone: boolean }
-export interface HeatCell { date: string; ms: number; level: 0 | 1 | 2 | 3 | 4 }
+export interface HeatCell { date: string; ms: number; level: 0 | 1 | 2 | 3 | 4; /** v9 B: Runden an dem Tag */ rounds?: number }
 export interface DailyPoint { date: string; n: number; accuracy: number | null; speed: number | null }
 export interface ApmPoint { date: string; perMinute: number | null; accuracy: number | null }
 export interface XpInfo { xp: number; level: number; into: number; needed: number }

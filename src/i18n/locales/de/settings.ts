@@ -21,7 +21,7 @@ export const settings = {
   summaryOff: 'Aus',
   // Erklärungen zu den Einstellungen
   categoriesHelp: 'Was in gemischten Runden und Empfehlungen vorkommt.',
-  dailyGoalHelp: 'So viele Minuten am Tag zählen für deine Serie.',
+  dailyGoalHelp: 'Eine Runde am Tag hält deine Serie. Für jede Woche am Stück bekommst du einen Freeze (höchstens 2), der einen verpassten Tag überbrückt.',
   roundLengthHelp: 'So viele Aufgaben hat eine Runde.',
   numpadLayoutHelp: 'Ziffern wie am Taschenrechner oder wie am Telefon.',
   themeHelp: '„System“ folgt der Einstellung deines Geräts.',
@@ -61,7 +61,7 @@ export const settings = {
   remindOnlyOpen: 'Nur wenn das Tagesziel offen ist',
   remindOnlyOpenHelp: 'Keine Erinnerung, wenn du heute schon genug trainiert hast.',
   remindStreak: 'Serie retten',
-  remindStreakHelp: 'Um 20 Uhr, wenn dein Tagesziel noch fehlt und die Serie sonst reißt.',
+  remindStreakHelp: 'Um 20 Uhr, wenn du heute noch keine Runde gespielt hast und die Serie sonst reißt.',
   remindReview: 'Wiederholungen',
   remindReviewHelp: 'Wenn frühere Fehler zur Wiederholung fällig sind – höchstens einmal am Tag, zwischen 9 und 20 Uhr.',
   remindTip: 'Lern-Hinweis',
@@ -173,4 +173,7 @@ export const settings = {
   errNotList: 'Feld „{field}“ muss eine Liste sein.',
   errBadField: 'Feld „{field}“ hat ein ungültiges Format.',
   errSave: 'Die Daten konnten nicht gespeichert werden (Speicher voll?).',
+  // v9 B
+  roundsN: '{n} Runden',
+  roundsNOne: '{n} Runde',
 } as const;

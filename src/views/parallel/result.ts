@@ -3,7 +3,8 @@
 import type { ParallelChainResult, ParallelState } from '../../types.ts';
 import { scoreParallel, updateParallelStats } from '../../core/parallel.ts';
 import { fmt } from '../../core/numbers.ts';
-import { getParallelStats, setParallelStats } from '../../data/storage.ts';
+import { addSession, getParallelStats, setParallelStats } from '../../data/storage.ts';
+import { newId } from '../../data/ids.ts';
 import { app, h, appendChildren } from '../../ui/dom.ts';
 import { go } from '../../router.ts';
 import { button, group, icon, insight, list, resultRow, resultSegments } from '../../ui/kit.ts';
@@ -54,6 +55,11 @@ export function renderResult(
   session.streak = result.allCorrect ? session.streak + 1 : 0;
   const stats = updateParallelStats(before, result, session.streak);
   setParallelStats(stats);
+  // v9 B: Die Runde zählt fürs Tagesziel (keine Attempts)
+  addSession({
+    id: newId(), ts: Date.now(), mode: 'parallel', n: result.total, correct: result.correct, points: result.points,
+    avgTimeMs: result.total ? Math.round(state.elapsedMs / result.total) : 0,
+  });
   const newBest = result.allCorrect && stats.bestChains > before.bestChains;
   const again = (): void => onAgain(stats.nextStart);
 

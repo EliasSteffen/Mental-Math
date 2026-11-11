@@ -15,7 +15,7 @@ Details: [docs/SPEC.md](docs/SPEC.md)
 - **Lösungsweg mit den Zahlen der Aufgabe** nach jeder Antwort, dazu „Wie geht das?“ als Hilfe vor dem Antworten (halbe Punkte)
 - **Lernbereich** (`#/lernen`): Methode, Vorgehen, Trick und typische Fehler für alle Aufgabentypen, mit Beispiel zum Mitrechnen
 - **Optionale KI-Erklärungen** (Google Gemini, nur auf Knopfdruck) – siehe unten
-- **Tagesziel & Serie** (Minuten pro Tag, einstellbar), Aktivitäts-Heatmap, Level/XP
+- **Tagesziel & Serie** (Tagesziel in Runden, einstellbar; eine Runde am Tag hält die Serie, je 7 Tage gibt es einen automatischen Freeze), Aktivitäts-Heatmap, Level/XP
 - **Schwierigkeitsstufen** Leicht/Mittel/Schwer – fest oder „Auto“: je Aufgabentyp eine Treppe (3 sichere Treffer → schwerer, 2 Fehler unter den letzten 4 → leichter). Unter „Leicht“ übt die App dazwischen die Grundlage, auf der der Typ aufbaut (z. B. 2-stellig × 1-stellig → kleines 1×1), bis hinunter zu einem Einstiegs-1×1 mit ×2, ×5 und ×10 (`src/core/adaptive.ts`)
 - **Einstufungstest** am Ende des Onboardings (und unter Profil → Training): bis zu 10 Aufgaben auf einer Leiter vom kleinen 1×1 bis zu 2-stellig × 2-stellig und Prozent-Veränderungen – bestanden → höher, ein Patzer → zweite Chance, zwei Fehler → tiefer. Das Ergebnis (0–6, in den Einstellungen, synchronisiert) legt die Startstufe jedes Aufgabentyps fest (`src/core/placement.ts`, `startStep`)
 - **Fehler-Wiederholung über Tage** (Leitner-Boxen: 1, 2, 4, 7, 14 Tage) und eine **Tagesempfehlung** auf der Startseite
@@ -213,14 +213,14 @@ Unter *Profil → Erinnerungen* schaltet man Push-Benachrichtigungen pro Gerät 
 
 | Erinnerung | Wann | Entfällt, wenn … |
 |---|---|---|
-| **Täglich** | zur gewählten Uhrzeit an den gewählten Wochentagen | das Tagesziel heute schon erreicht ist (abschaltbar) |
-| **Serie retten** | um 20 Uhr | das Tagesziel erreicht ist oder keine Serie läuft |
+| **Täglich** | zur gewählten Uhrzeit an den gewählten Wochentagen | das Tagesziel (Runden) heute schon erreicht ist (abschaltbar) |
+| **Serie retten** | um 20 Uhr | heute schon eine Runde gespielt wurde oder keine Serie läuft |
 | **Wiederholungen** | sobald Leitner-Wiederholungen fällig sind, zwischen 9 und 20 Uhr, höchstens einmal am Tag | nichts fällig ist |
 | **Lern-Hinweis** | sonntags um 10 Uhr: ein Rechentrick, bevorzugt zu einer Schwäche | – |
 
 Zusätzlich gilt: keine Erinnerung, wenn die App in den letzten 20 Minuten offen war; zwischen zwei Benachrichtigungen liegen mindestens 90 Minuten (außer bei der täglichen). Uhrzeiten gelten in der Zeitzone des Geräts, auch über die Zeitumstellung hinweg.
 
-**So funktioniert es:** Die App abonniert Web Push (VAPID) und meldet Einstellungen, Zeitzone und einen knappen Lernstand (Serie, Tagesziel erreicht, fällige Wiederholungen, bis zu 3 schwache Aufgabentypen) an `/api/push` (`functions/api/push/[[path]].ts` → `server/push.ts`). Ein Supabase-Cron (`pg_cron` + `pg_net`) ruft jede Minute `/api/push/tick` auf; der Server holt die fälligen Abos, entscheidet (`src/core/reminders.ts`), verschlüsselt die Nachricht (RFC 8291, `server/push-crypto.ts`) und schickt sie an den Push-Dienst des Browsers. Der Service Worker zeigt sie an und öffnet beim Antippen die passende Seite. Das Gerät erzeugt eine zufällige ID und ein Geheimnis; gespeichert wird nur dessen SHA-256-Hash. Ausschalten löscht das Abo auf dem Server.
+**So funktioniert es:** Die App abonniert Web Push (VAPID) und meldet Einstellungen, Zeitzone und einen knappen Lernstand (Serie, Runden heute und Tagesziel in Runden, Serie gesichert, aktive Minuten, fällige Wiederholungen, bis zu 3 schwache Aufgabentypen; die Runden-Felder sind optional, damit ältere Clients und Server zusammenpassen) an `/api/push` (`functions/api/push/[[path]].ts` → `server/push.ts`). Ein Supabase-Cron (`pg_cron` + `pg_net`) ruft jede Minute `/api/push/tick` auf; der Server holt die fälligen Abos, entscheidet (`src/core/reminders.ts`), verschlüsselt die Nachricht (RFC 8291, `server/push-crypto.ts`) und schickt sie an den Push-Dienst des Browsers. Der Service Worker zeigt sie an und öffnet beim Antippen die passende Seite. Das Gerät erzeugt eine zufällige ID und ein Geheimnis; gespeichert wird nur dessen SHA-256-Hash. Ausschalten löscht das Abo auf dem Server.
 
 **Einrichten (einmalig):** Voraussetzung ist dasselbe Supabase-Projekt wie für das Konto, also die Pages-Secrets `SUPABASE_URL` und `SUPABASE_SERVICE_ROLE_KEY`. Dann im Supabase-SQL-Editor nacheinander ausführen:
 

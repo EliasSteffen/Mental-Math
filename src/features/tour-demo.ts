@@ -4,7 +4,7 @@ import { SUBTYPES } from '../core/catalog.ts';
 import { challengeDay, dailyId } from '../core/challenge.ts';
 import type { ChallengeInfo, Leaderboard } from '../core/challenge.ts';
 import { generate } from '../core/generators/index.ts';
-import { addActivityMs, addAttempt, setSettings } from '../data/storage.ts';
+import { addActivityMs, addAttempt, addSession, setSettings } from '../data/storage.ts';
 import type { Settings, Task } from '../types.ts';
 import type { Overview } from './challenge.ts';
 
@@ -41,7 +41,7 @@ export type DemoKeep = Pick<Settings, 'lang' | 'theme' | 'keypadSide' | 'numpadL
 export function seedDemoData(keep: DemoKeep, now: number = Date.now()): void {
   setSettings({
     ...keep, keypad: 'on', timerDisplay: 'calm', autoSubmit: false, onboardingDone: true,
-    difficulty: 'auto', sessionLength: 10, dailyGoalMin: 15, placement: { theta: 3, ts: now - 45 * DAY },
+    difficulty: 'auto', sessionLength: 10, dailyGoalMin: 15, dailyGoalRounds: 3, placement: { theta: 3, ts: now - 45 * DAY },
   });
   const rng = seededRandom(20261109);
   const subs = Object.values(SUBTYPES).filter((s) => s.category !== 'custom');
@@ -66,10 +66,22 @@ export function seedDemoData(keep: DemoKeep, now: number = Date.now()): void {
       });
     }
   }
-  // Serie der letzten zwei Wochen, davor unregelmäßig
+  // Serie: 12 Tage am Stück (heute 2 von 3 Runden → „2 / 3 Runden · 12 in Folge“), davor eine Lücke von drei Tagen
+  // (mehr als die höchstens 2 Freezes überbrücken), dann unregelmäßig
+  const noon = (d: number): number => {
+    const x = new Date(now);
+    return new Date(x.getFullYear(), x.getMonth(), x.getDate() - d, 12).getTime();
+  };
   for (let d = 80; d >= 0; d -= 1) {
-    if (d > 13 && rng() < 0.4) continue;
-    addActivityMs(Math.round((d > 13 ? 6 + rng() * 14 : 16 + rng() * 9) * MIN), now - d * DAY);
+    if (d >= 12 && d <= 14) continue;
+    if (d > 14 && rng() < 0.4) continue;
+    addActivityMs(Math.round((d > 14 ? 6 + rng() * 14 : 16 + rng() * 9) * MIN), now - d * DAY);
+    if (d > 14) continue;
+    const rounds = d === 0 ? 2 : 1;
+    for (let k = 0; k < rounds; k += 1) {
+      const ts = d === 0 ? now - (rounds - k) * 30_000 : noon(d) + k * 60_000;
+      addSession({ id: `demo-s${d}-${k}`, ts, mode: 'all', n: 10, correct: 8, points: 800, avgTimeMs: 6000 });
+    }
   }
 }
 

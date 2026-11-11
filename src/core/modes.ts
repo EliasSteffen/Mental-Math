@@ -23,6 +23,9 @@ export function isValidMode(raw: string): boolean {
 }
 
 export function modeName(mode: Mode): string {
+  // v9 B: Runden außerhalb von #/train
+  if (mode === 'chain') return t('chain.title');
+  if (mode === 'parallel') return t('parallel.title');
   if ((SPECIAL as readonly string[]).includes(mode)) return t(`core.mode.${mode}`);
   const s = has(SUBTYPES, mode) ? SUBTYPES[mode] : undefined;
   if (s) {

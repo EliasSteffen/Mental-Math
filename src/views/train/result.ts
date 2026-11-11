@@ -5,7 +5,9 @@ import { SUBTYPES } from '../../core/catalog.ts';
 import { getMethod } from '../../core/methods.ts';
 import { modeName } from '../../core/modes.ts';
 import { dayKey } from '../../core/progress.ts';
-import { addSession, getActivity, getSettings, setDailyResult } from '../../data/storage.ts';
+import { habitInfo } from '../../core/habit.ts'; // v9 B
+import { confetti } from '../../ui/charts.ts'; // v9 B
+import { addSession, getActivity, getSessions, getSettings, setDailyResult, setSettings } from '../../data/storage.ts';
 import { go, addCleanup } from '../../router.ts';
 import { toast } from '../../ui/toast.ts';
 import { h } from '../../ui/dom.ts';
@@ -203,7 +205,13 @@ export function showResult(ctx: TrainCtx): void {
   }
 
   const settings = getSettings();
-  const todayMin = (getActivity()[dayKey(Date.now())] ?? 0) / 60000;
+  // v9 B: Runden heute (die eben gespeicherte Runde zählt mit); erreicht genau diese Runde das Ziel → Zeile, ggf. Konfetti
+  const habit = habitInfo({ sessions: getSessions(), activity: getActivity(), goalRounds: settings.dailyGoalRounds });
+  const goalHit = habit.todayRounds === habit.goalRounds && dayKey(ctx.startedAt) === dayKey(Date.now());
+  if (goalHit && settings.celebrated !== dayKey(Date.now())) {
+    setSettings({ celebrated: dayKey(Date.now()) });
+    if (settings.confetti === true) confetti();
+  }
   const ins = roundInsight(results);
   const tasksText = n === 1 ? t('train.tasksOne') : t('train.tasksMany', { n });
 
@@ -218,7 +226,8 @@ export function showResult(ctx: TrainCtx): void {
         h('p', { class: 'train-result-avg num' }, t('train.avgPerTask', { time: fmtSeconds(avg) }))),
       n ? resultSegments(results.map((r) => r.ev.correct)) : null,
       ins ? insightCard(ins) : null,
-      statusLine({ todayMin, goalMin: settings.dailyGoalMin || 15, xp: ctx.points }),
+      statusLine({ todayRounds: habit.todayRounds, goalRounds: habit.goalRounds, streak: habit.streak, freezes: habit.freezes, xp: ctx.points }),
+      goalHit ? h('p', { class: 'goal-reached rise' }, icon('check', 16), t('common.goalReached')) : null,
       n ? group({ title: t('train.tasks'), meta: wrongRows.length ? t('train.wrongFirst') : undefined },
         list([...wrongRows, toggle, ...rightRows])) : null),
     dock(

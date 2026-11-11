@@ -4,6 +4,7 @@ import { dayKey } from '../core/progress.ts';
 import { weaknesses } from '../core/scoring.ts';
 import { fmt } from '../core/numbers.ts';
 import { activeCategories } from '../core/catalog.ts';
+import { LEGACY_ACTIVE_MS, roundsByDay } from '../core/habit.ts'; // v9 B
 
 // Lokaler Tag um 12 Uhr (DST-sicher), n Tage verschoben
 const dayAt = (ts: number, offset = 0): Date => {
@@ -198,4 +199,32 @@ export function dailyHistory(results: Record<string, DailyResult> | null | undef
 export function fmtSec(ms: number): string {
   const s = Math.max(0, ms || 0) / 1000;
   return `${fmt(s, s >= 10 ? 0 : 1)} s`;
+}
+
+/* ---------- Woche in Runden (v9 B) ---------- */
+
+export interface WeekRoundsDay {
+  date: string;
+  ts: number;
+  rounds: number;
+  today: boolean;
+  future: boolean;
+}
+
+/** Montag bis Sonntag der aktuellen Woche mit Runden je Tag (Altbestand ohne Runden, aber ≥ 5 aktive Minuten: 1). */
+export function weekRounds(
+  sessions: readonly { ts: number }[], activity: Activity | null | undefined, now: number = Date.now(),
+): WeekRoundsDay[] {
+  const rounds = roundsByDay(sessions);
+  const act = activity || {};
+  return weekDays(act, now).map((d) => ({
+    date: d.date, ts: d.ts, today: d.today, future: d.future,
+    rounds: rounds[d.date] ?? ((act[d.date] || 0) >= LEGACY_ACTIVE_MS ? 1 : 0),
+  }));
+}
+
+/** Skalen-Obergrenze der Wochenbalken: Ziel × 4/3 (Ziellinie bei 75 %), mindestens der größte Tageswert. */
+export function weekRoundsScaleMax(days: readonly WeekRoundsDay[], goalRounds: number): number {
+  const goal = Math.max(1, goalRounds || 0);
+  return Math.max(Math.ceil((goal * 4) / 3), ...days.map((d) => d.rounds), 1);
 }

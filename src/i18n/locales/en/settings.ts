@@ -23,7 +23,7 @@ export const settings: Record<keyof typeof De, string> = {
   summaryOff: 'Off',
   // Explanations for the settings
   categoriesHelp: 'What appears in mixed rounds and recommendations.',
-  dailyGoalHelp: 'This many minutes a day count toward your streak.',
+  dailyGoalHelp: 'One round a day keeps your streak. For every week in a row you earn a freeze (at most 2) that bridges a missed day.',
   roundLengthHelp: 'This many tasks make up a round.',
   numpadLayoutHelp: 'Digits like on a calculator or like on a phone.',
   themeHelp: '“System” follows your device setting.',
@@ -63,7 +63,7 @@ export const settings: Record<keyof typeof De, string> = {
   remindOnlyOpen: 'Only if the daily goal is open',
   remindOnlyOpenHelp: 'No reminder if you have already trained enough today.',
   remindStreak: 'Save your streak',
-  remindStreakHelp: 'At 8 pm if your daily goal is still open and your streak would end.',
+  remindStreakHelp: 'At 8 pm if you have not played a round today and your streak would end.',
   remindReview: 'Reviews',
   remindReviewHelp: 'When earlier mistakes are due for review – at most once a day, between 9 am and 8 pm.',
   remindTip: 'Learning tip',
@@ -175,4 +175,7 @@ export const settings: Record<keyof typeof De, string> = {
   errNotList: 'Field “{field}” must be a list.',
   errBadField: 'Field “{field}” has an invalid format.',
   errSave: 'The data could not be saved (storage full?).',
+  // v9 B
+  roundsN: '{n} rounds',
+  roundsNOne: '{n} round',
 };
