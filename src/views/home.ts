@@ -20,6 +20,7 @@ import { locale, t } from '../i18n/index.ts';
 import type { Recommendation } from '../types.ts';
 import { dateLine, daypart, goalDots, heroExample, heroPlan, timeGap, type HeroExample, type HeroPlan, type TimeGap } from './home-data.ts';
 import { levelFor } from '../core/scoring.ts'; // v9 H
+import { questsView } from '../features/quests.ts'; // v10 Q
 
 const GREETING = { morning: 'home.greetMorning', day: 'home.greetDay', evening: 'home.greetEvening' } as const;
 
@@ -165,6 +166,14 @@ export function renderHome(): void {
       icon: 'calendar', label: t('home.dailyChallenge'), sub: t('home.dailySub'), href: '#/train/daily',
       value: daily ? `${daily.correct}/${daily.n}` : t('home.dailyOpen'), accent: !daily,
     });
+  // v10 Q: Quests des Tages (3) und Wochenstand
+  const qv = questsView(now);
+  const questTile = tile({
+    icon: 'star', label: t('quests.tileLabel'), href: '#/quests',
+    sub: qv.doneToday >= 3 ? t('quests.tileSubDone') : t('quests.tileSub', { n: qv.stars }),
+    value: qv.ready ? t('quests.chestReady') : t('quests.tileValue', { done: qv.doneToday }),
+    accent: qv.ready > 0 || qv.doneToday < 3,
+  });
   // Anmeldung kommt beim Start oft erst nach dem ersten Bild: dann die Daily-Kachel umstellen
   if (accountEnabled()) addCleanup(onAccountChange(() => rerender({ keepScroll: true })));
 
@@ -193,6 +202,7 @@ export function renderHome(): void {
   const tiles: HTMLElement[] = [
     needsPlacement ? tile({ icon: 'target', label: t('home.placementTitle'), sub: t('home.placementSub'), value: t('home.placementValue'), accent: true, href: '#/einstufung' }) : null,
     dailyTile,
+    questTile, // v10 Q
     tile({ icon: 'grid', label: t('home.mixedShort'), sub: t('home.mixedSub'), href: '#/train/all' }),
     tile({ icon: 'plus-minus', label: t('home.categories'), sub: t('home.categoriesSub'), onClick: openCategories, phoneOnly: true }),
     tile({ icon: 'link', label: t('home.moreModes'), sub: t('home.moreModesShort'), onClick: openModes, phoneOnly: true }),

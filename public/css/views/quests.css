@@ -1,0 +1,65 @@
+/* Quests und Wochentruhe (v10 Q): Seite #/quests und Enthüllung. Ruhig: Zeilen, Balken, ein sanftes Einblenden. */
+@layer views {
+  .quests { display:flex; flex-direction:column; gap:var(--space-5); min-width:0; }
+  .quest-list, .quest-chests { list-style:none; margin:0; padding:0; }
+  .quest-list { display:flex; flex-direction:column; }
+
+  /* ---------- Tagesquests ---------- */
+  .quest { display:flex; align-items:flex-start; gap:var(--space-3); padding:var(--space-3) 0; min-width:0; }
+  .quest + .quest { border-top:1px solid var(--border); }
+  .quest-mark {
+    display:flex; flex:none; align-items:center; justify-content:center; width:28px; height:28px; margin-top:1px;
+    border-radius:var(--radius-pill); background:var(--surface-2); color:var(--muted);
+  }
+  .quest.is-done .quest-mark { background:color-mix(in srgb, var(--good) 18%, transparent); color:var(--good); }
+  .quest-level { display:block; width:10px; height:10px; border-radius:var(--radius-pill); background:currentColor; opacity:.35; }
+  .quest-level.is-2 { opacity:.6; }
+  .quest-level.is-3 { opacity:.9; }
+  .quest-body { display:flex; flex:1 1 auto; flex-direction:column; gap:6px; min-width:0; }
+  .quest-title { margin:0; font-size:var(--text-md); font-weight:var(--weight-semibold); line-height:1.3; overflow-wrap:anywhere; }
+  .quest-meta { display:flex; justify-content:space-between; gap:var(--space-2); margin:0; font-size:var(--text-xs); color:var(--muted); }
+  .quest-xp { flex:none; padding-top:2px; font-size:var(--text-sm); font-weight:var(--weight-semibold); color:var(--accent-text); white-space:nowrap; }
+  .quest.is-done .quest-xp { color:var(--muted); }
+  .quest.is-done .quest-title { color:var(--muted); }
+
+  /* ---------- Woche und Truhen ---------- */
+  .quest-hint { margin:0 0 var(--space-3); font-size:var(--text-sm); line-height:1.5; color:var(--muted); }
+  .quest-chests { display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:var(--space-2); }
+  .quest-chest {
+    display:flex; flex-direction:column; align-items:center; gap:4px; min-width:0; padding:var(--space-3) var(--space-2);
+    border-radius:var(--radius-md); background:var(--surface-2); text-align:center;
+  }
+  .quest-chest.is-ready { background:var(--accent-soft); box-shadow:inset 0 0 0 1.5px color-mix(in srgb, var(--accent) 45%, transparent); }
+  .quest-chest-icon { display:flex; color:var(--muted); }
+  .quest-chest.is-ready .quest-chest-icon { color:var(--accent-text); }
+  .quest-chest.is-opened .quest-chest-icon { color:var(--good); }
+  .quest-chest-name { margin:0; font-size:var(--text-sm); font-weight:var(--weight-bold); line-height:1.25; }
+  .quest-chest-sub { margin:0; font-size:var(--text-xs); line-height:1.35; color:var(--muted); overflow-wrap:anywhere; }
+  .quest-chest-stars { display:flex; gap:2px; margin:2px 0; color:var(--border); }
+  .quest-star { display:flex; }
+  .quest-star.is-on { color:var(--accent-text); }
+  .quest-star.is-on svg { fill:currentColor; }
+  .quest-chest-state { margin:0; margin-top:auto; font-size:var(--text-xs); color:var(--muted); }
+  .quest-chest .btn { margin-top:auto; min-height:40px; padding-inline:var(--space-2); }
+
+  /* ---------- Enthüllung ---------- */
+  .quest-reveal { display:flex; flex-direction:column; align-items:center; gap:var(--space-4); padding:var(--space-3) 0 var(--space-2); text-align:center; }
+  .quest-reveal-gift { display:flex; color:var(--accent-text); animation:quest-rise .5s ease-out both; }
+  .quest-reveal-lines { display:flex; flex-direction:column; align-items:center; gap:var(--space-2); animation:quest-rise .5s .15s ease-out both; }
+  .quest-reveal-xp { margin:0; font-size:var(--text-xl, 28px); font-weight:var(--weight-bold); line-height:1.2; }
+  .quest-reveal-item { display:flex; align-items:center; gap:var(--space-2); margin:0; font-size:var(--text-md); }
+  .quest-reveal-note { margin:0; font-size:var(--text-sm); color:var(--muted); }
+  .quest-reveal .btn { margin-top:var(--space-2); }
+  @keyframes quest-rise { from { opacity:0; transform:translateY(8px) scale(.96); } to { opacity:1; transform:none; } }
+  @media (prefers-reduced-motion: reduce) {
+    .quest-reveal-gift, .quest-reveal-lines { animation:none; }
+  }
+
+  @media (max-width: 400px) {
+    .quest-chest-stars .quest-star svg { width:12px; height:12px; }
+  }
+  @media (min-width: 720px) {
+    .quest-chests { gap:var(--space-3); }
+    .quest-chest { padding:var(--space-4) var(--space-3); }
+  }
+}

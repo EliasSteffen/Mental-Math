@@ -12,5 +12,6 @@
 @import "views/play.css";
 @import "views/compete.css";
 @import "views/duel.css"; /* v9 I */
+@import "views/quests.css"; /* v10 Q */
 @import "views/tour.css";
 @import "exhibit.css";
