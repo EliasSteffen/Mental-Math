@@ -118,8 +118,10 @@ async function publish(channel: LiveChannel): Promise<void> {
     }
     const precache = JSON.parse(readFileSync(join(dist, 'precache.json'), 'utf8')) as { files: string[] };
     // Chunks, die nur Auth/Native laden (scripts/bundle.ts), stehen nicht im Precache, gehören aber ins App-Bundle
+    // Fehlt die Liste, fehlten der App nach dem Update Anmeldung und Native-Brücke – dann lieber gar nicht veröffentlichen.
     const appOnlyPath = join(dist, 'app-only.json');
-    const appOnly = existsSync(appOnlyPath) ? (JSON.parse(readFileSync(appOnlyPath, 'utf8')) as { files: string[] }).files : [];
+    if (!existsSync(appOnlyPath)) throw new Error('dist/app-only.json fehlt – npm run build (scripts/bundle.ts) ausführen');
+    const appOnly = (JSON.parse(readFileSync(appOnlyPath, 'utf8')) as { files: string[] }).files;
     input = {
       ...input,
       bundle: {
