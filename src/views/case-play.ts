@@ -23,6 +23,8 @@ import { diagnose, answerText, givenAnswerText } from './train/diagnosis.ts';
 import { choiceOutcome } from './train/feedback.ts';
 import { createTimer, type TaskTimer } from './train/timer.ts';
 import { t } from '../i18n/index.ts';
+import { updateProgressRewards } from '../features/rewards.ts'; // v9 J
+import { rewardBlock } from '../ui/rewards.ts'; // v9 J
 
 interface StepResult { step: CaseStep; task: Task; given: number | null; ev: Evaluation; timeMs: number }
 
@@ -249,6 +251,7 @@ export function renderCasePlay(templateId: string, fromRandom: boolean): void {
     const avg = n ? results.reduce((s, r) => s + r.timeMs, 0) / n : 0;
     // Keine Attempts: nur eine Runde, die fürs Tagesziel zählt
     addSession({ id: sessionId, ts: startedAt, mode: `case:${templateId}`, n, correct, points, avgTimeMs: Math.round(avg) });
+    const rewards = rewardBlock(updateProgressRewards()); // v9 J
 
     const wrongRows = results.filter((r) => !r.ev.correct).map(stepRow);
     const rightRows = results.filter((r) => r.ev.correct).map(stepRow);
@@ -261,6 +264,7 @@ export function renderCasePlay(templateId: string, fromRandom: boolean): void {
           title,
           h('p', { class: 'train-result-avg num' }, t('cases.avgPerStep', { time: fmtSeconds(avg) }))),
         n ? resultSegments(results.map((r) => r.ev.correct)) : null,
+        rewards,
         n ? group({ title: t('cases.steps'), meta: wrongRows.length ? t('train.wrongFirst') : undefined }, list([...wrongRows, ...rightRows])) : null),
       dock(
         h('div', { class: 'train-result-actions' }, button({ label: t('train.done'), href: '#/' })),

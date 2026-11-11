@@ -22,6 +22,8 @@ import { t } from '../i18n/index.ts';
 import { pitfallList, safeSteps, stepsList } from '../ui/widgets.ts';
 import { matchesSearch, normalizeSearch, pickNext } from './lernen-search.ts';
 import { hasGuided } from '../core/solutions/guided.ts';
+import { CARD_IDS, CARD_UNLOCK_SCORE, cardRarity } from '../core/cards.ts'; // v9 J
+import { cardMini, openCardSheet, rarityLabel } from '../ui/collectibles.ts'; // v9 J
 import { PRACTICE_N, guideHref, practiceHref, renderGuide, resetGuide } from './lernen-guide.ts';
 
 const MASTERY_RANK: Readonly<Record<Mastery, number>> = { empty: 0, half: 1, full: 2 };
@@ -173,6 +175,17 @@ function statusLine(sub: Subtype, score: number | null | undefined, count: numbe
   return h('p', { class: 'learn-status' }, masteryMark(m), h('span', null, parts.join(' · ')));
 }
 
+/** Trick-Karte des Typs (v9 J): freigeschaltet oder Skill-Stand; Tipp öffnet die Karte. */
+function cardEntry(sub: Subtype, score: number | null | undefined): HTMLElement | null {
+  if (!CARD_IDS.includes(sub.id)) return null;
+  const unlocked = Object.hasOwn(getSettings().cards, sub.id) || (score ?? 0) >= CARD_UNLOCK_SCORE;
+  return group(null, list([row({
+    leading: cardMini(sub.id),
+    label: unlocked ? t('rewards.learnCardOpen') : t('rewards.learnCardLocked', { score: score ?? 0, needed: CARD_UNLOCK_SCORE }),
+    sub: rarityLabel(cardRarity(sub.id)), onClick: () => openCardSheet(sub.id), chevron: true,
+  })]));
+}
+
 /** Einstieg in den geführten Lernmodus (nur für Typen mit strukturierten Schritten); startet immer frisch. */
 function guideEntry(id: string): HTMLElement {
   const entry = row({
@@ -236,6 +249,7 @@ function detailNodes(sub: Subtype, back: boolean): Child[] {
   return [
     back ? backLink({ label: t('lernen.title'), href: '#/lernen', ariaLabel: t('lernen.back') }) : null,
     h('div', { class: 'learn-head' }, largeTitle(sub.name, cat?.name), statusLine(sub, score, count, lvl)),
+    cardEntry(sub, score), // v9 J
     hasGuided(sub.id) ? guideEntry(sub.id) : null,
     m?.idea ? group(t('lernen.idea'), card([h('p', { class: 'method-text' }, m.idea)])) : null,
     m?.steps?.length ? group(t('lernen.approach'), card([stepsList(m.steps)])) : null,

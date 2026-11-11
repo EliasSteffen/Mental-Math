@@ -15,6 +15,8 @@ import { tapGuard } from '../ui/dock.ts';
 import { answerFx } from '../ui/fx.ts';
 import { answerDock, answerInput, parseNumber, playDock } from './play-ui.ts';
 import { t } from '../i18n/index.ts';
+import { updateProgressRewards } from '../features/rewards.ts'; // v9 J
+import { rewardBlock } from '../ui/rewards.ts'; // v9 J
 
 type LevelKey = `${Level}`;
 type Tempo = '800' | '1200' | '1800';
@@ -144,6 +146,7 @@ export function renderChain(): void {
     answerFx(ok);
     // v9 B: Jede Kette ist eine Runde und zählt fürs Tagesziel (keine Attempts: Skills bleiben unberührt)
     addSession({ id: newId(), ts: Date.now(), mode: 'chain', n: 1, correct: ok ? 1 : 0, points: ok ? 100 * level : 0, avgTimeMs: Math.max(0, Date.now() - askedAt) });
+    const rewards = rewardBlock(updateProgressRewards()); // v9 J
 
     const state = ok ? 'good' : given === null ? 'skip' : 'bad';
     const result = fmt(task.result);
@@ -169,6 +172,7 @@ export function renderChain(): void {
         newBest ? insight({
           icon: 'trophy', tone: 'good', title: t('chain.newBest'), text: t('chain.newBestText', { n: streak, level }), outline: true,
         }) : null,
+        rewards,
         // Lösungsweg nach falscher/übersprungener Antwort offen, nach richtiger zugeklappt (E16)
         fold({ label: t('chain.solution'), open: !ok, children: [steps(solution(task))] }),
         h('div', { class: 'play-dock-row' },

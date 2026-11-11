@@ -15,7 +15,7 @@ export interface RoundRecap {
 }
 
 /** Feste oder fremde Runden: kein Bestzeit-Vergleich */
-const NO_BEST = new Set(['daily', 'retry', 'review', 'placement', 'challenge', 'custom']);
+export const NO_BEST = new Set(['daily', 'retry', 'review', 'placement', 'challenge', 'custom']);
 
 export function roundRecap(o: {
   mode: Mode; n: number; correct: number; avgMs: number; assistedAny: boolean;

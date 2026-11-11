@@ -17,6 +17,8 @@ import { maybeAskForReview } from '../../features/app-store.ts';
 import { publicUrl } from '../../platform/index.ts';
 import { buildShareCard } from '../../features/share-card.ts';
 import { shareCardButton } from '../../ui/share-card.ts';
+import { updateProgressRewards } from '../../features/rewards.ts'; // v9 J
+import { rewardBlock } from '../../ui/rewards.ts'; // v9 J
 
 export interface ParallelSession {
   /** aufeinanderfolgende fehlerfreie Runden in diesem Besuch */
@@ -61,6 +63,7 @@ export function renderResult(
     avgTimeMs: result.total ? Math.round(state.elapsedMs / result.total) : 0,
   });
   const newBest = result.allCorrect && stats.bestChains > before.bestChains;
+  const rewards = rewardBlock(updateProgressRewards()); // v9 J
   const again = (): void => onAgain(stats.nextStart);
 
   const title = h('h1', { class: 'play-result-title num', tabindex: '-1' },
@@ -89,6 +92,7 @@ export function renderResult(
       newBest ? insight({
         icon: 'trophy', tone: 'good', title: t('parallel.newBest'), text: t('parallel.newBestText', { n: stats.bestChains }),
       }) : null,
+      rewards,
       session.streak > 1
         ? h('p', { class: 'play-note' }, icon('flame', 18), h('span', null, t('parallel.streakRounds', { n: session.streak })))
         : null,

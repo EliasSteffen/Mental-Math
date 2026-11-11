@@ -8,6 +8,8 @@ import { dayKey } from '../../core/progress.ts';
 import { habitInfo } from '../../core/habit.ts'; // v9 B
 import { confetti } from '../../ui/charts.ts'; // v9 B
 import { roundRecap, type RoundRecap } from '../../core/recap.ts'; // v9 A
+import { updateProgressRewards } from '../../features/rewards.ts'; // v9 J
+import { rewardBlock } from '../../ui/rewards.ts'; // v9 J
 import { addSession, getActivity, getAttempts, getSessions, getSettings, setDailyResult, setSettings } from '../../data/storage.ts';
 import { go, addCleanup } from '../../router.ts';
 import { toast } from '../../ui/toast.ts';
@@ -301,6 +303,7 @@ export function showResult(ctx: TrainCtx): void {
     setSettings({ celebrated: dayKey(Date.now()) });
     if (settings.confetti === true) confetti();
   }
+  const rewards = n ? rewardBlock(updateProgressRewards()) : null; // v9 J: Aufstieg, Orden, Karten dieser Runde
   const ins = roundInsight(results);
   const tasksText = n === 1 ? t('train.tasksOne') : t('train.tasksMany', { n });
 
@@ -326,6 +329,7 @@ export function showResult(ctx: TrainCtx): void {
       statusLine({ todayRounds: habit.todayRounds, goalRounds: habit.goalRounds, streak: habit.streak, freezes: habit.freezes }),
       goalHit ? h('p', { class: 'goal-reached rise' }, icon('check', 16), t('common.goalReached')) : null,
       n ? recapBlock(recap) : null,
+      rewards,
       n ? group({ title: t('train.tasks'), meta: wrongRows.length ? t('train.wrongFirst') : undefined },
         list([...wrongRows, toggle, ...rightRows])) : null),
     dock(

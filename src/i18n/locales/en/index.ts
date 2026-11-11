@@ -19,5 +19,6 @@ import { tour } from './tour.ts';
 import { recap } from './recap.ts'; // v9 A
 import { cases } from './cases.ts'; // v9 C
 import { duel } from './duel.ts'; // v9 I
+import { rewards } from './rewards.ts'; // v9 J
 
-export const dict = { tour, common, home, train, parallel, chain, custom, analyse, lernen, settings, release, core, account, sol, onboarding, guide, compete, placement, recap, cases, duel } as const;
+export const dict = { tour, common, home, train, parallel, chain, custom, analyse, lernen, settings, release, core, account, sol, onboarding, guide, compete, placement, recap, cases, duel, rewards } as const;

@@ -19,6 +19,7 @@ import { setPrimaryAction } from '../ui/shell.ts';
 import { isTablet } from '../ui/viewport.ts';
 import { safeSteps } from '../ui/widgets.ts';
 import { t, locale } from '../i18n/index.ts';
+import { achievementsRow } from '../ui/rewards.ts'; // v9 J
 import {
   accuracyOf, attemptsLastDays, dailyHistory, firstLast, fmtSec, focusOf, minutesLastDays, patternCounts, recentErrors,
   relativeDay, rollingMean, trendOf, weekRounds, weekRoundsScaleMax, type FocusState, type PatternCounts,
@@ -167,7 +168,7 @@ function overviewView(attempts: Attempt[], settings: Settings, now: number): HTM
 
   return h('div', { class: 'prog-view' },
     weekCard(settings.dailyGoalRounds, now),
-    list([reviewRow, level]));
+    list([reviewRow, level, achievementsRow()]));
 }
 
 /* ---------- Kategorien ---------- */
@@ -321,7 +322,7 @@ export function renderAnalyse(): void {
 
   // Noch nichts geübt: nur die ruhige Einladung, keine leeren Diagramme
   if (!attempts.length) {
-    appendChildren(app, [title, focusCard({ kind: 'few' })]);
+    appendChildren(app, [title, focusCard({ kind: 'few' }), group(null, list([achievementsRow()]))]); // v9 J
     setPrimaryAction({ label: t('analyse.ctaStart'), href: '#/train/all', icon: 'play' });
     return;
   }

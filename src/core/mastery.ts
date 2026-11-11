@@ -1,7 +1,19 @@
 // Meisterung zählen für die Lernkarte im Lernen-Tab (DOM-frei, getestet).
 
-/** Stufe je Aufgabentyp; die Schwellen liegen in ui/kit.ts (masteryOf). */
+/** Stufe je Aufgabentyp (Schwellen: MASTERY_FULL / MASTERY_HALF, Auswertung: masteryLevel). */
 export type MasteryLevel = 'full' | 'half' | 'empty';
+
+/** Skill ab dem ein Aufgabentyp „sicher“ ist bzw. halb sitzt (v9 J: eine Quelle für Anzeige, Karten und Orden). */
+export const MASTERY_FULL = 70;
+export const MASTERY_HALF = 40;
+
+/** Meisterung aus dem Skill-Wert: ≥ 70 voll, 40–69 halb, sonst (auch ohne Daten) leer. */
+export function masteryLevel(score: number | null | undefined): MasteryLevel {
+  if (typeof score !== 'number' || !Number.isFinite(score)) return 'empty';
+  if (score >= MASTERY_FULL) return 'full';
+  if (score >= MASTERY_HALF) return 'half';
+  return 'empty';
+}
 
 export interface MasteryCounts {
   full: number;
