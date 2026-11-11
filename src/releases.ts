@@ -5,6 +5,18 @@ const DATE = '2026-10-30';
 
 export const RELEASES: Release[] = [
   {
+    version: '2.2.0', date: '2026-11-11',
+    title: { de: 'Shop, Quests & Comeback', en: 'Shop, quests & comeback' },
+    highlights: [
+      { de: 'Neu: der Shop unter Fortschritt → Erfolge. Tausche deine XP gegen Streak-Freezes, drei neue Themes (Abendrot, Sand, Tiefsee) und Rahmen für dein Liga-Emblem. Dein Level sinkt dabei nie.', en: 'New: the shop under Progress → Achievements. Trade your XP for streak freezes, three new themes (Sunset, Sand, Deep sea) and frames for your league emblem. Your level never drops when you spend.' },
+      { de: 'Neu: jeden Tag drei Quests – leicht, mittel und schwer – mit XP als Belohnung. Jede erledigte Quest ist ein Stern; bei 5, 10 und 15 Sternen öffnest du die Wochentruhe in Bronze, Silber oder Gold.', en: 'New: three quests every day – easy, medium and hard – with XP as a reward. Every finished quest is a star; at 5, 10 and 15 stars you open the weekly chest in bronze, silver or gold.' },
+      { de: 'Schön, dass du wieder da bist: Nach ein paar Tagen Pause wartet eine leichte Aufwärmrunde mit Comeback-Bonus.', en: 'Good to have you back: after a few days off, an easy warm-up round with a comeback bonus is waiting.' },
+      { de: 'Serie gerissen? Am nächsten Tag holst du sie zurück – mit drei Runden oder mit XP.', en: 'Streak broken? The next day you can get it back – with three rounds or with XP.' },
+      { de: 'Nach jeder Runde siehst du die gewonnenen Ligapunkte und wie weit es bis zur nächsten Stufe ist. Auf Heute steht dein nächstes Ziel, zum Beispiel „Noch 36 LP bis Gold I“.', en: 'After every round you see the league points you gained and how far it is to the next tier. Today shows your next goal, for example “36 LP to Gold I”.' },
+      { de: 'Behoben: Wer mehr als 5.000 Aufgaben gelöst hatte, konnte Level verlieren. Dein Level zählt jetzt alle je verdienten XP.', en: 'Fixed: after more than 5,000 solved tasks you could lose levels. Your level now counts all XP you have ever earned.' },
+    ],
+  },
+  {
     version: '2.1.0', date: '2026-11-11',
     title: { de: 'Ligen, Orden & Mini-Cases', en: 'Leagues, badges & mini cases' },
     highlights: [

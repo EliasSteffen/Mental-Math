@@ -1,6 +1,6 @@
 # Plan v10 – Motivation: XP-Shop, Comeback, sichtbarer Fortschritt, Quests & Truhen
 
-Stand: 2026-11-11 · Basis: `develop` @ `152a88e` (2.1.0) + Fundament-Commit dieses Plans · Ziel-Version **2.2.0**
+Stand: 2026-11-11 · **umgesetzt in 2.2.0** (Pakete P, C, F, Q) · Basis war `develop` @ `152a88e` (2.1.0)
 
 Wunsch des Product Owners (2026-11-11): „XP bekommt einen Sinn“, „Comeback und Serie reparieren“, „sichtbarer Fortschritt“, „Tagesquests und Wochentruhen“. Keine Freundesliste, ruhiges Design bleibt.
 
