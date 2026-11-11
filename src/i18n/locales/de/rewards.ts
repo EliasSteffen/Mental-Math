@@ -22,9 +22,7 @@ export const rewards = {
   shopNext: 'Als Nächstes: {name} für {price}\u00a0XP',
   shopAllOwned: 'Alles Kaufbare gehört dir.',
   tabsLabel: 'Ansicht',
-  tabLeague: 'Liga',
   tabBadges: 'Orden',
-  tabCards: 'Karten',
   // Ligen
   league_bronze: 'Bronze',
   league_silver: 'Silber',
@@ -122,10 +120,8 @@ export const rewards = {
   newCard: 'Trick-Karte freigeschaltet',
   more: '+{n} weitere',
   // Einstiege
-  introToast: 'Neu: Ligen, Orden & Trick-Karten – schau unter Fortschritt → Erfolge.',
+  introToast: 'Neu: Ligen, Orden & Trick-Karten – schau unter Erfolge.',
   introAction: 'Ansehen',
-  rowTitle: 'Erfolge',
-  rowSub: '{badges} Orden · {cards} Karten',
   learnCardOpen: 'Trick-Karte freigeschaltet',
   learnCardLocked: 'Trick-Karte: Skill {score} / {needed}',
 } as const;

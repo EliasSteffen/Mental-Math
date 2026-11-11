@@ -108,7 +108,7 @@ export function helpPage(): string {
       <h3>Wie lade ich Freunde in eine Gruppe ein?</h3>
       <p>Tab Wettkampf → Gruppe erstellen, dann in der Gruppe „Einladen“. Andere treten mit dem Link oder dem sechsstelligen Code bei. Wer die Gruppe angelegt hat, kann dort eigene Wettbewerbe starten (1–7 Tage, Kategorie, Anzahl, Stufe).</p>
       <h3>Wie melde ich mich an?</h3>
-      <p>Mit einem Passkey (Face ID, Touch ID oder Gerätecode), ohne E-Mail und Passwort: Profil → Anmelden oder Konto erstellen.</p>
+      <p>Mit einem Passkey (Face ID, Touch ID oder Gerätecode), ohne E-Mail und Passwort: Profil (Emblem oben rechts) → Anmelden oder Konto erstellen.</p>
       <h3>Ich habe meinen Passkey verloren.</h3>
       <p>Beim Anlegen des Kontos zeigt die App einmalig einen Wiederherstellungscode. Damit legst du unter Profil → Daten &amp; Account → „Passkey verloren?“ einen neuen Passkey an.</p>
       <h3>Wie übertrage ich meine Daten auf ein neues Gerät?</h3>
@@ -132,7 +132,7 @@ export function helpPage(): string {
       <h3>How do I invite friends to a group?</h3>
       <p>Compete tab → Create group, then “Invite” in the group. Others join with the link or the six-character code. The person who created the group can start its own competitions there (1–7 days, category, number, level).</p>
       <h3>How do I sign in?</h3>
-      <p>With a passkey (Face ID, Touch ID or device passcode) – no email, no password: Profile → Sign in or create account.</p>
+      <p>With a passkey (Face ID, Touch ID or device passcode) – no email, no password: Profile (emblem at the top right) → Sign in or create account.</p>
       <h3>I lost my passkey.</h3>
       <p>When you create your account, the app shows a recovery code once. Use it under Profile → Data &amp; account → “Lost your passkey?” to create a new passkey.</p>
       <h3>How do I move my data to a new device?</h3>

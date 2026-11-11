@@ -76,10 +76,29 @@ const COMPETE: TourChapter = {
   ],
 };
 
-const PROGRESS: TourChapter = {
-  id: 'progress', title: 'tour.chProgress',
+/** Profil: auf dem Telefon das Emblem oben rechts, auf dem iPad der Eintrag unten in der Seitenleiste */
+const EMBLEM = '.account-button';
+const SIDE_PROFILE = '.tabbar-profile';
+
+const ACHIEVEMENTS: TourChapter = {
+  id: 'achievements', title: 'tour.chAchievements',
   steps: [
-    go('#/fortschritt'),
+    go('#/'),
+    tap('[data-tab="achievements"]'),
+    wait(300),
+    say('tour.achOverview', '.pcard', 3000),
+    say('tour.achQuests', '.ach-quests', 3000),
+    say('tour.achShop', 'a[href="#/erfolge/shop"]', 2800),
+  ],
+};
+
+const STATS: TourChapter = {
+  id: 'stats', title: 'tour.chStats',
+  steps: [
+    go('#/erfolge'),
+    say('tour.statsRow', '.ach-stats-row', 2600),
+    tap('.ach-stats-row'),
+    wait(300),
     say('tour.progressFocus', '.prog-focus', 3200),
     tap('.prog-switch button:nth-child(3)', 'phone'),
     say('tour.progressHistory', '.heatmap', 3000),
@@ -89,7 +108,12 @@ const PROGRESS: TourChapter = {
 const SETTINGS: TourChapter = {
   id: 'settings', title: 'tour.chSettings',
   steps: [
-    go('#/profil'),
+    go('#/'),
+    say('tour.settingsEmblem', EMBLEM, 2800, 'phone'),
+    say('tour.settingsSide', SIDE_PROFILE, 2800, 'tablet'),
+    tap(EMBLEM, 'phone'),
+    tap(SIDE_PROFILE, 'tablet'),
+    wait(400),
     say('tour.settingsMenu', 'nav .list', 2800),
     tap(sectionRow('training')),
     say('tour.settingsTraining', SECTION_BODY, 2800),
@@ -109,22 +133,29 @@ const SETTINGS: TourChapter = {
 
 /* ---------- Update 2.0.0 ---------- */
 
-const V2_COMPETE: TourChapter = {
-  id: 'v2-compete', title: 'tour.chCompete',
+const V2_TABS: TourChapter = {
+  id: 'v2-tabs', title: 'tour.chTabs',
   steps: [
     go('#/'),
-    say('tour.v2Tab', '[data-tab="compete"]', 2800),
-    tap('[data-tab="compete"]'),
+    say('tour.v2Tabs', '.tabbar', 3000),
+    tap('[data-tab="achievements"]'),
     wait(300),
-    say('tour.competeDaily', '.compete-hero', 3000),
+    say('tour.achOverview', '.pcard', 2800),
+    say('tour.achQuests', '.ach-quests', 2600),
+    say('tour.achShop', 'a[href="#/erfolge/shop"]', 2400),
   ],
 };
 
 const V2_SETTINGS: TourChapter = {
   id: 'v2-settings', title: 'tour.chSettings',
   steps: [
-    go('#/profil'),
-    say('tour.v2Menus', 'nav .list', 3200),
+    go('#/'),
+    say('tour.settingsEmblem', EMBLEM, 2800, 'phone'),
+    say('tour.settingsSide', SIDE_PROFILE, 2800, 'tablet'),
+    tap(EMBLEM, 'phone'),
+    tap(SIDE_PROFILE, 'tablet'),
+    wait(400),
+    say('tour.v2Menus', 'nav .list', 3000),
   ],
 };
 
@@ -156,18 +187,19 @@ const STORE: TourChapter = {
     go('#/wettbewerbe'),
     wait(500),
     say('tour.store5', '.compete-hero', 2800),
-    go('#/fortschritt'),
-    say('tour.store6', '.prog-focus', 2600),
+    go('#/erfolge'),
+    wait(300),
+    say('tour.store6', '.pcard', 2600),
     go('#/'),
     say('tour.store7', undefined, 2000),
   ],
 };
 
 export const TOURS: Readonly<Record<TourId, Tour>> = {
-  intro: { id: 'intro', chapters: [START, TODAY, TASK, MISTAKE, LEARN, COMPETE, PROGRESS, SETTINGS] },
-  v2: { id: 'v2', chapters: [V2_COMPETE, V2_SETTINGS, V2_IPAD] },
+  intro: { id: 'intro', chapters: [START, TODAY, TASK, MISTAKE, LEARN, COMPETE, ACHIEVEMENTS, STATS, SETTINGS] },
+  v2: { id: 'v2', chapters: [V2_TABS, V2_SETTINGS, V2_IPAD] },
   store: { id: 'store', chapters: [STORE] },
 };
 
 /** Einzeln abspielbar (Profil → Hilfe & Info) */
-export const REPLAY_CHAPTERS: readonly TourChapter[] = [TODAY, TASK, MISTAKE, LEARN, COMPETE, PROGRESS, SETTINGS];
+export const REPLAY_CHAPTERS: readonly TourChapter[] = [TODAY, TASK, MISTAKE, LEARN, COMPETE, ACHIEVEMENTS, STATS, SETTINGS];
