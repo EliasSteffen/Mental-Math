@@ -25,19 +25,18 @@ export const ONBOARDING_STEPS: readonly OnboardingStep[] = [
 ];
 
 export interface OnboardingInput {
+  /** Gesetzt, sobald der Nutzer im Dialog gewählt bzw. die Einführung beendet/übersprungen hat */
   onboardingDone: boolean;
-  lastSeenVersion: string;
   /** Anzahl gespeicherter Versuche */
   attempts: number;
 }
 
 /**
- * Nur bei einer Neuinstallation: noch nie gesehen, keine Trainingsdaten und noch keine Version gemerkt.
- * Bestehende Nutzer (lastSeenVersion gesetzt oder Versuche vorhanden) sehen sie nie von selbst.
- * Vor maybeShowWhatsNew() auswerten – das setzt lastSeenVersion bei Neuinstallationen.
+ * Solange der Nutzer nicht gewählt hat (onboardingDone) und keine Trainingsdaten da sind. Schließt er die App bei
+ * offenem Dialog, erscheint er beim nächsten Start wieder. „Was ist neu?“ (lastSeenVersion) spielt keine Rolle.
  */
 export function shouldShowOnboarding(o: OnboardingInput): boolean {
-  return !o.onboardingDone && o.lastSeenVersion === '' && o.attempts === 0;
+  return !o.onboardingDone && o.attempts === 0;
 }
 
 /** Schritt nach Pfeiltaste (Leserichtung links → rechts); null = Taste gehört nicht dazu bzw. Rand erreicht. */

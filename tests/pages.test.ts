@@ -1,8 +1,9 @@
 // Öffentliche Seiten (scripts/pages.ts): Datenschutz, Hilfe, Neuigkeiten.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { CONTACT, esc, helpPage, privacyPage, releasesPage } from '../scripts/pages.ts';
+import { esc, helpPage, privacyPage, releasesPage } from '../scripts/pages.ts';
 import { RELEASES } from '../src/releases.ts';
+import { CONTACT, contactDisplay } from '../src/core/contact.ts';
 
 test('Seiten: deutsch und englisch, Stil ohne Inline-CSS (CSP), Navigation markiert die aktuelle Seite', () => {
   for (const [html, slug] of [[privacyPage(), 'datenschutz'], [helpPage(), 'hilfe'], [releasesPage(), 'neuigkeiten']] as const) {
@@ -17,7 +18,7 @@ test('Seiten: deutsch und englisch, Stil ohne Inline-CSS (CSP), Navigation marki
 test('Datenschutz und Hilfe nennen den Verantwortlichen bzw. Kontakt', () => {
   for (const html of [privacyPage(), helpPage()]) {
     assert.ok(html.includes(CONTACT.name));
-    assert.ok(html.includes(esc(CONTACT.email)));
+    assert.ok(html.includes(esc(contactDisplay())));
   }
 });
 
