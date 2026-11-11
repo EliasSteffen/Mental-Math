@@ -27,6 +27,7 @@ import { modeName } from './core/modes.ts';
 import { initShell, setPrimaryAction, setShell } from './ui/shell.ts';
 import { LAST_TAB_KEY, lastTabHash, shellOf, type ShellState, type TabId } from './core/nav.ts'; // v11 N
 import { mountAccountButton, paintSidebarProfile } from './ui/account-button.ts'; // v11 N
+import { maybeShowNavHint } from './ui/nav-hint.ts'; // v11 T
 import { onLayoutChange } from './ui/viewport.ts';
 import { renderCrash } from './ui/crash.ts';
 
@@ -292,6 +293,12 @@ function withTransition(from: TabId | null | undefined, to: TabId | null, update
   }
 }
 
+let navHintTimer: ReturnType<typeof setTimeout> | null = null;
+function scheduleNavHint(focus: boolean): void {
+  if (navHintTimer !== null) clearTimeout(navHintTimer);
+  navHintTimer = setTimeout(() => { navHintTimer = null; try { maybeShowNavHint(focus); } catch { /* Hinweis ist nebensächlich */ } }, 900);
+}
+
 export function render({ keepScroll = false }: RenderOptions = {}): void {
   canonicalize();
   const route = parseRoute();
@@ -328,6 +335,8 @@ export function render({ keepScroll = false }: RenderOptions = {}): void {
     }
     // v11 N: Profil-Knopf (Liga-Emblem) in den Titel der Tab-Startseiten; nicht bei der Fehlerkarte
     if (isTabStart(route) && !app.querySelector('.crash')) mountAccountButton(app);
+    // v11 T: einmaliger Hinweis nach dem Update – erst kurz nach dem Zeichnen (Dialoge/Rundgang-Ende haben dann ihren Stand)
+    scheduleNavHint(tab === null && !shell.modal);
     // Für den Start-Wächter (public/js/boot-guard.js): Die App hat gezeichnet
     document.documentElement.dataset['booted'] = '1';
     const y = keepY ?? (key !== null && key !== prevKey ? (scrollByKey.get(key) ?? 0) : 0);

@@ -3,7 +3,7 @@
 import type { IconName } from '../ui/charts.ts';
 import type { TabId } from '../ui/shell.ts';
 
-export type OnboardingStepId = 'welcome' | 'today' | 'learn' | 'progress' | 'profile' | 'placement';
+export type OnboardingStepId = 'welcome' | 'today' | 'learn' | 'achievements' | 'compete' | 'profile' | 'placement';
 
 export interface OnboardingStep {
   id: OnboardingStepId;
@@ -14,12 +14,13 @@ export interface OnboardingStep {
   tab: TabId | null;
 }
 
-/** Reihenfolge wie die Tab-Leiste; Icons wie dort (shell/index.html). Zum Schluss das Angebot des Einstufungstests. */
+/** Reihenfolge wie die Tab-Leiste; Icons wie dort (shell/index.html). Das Profil liegt hinter dem Liga-Emblem oben rechts (kein Tab). Zum Schluss das Angebot des Einstufungstests. */
 export const ONBOARDING_STEPS: readonly OnboardingStep[] = [
   { id: 'welcome', icon: 'sparkles', titleKey: 'onboarding.welcomeTitle', textKey: 'onboarding.welcomeText', tab: null },
   { id: 'today', icon: 'sun', titleKey: 'onboarding.todayTitle', textKey: 'onboarding.todayText', tab: 'today' },
   { id: 'learn', icon: 'book', titleKey: 'onboarding.learnTitle', textKey: 'onboarding.learnText', tab: 'learn' },
-  { id: 'progress', icon: 'bars', titleKey: 'onboarding.progressTitle', textKey: 'onboarding.progressText', tab: 'achievements' },
+  { id: 'achievements', icon: 'medal', titleKey: 'onboarding.achievementsTitle', textKey: 'onboarding.achievementsText', tab: 'achievements' },
+  { id: 'compete', icon: 'trophy', titleKey: 'onboarding.competeTitle', textKey: 'onboarding.competeText', tab: 'compete' },
   { id: 'profile', icon: 'person', titleKey: 'onboarding.profileTitle', textKey: 'onboarding.profileText', tab: null },
   { id: 'placement', icon: 'target', titleKey: 'onboarding.placementTitle', textKey: 'onboarding.placementText', tab: null },
 ];

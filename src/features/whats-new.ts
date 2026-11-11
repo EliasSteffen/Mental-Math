@@ -5,6 +5,7 @@ import { BUILD_INFO } from '../generated/build-info.ts';
 import { RELEASES, releasesSince } from '../releases.ts';
 import { getAttempts, getSettings, setSettings } from '../data/storage.ts';
 import { h } from '../ui/dom.ts';
+import { markNavHintSeen } from '../core/nav-hint.ts';
 import { openModal } from '../ui/modal.ts';
 import { toast } from '../ui/toast.ts';
 import { liveUpdatedTo } from '../platform/index.ts';
@@ -50,7 +51,7 @@ function openWhatsNew(seen: string, onClose?: () => void): void {
     // Erst nach dem Schließen: onClose merkt sich die Version noch in den echten Daten
     onClose: () => {
       onClose?.();
-      if (tour && wantsTour) void import('./tour.ts').then((m) => { m.startTour(tour); });
+      if (tour && wantsTour) void import('./tour.ts').then((m) => { m.startTour(tour, { onEnd: (end) => { if (end === 'done') markNavHintSeen(); } }); }); // Rundgang gesehen = Hinweis erledigt (v11 T)
     },
   });
 }

@@ -10,6 +10,7 @@ import { startSync } from './features/sync.ts';
 import { watchPending } from './features/challenge.ts';
 import { maybeShowWhatsNew } from './features/whats-new.ts';
 import { shouldShowOnboarding } from './features/onboarding.ts';
+import { markNavHintSeen } from './core/nav-hint.ts';
 import { showWelcome } from './ui/onboarding.ts';
 import { openAccountOnProfile } from './views/settings.ts';
 import { startPush } from './platform/reminders.ts';
@@ -53,6 +54,7 @@ safely('account-watch', () => watchAccountRestore()); // Offline-Kaltstart: Anme
 safely('challenge', () => watchPending()); // Gewertete Challenge: offene Abgabe senden, sobald angemeldet bzw. wieder online
 safely('sync', startSync);
 safely('push', startPush);
+if (firstRun) markNavHintSeen(); // Neulinge bekommen die Einführung, nie den Hinweis „Neu sortiert“ (v11 T)
 safely('whats-new', maybeShowWhatsNew);
 safely('quest-hooks', registerQuestHooks); // v10 Q: Tagesquests und Wochentruhe (vor startProgressRewards)
 safely('comeback-hooks', registerComebackHooks); // v10 C: Comeback und Serie reparieren (vor startProgressRewards)

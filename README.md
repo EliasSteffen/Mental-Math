@@ -8,18 +8,19 @@ Minimalistischer Kopfrechen-Trainer für Case Interviews (Consulting). Er ist in
 - **Score pro Aufgabe** aus Ergebnis, Zeit im Verhältnis zur Zielzeit und Schwierigkeit
 - **Skill pro Kategorie und Aufgabentyp** (0–100) aus Genauigkeit und Tempo der letzten Versuche
 - **Schwächen-Erkennung** mit Diagnose (Nullen-Fehler, ungenau, zu langsam) und Tipps, dazu ein Modus „Schwächen trainieren“
-- **Analyse-Seite** mit Kategorien, Fehlermustern, Verlauf, letzten Fehlern und Export
+- **Statistik** (Erfolge → Statistik) mit Kategorien, Fehlermustern, Verlauf, letzten Fehlern und Export
 
 Details: [docs/SPEC.md](docs/SPEC.md)
 
 - **Lösungsweg mit den Zahlen der Aufgabe** nach jeder Antwort, dazu „Wie geht das?“ als Hilfe vor dem Antworten (halbe Punkte)
 - **Lernbereich** (`#/lernen`): Methode, Vorgehen, Trick und typische Fehler für alle Aufgabentypen, mit Beispiel zum Mitrechnen
+- **Navigation** (v11): vier Tabs *Heute · Lernen · Erfolge · Wettkampf*; Profil und Einstellungen liegen hinter dem Liga-Emblem oben rechts (iPad: Eintrag „Profil“ unten in der Seitenleiste)
 - **Optionale KI-Erklärungen** (Google Gemini, nur auf Knopfdruck) – siehe unten
 - **Tagesziel & Serie** (Tagesziel in Runden, einstellbar; eine Runde am Tag hält die Serie, je 7 Tage gibt es einen automatischen Freeze), Aktivitäts-Heatmap, Level/XP
 - **Schwierigkeitsstufen** Leicht/Mittel/Schwer – fest oder „Auto“: je Aufgabentyp eine Treppe (3 sichere Treffer → schwerer, 2 Fehler unter den letzten 4 → leichter). Unter „Leicht“ übt die App dazwischen die Grundlage, auf der der Typ aufbaut (z. B. 2-stellig × 1-stellig → kleines 1×1), bis hinunter zu einem Einstiegs-1×1 mit ×2, ×5 und ×10 (`src/core/adaptive.ts`)
-- **Einstufungstest** am Ende des Onboardings (und unter Profil → Training): bis zu 10 Aufgaben auf einer Leiter vom kleinen 1×1 bis zu 2-stellig × 2-stellig und Prozent-Veränderungen – bestanden → höher, ein Patzer → zweite Chance, zwei Fehler → tiefer. Das Ergebnis (0–6, in den Einstellungen, synchronisiert) legt die Startstufe jedes Aufgabentyps fest (`src/core/placement.ts`, `startStep`)
+- **Einstufungstest** am Ende des Onboardings (und unter Profil → Training, erreichbar über das Liga-Emblem oben rechts): bis zu 10 Aufgaben auf einer Leiter vom kleinen 1×1 bis zu 2-stellig × 2-stellig und Prozent-Veränderungen – bestanden → höher, ein Patzer → zweite Chance, zwei Fehler → tiefer. Das Ergebnis (0–6, in den Einstellungen, synchronisiert) legt die Startstufe jedes Aufgabentyps fest (`src/core/placement.ts`, `startStep`)
 - **Fehler-Wiederholung über Tage** (Leitner-Boxen: 1, 2, 4, 7, 14 Tage) und eine **Tagesempfehlung** auf der Startseite
-- **Verlauf pro Kategorie** (14 Tage) auf der Analyse-Seite
+- **Verlauf pro Kategorie** (14 Tage) unter Erfolge → Statistik
 - **Themes** (Neon, OLED, Pastel, System), Einstellungen, Haptik/Sound, ±-Taste für Minus auf iOS
 - **PWA**: auf dem Handy installierbar, funktioniert offline (außer KI)
 - **iOS-App** aus demselben Code (Capacitor), gebaut und zu App Store Connect hochgeladen von GitHub Actions – siehe [iOS-App](#ios-app-app-store)
@@ -209,7 +210,7 @@ Pages Functions können keine eigenen Durable Objects definieren. Deshalb stellt
 
 ## Erinnerungen (Push-Benachrichtigungen)
 
-Unter *Profil → Erinnerungen* schaltet man Push-Benachrichtigungen pro Gerät ein. Ein Konto ist dafür nicht nötig.
+Unter *Profil → Erinnerungen* (Liga-Emblem oben rechts, auf dem iPad „Profil“ in der Seitenleiste) schaltet man Push-Benachrichtigungen pro Gerät ein. Ein Konto ist dafür nicht nötig.
 
 | Erinnerung | Wann | Entfällt, wenn … |
 |---|---|---|
