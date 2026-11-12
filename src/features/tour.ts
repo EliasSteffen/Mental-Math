@@ -30,6 +30,8 @@ export interface StartTourOptions {
 
 const RETRY_KEY = 'mm.retry';
 const TRAIN_RETRY = '#/train/retry';
+/** Antwortfeld: bleibt beim Eintippen sichtbar (die Karte weicht aus) */
+const ANSWER_FIELD = '.train-field';
 /** So lange wartet „Jetzt du“ auf eine erste Eingabe bzw. auf das Prüfen nach begonnener Eingabe (ms). */
 const ASK_IDLE_MS = 9000;
 const ASK_TYPING_MS = 20000;
@@ -133,9 +135,14 @@ async function typeAnswer(s: Session, wrong: boolean): Promise<void> {
   const task = s.tasks[s.taskIndex];
   s.taskIndex += 1;
   if (!task) return;
-  // Falsch: eine Null zu viel, der typische Fehler beim Kopfrechnen
-  for (const digit of String(wrong ? task.expected * 10 : task.expected)) await tap(s, `.numpad-key[data-key="${digit}"]`, true);
-  await tap(s, '.numpad-check');
+  s.overlay.clear(ANSWER_FIELD);
+  try {
+    // Falsch: eine Null zu viel, der typische Fehler beim Kopfrechnen
+    for (const digit of String(wrong ? task.expected * 10 : task.expected)) await tap(s, `.numpad-key[data-key="${digit}"]`, true);
+    await tap(s, '.numpad-check');
+  } finally {
+    s.overlay.clear(null);
+  }
   s.overlay.point(null);
 }
 
@@ -145,6 +152,7 @@ const isAnswered = (): boolean => document.querySelector('.focus > .sheet') !== 
 async function askUser(s: Session, text: string): Promise<void> {
   s.overlay.say(text);
   s.overlay.point(null);
+  s.overlay.clear(ANSWER_FIELD); // Wer tippt, muss sehen, was im Feld steht
   s.overlay.spot('.numpad');
   const input = (): HTMLInputElement | null => document.querySelector<HTMLInputElement>('.train-input');
   s.asking = true;
@@ -156,6 +164,7 @@ async function askUser(s: Session, text: string): Promise<void> {
     }
   } finally {
     s.asking = false;
+    s.overlay.clear(null);
   }
   s.overlay.spot(null);
   if (isAnswered()) { s.taskIndex += 1; return; }
@@ -175,9 +184,13 @@ async function exec(s: Session, step: TourStep): Promise<void> {
     case 'say': {
       s.overlay.say(t(step.text));
       s.overlay.point(null);
+      // Die alte Stelle nicht unter dem neuen Text hervorheben; ist das Ziel gleich da, merkt man davon nichts
+      s.overlay.spot(null);
       const el = step.target ? await find(s, step.target) : null;
       if (el) ensureVisible(el, s.reduced);
-      s.overlay.spot(el && step.target ? step.target : null);
+      // Mit Ziel steht die Karte daneben; ohne geht sie an ihren Ruheplatz
+      if (el && step.target) s.overlay.spot(step.target);
+      else s.overlay.rest();
       if (s.record) console.info('mm-record-say', step.text); // Taktgeber für scripts/record-preview.ts
       await hold(s, step.ms ?? SAY_MS);
       return;

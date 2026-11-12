@@ -83,6 +83,14 @@ export const common: Record<keyof typeof De, string> = {
   // App update from the App Store (features/app-store.ts)
   storeUpdate: 'Update available',
   storeUpdateAction: 'Update',
+  // Website on iPhone and iPad: pointer to the iOS app (features/app-offer.ts)
+  appOfferTitle: 'Mental Math is available as an app',
+  appOfferLead: 'On the App Store for iPhone and iPad – everything you have here, plus:',
+  appOfferReminders: 'Reminders as notifications to keep your streak alive',
+  appOfferFeel: 'Haptic feedback with every tap',
+  appOfferSync: 'Sign in with your account and your progress comes along',
+  appOfferLater: 'Not now',
+  appOfferOpen: 'Open App Store',
   // Error card instead of an empty page (ui/crash.ts) and boot guard (public/js/boot-guard.js)
   crashTitle: 'This page could not be loaded',
   crashText: 'An error stopped the page from showing. Your data is safe. The other tabs usually keep working – and the error report helps to fix this.',

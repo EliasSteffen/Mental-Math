@@ -16,6 +16,7 @@ import { showWelcome } from './ui/onboarding.ts';
 import { openAccountOnProfile } from './views/settings.ts';
 import { startPush } from './platform/reminders.ts';
 import { startAppUpdateCheck } from './features/app-store.ts';
+import { armAppOffer } from './features/app-offer.ts';
 import { watchKeyboardInset } from './ui/keyboard-inset.ts';
 import { watchTextScale } from './ui/text-scale.ts';
 import { startEdgeSwipe } from './ui/edge-swipe.ts'; // Zurück-Wisch in der iOS-App
@@ -65,6 +66,7 @@ safely('comeback-hooks', registerComebackHooks); // v10 C: Comeback und Serie re
 safely('rewards', startProgressRewards); // v9 J: Liga, Orden, Karten still nachholen (Bestandsnutzer: einmal Hinweis)
 safely('league', () => startLeagueSync()); // v9 K: Liga-Wertung melden, Champion-Status holen (nur mit Konto, im Hintergrund)
 safely('app-store', startAppUpdateCheck); // nur iOS: neue Version im App Store
+safely('app-offer', () => { armAppOffer({ firstRun }); }); // nur Website auf iPhone/iPad: Hinweis auf die iOS-App
 appReady(); // nur iOS: Oberfläche läuft – bestätigt ein Live-Update, sucht nach neuen
 
 // Erst jetzt: Die Schritte oben müssen noch auf den echten Daten laufen (der Rundgang stellt auf Demo-Daten um)

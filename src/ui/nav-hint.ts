@@ -31,7 +31,8 @@ export function maybeShowNavHint(focus: boolean): void {
     onboardingDone: getSettings().onboardingDone,
     attempts: getAttempts().length,
     focus,
-    dialogOpen: document.querySelector('dialog[open], .sheet, .tour-ui') !== null,
+    // Auch kein Toast: Der Hinweis-Toast für Bestandsnutzer läge sonst über „OK“ (gleicher Start)
+    dialogOpen: document.querySelector('dialog[open], .sheet, .tour-ui, .toast') !== null,
     tourRunning: document.documentElement.dataset['tour'] !== undefined,
     targetVisible: visible(target),
   });

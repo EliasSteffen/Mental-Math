@@ -81,6 +81,14 @@ export const common = {
   // App-Update aus dem App Store (features/app-store.ts)
   storeUpdate: 'Update verfügbar',
   storeUpdateAction: 'Aktualisieren',
+  // Website auf iPhone und iPad: Hinweis auf die iOS-App (features/app-offer.ts)
+  appOfferTitle: 'Mental Math gibt’s als App',
+  appOfferLead: 'Im App Store für iPhone und iPad – alles, was du hier hast, und dazu:',
+  appOfferReminders: 'Erinnerungen als Mitteilung, damit deine Serie hält',
+  appOfferFeel: 'Spürbares Feedback (Haptik) bei jeder Eingabe',
+  appOfferSync: 'Mit deinem Konto ist dein Fortschritt auch in der App da',
+  appOfferLater: 'Später',
+  appOfferOpen: 'Zum App Store',
   // Fehlerkarte statt leerer Seite (ui/crash.ts) und Start-Wächter (public/js/boot-guard.js)
   crashTitle: 'Diese Seite konnte nicht geladen werden',
   crashText: 'Ein Fehler hat das Anzeigen abgebrochen. Deine Daten sind sicher. Die anderen Tabs funktionieren in der Regel weiter – und der Fehlerbericht hilft, das zu beheben.',
