@@ -5,6 +5,16 @@ const DATE = '2026-10-30';
 
 export const RELEASES: Release[] = [
   {
+    version: '2.4.1', date: '2026-11-12',
+    title: { de: 'Ein ruhigerer Rundgang', en: 'A calmer tour' },
+    highlights: [
+      { de: 'Der Rundgang ist ruhiger: Seine Texte stehen jetzt direkt neben der Stelle, um die es gerade geht, und zeigen mit einem Pfeil darauf. Statt zwischen oberem und unterem Rand zu springen, gleiten sie sanft zum nächsten Ziel.', en: 'A calmer tour: its texts now sit right next to the part they are about and point at it with an arrow. Instead of jumping between the top and bottom edge, they glide gently to the next spot.' },
+      { de: 'Wenn im Rundgang getippt wird, bleibt das Antwortfeld frei – du siehst immer, was im Feld steht. Und das Kapitel Lernen öffnet auf dem iPhone wieder den Lernen-Tab.', en: 'When the tour types an answer or it is your turn, the answer field stays visible – you always see what is in it. And the Learn chapter opens the Learn tab on iPhone again.' },
+      { de: 'Im Browser auf iPhone und iPad weist die Website jetzt auf die App im App Store hin – höchstens dreimal und nie mitten in einer Runde.', en: 'In the browser on iPhone and iPad, the website now points you to the app on the App Store – at most three times and never in the middle of a round.' },
+      { de: 'Behoben: Im Theme Aurora schien die Seite durch den Hinweis „Neu sortiert“ und durch das Banner im Live-Rennen. Beide sind jetzt gut lesbar, und der Hinweis liegt nicht mehr unter einer anderen Meldung.', en: 'Fixed: in the Aurora theme the page showed through the “Reorganised” hint and the live race banner. Both are easy to read now, and the hint no longer sits under another message.' },
+    ],
+  },
+  {
     version: '2.4.0', date: '2026-11-11',
     title: { de: 'Raketen-Rennen mit deiner Gruppe', en: 'Rocket races with your group' },
     highlights: [
