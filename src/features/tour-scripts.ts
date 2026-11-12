@@ -57,8 +57,10 @@ const MISTAKE: TourChapter = {
 const LEARN: TourChapter = {
   id: 'learn', title: 'tour.chLearn',
   steps: [
+    go('#/'), // Das Kapitel davor endet in einer Runde – dort gibt es keine Tab-Leiste zum Antippen
     tap('[data-tab="learn"]'),
-    say('tour.learnList', '.learn-groups', 2600, 'narrow'),
+    // Auf dem Telefon hat .learn-groups keine eigene Box (display: contents): dann die erste Gruppe
+    say('tour.learnList', '.learn-groups, .learn-group', 2600, 'narrow'),
     go('#/lernen/mult.2x1'),
     say('tour.learnMethod', '.learn-head', 3000),
     say('tour.learnGuide', '.guide-entry', 3000),
