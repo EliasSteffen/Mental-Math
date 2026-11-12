@@ -125,11 +125,11 @@
   /* ---------- iPad: Spielmodi in Tablet-Größe, Parallel-Karten nutzen die Breite ---------- */
   @media (min-width: 720px) and (min-height: 641px) {
     .play-caption { font-size:var(--text-md); }
-    .play-answer { width:min(100%, 340px); height:88px; padding:0 var(--space-5); border-radius:var(--radius-lg); font-size:48px; }
+    .play-answer { width:min(100%, 340px); height:88px; padding:0 var(--space-5); border-radius:var(--radius-lg); font-size:calc(48px * var(--type-scale-cap, 1)); }
     .play-answer.is-compact { width:160px; height:56px; font-size:var(--text-xl); }
     .play-cards { --play-card-h:208px; width:100%; max-width:760px; gap:var(--space-4); }
     .play-card { padding:var(--space-4); }
-    .play-card-main { font-size:56px; }
+    .play-card-main { font-size:calc(56px * var(--type-scale-cap, 1)); }
     .play-fields { max-width:480px; }
     .play-field { min-height:72px; }
   }
@@ -153,4 +153,42 @@
     font-size:var(--text-sm); line-height:1.45; color:var(--text);
   }
   .play-hint > .icon { margin-top:1px; color:var(--warn); }
+
+  /* ---------- Mini-Case (src/views/case-play.ts, v9 C) ---------- */
+  .case-stage { justify-content:flex-start; align-items:stretch; gap:var(--space-3); text-align:start; }
+  .case-stage > .train-cat { text-align:center; }
+  .case-stage > .train-q, .case-stage > .train-hint { align-self:center; text-align:center; }
+  .case-q { font-size:var(--text-lg); font-weight:var(--weight-semibold); }
+  .case-stage > .train-answer-block { margin-top:var(--space-1); }
+  .case-stage .train-outcome { align-self:center; }
+  /* Fallbeschreibung: einklappbar, nach dem ersten Schritt zu */
+  .case-brief {
+    width:100%; max-width:520px; margin-inline:auto;
+    border:1px solid var(--border); border-radius:var(--radius-md); background:var(--surface);
+  }
+  .case-brief-sum {
+    display:flex; align-items:center; justify-content:space-between; gap:var(--space-3);
+    min-height:var(--hit-min); padding:var(--space-2) var(--space-4); list-style:none; cursor:pointer;
+    border-radius:var(--radius-md);
+  }
+  .case-brief-sum::-webkit-details-marker { display:none; }
+  .case-brief-text { display:flex; flex-direction:column; min-width:0; gap:1px; }
+  .case-brief-label { font-size:var(--text-xs); color:var(--muted); }
+  .case-brief-title { font-size:var(--text-sm); font-weight:var(--weight-semibold); overflow-wrap:anywhere; }
+  .case-brief-chevron { display:flex; flex:none; color:var(--muted); transition:transform var(--dur-state) var(--ease-out); }
+  .case-brief[open] .case-brief-chevron { transform:rotate(180deg); }
+  .case-brief-body { display:flex; flex-direction:column; gap:var(--space-3); padding:0 var(--space-4) var(--space-4); }
+  .case-brief-p { font-size:var(--text-sm); line-height:1.5; }
+  .case-brief-body .exhibit { margin:0; }
+  /* Entscheidung: lange Antworten untereinander, linksbündig */
+  .case-stage ~ .dock .train-choices { grid-template-columns:minmax(0, 1fr); }
+  .case-stage ~ .dock .train-choice {
+    justify-content:flex-start; min-height:56px; padding:var(--space-2) var(--space-4);
+    font-size:var(--text-md); text-align:start;
+  }
+  .case-stage ~ .dock .train-choice-text { flex:1; }
+  /* Begründung und richtige Antwort im Sheet */
+  .case-why { font-size:var(--text-sm); line-height:1.5; }
+  .case-sheet-answer { margin-bottom:var(--space-3); font-size:var(--text-sm); color:var(--muted); }
+  @media (prefers-reduced-motion: reduce) { .case-brief-chevron { transition:none; } }
 }

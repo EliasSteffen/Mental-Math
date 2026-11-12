@@ -2,7 +2,7 @@ import type { analyse as De } from '../de/progress.ts';
 
 // Namespace 'analyse' (English) – muss exakt dieselben Schlüssel wie de/progress.ts haben
 export const analyse: Record<keyof typeof De, string> = {
-  title: 'Progress',
+  title: 'Statistics',
   sub: 'Last 7 days',
   // Fokus-Karte
   focusLabel: 'Your focus this week',
@@ -82,4 +82,12 @@ export const analyse: Record<keyof typeof De, string> = {
   trend: 'Trend',
   heatmapAria: 'Activity over the last weeks',
   minutes: '{n} min',
+  // v9 B
+  weekGoalRounds: 'Goal {n} rounds / day',
+  weekGoalRoundsOne: 'Goal {n} round / day',
+  weekAriaRounds: 'Rounds per day: {days}',
+  roundsOne: '{n} round',
+  roundsMany: '{n} rounds',
+  activityFreeze: '{n} freeze',
+  activityFreezes: '{n} freezes',
 };

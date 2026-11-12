@@ -62,6 +62,12 @@ test('Defaults, alte Daten werden ergänzt (In-Memory)', () => {
     lang: 'auto', lastSeenVersion: '', timerDisplay: 'calm', breathe: false, confetti: false,
     lastStoreCheck: 0, updateNotifiedVersion: '', updateNotifiedAt: 0, reviewAskedVersion: '', reviewAskedAt: 0,
     onboardingDone: false, placement: null,
+    dailyGoalRounds: 3, // v9 B
+    autoAdvance: true, // v9 A
+    duelName: '', // v9 I
+    league: null, badges: {}, cards: {}, // v9 J
+    xp: { earned: 0, seen: 0, bonus: 0, spent: 0 }, purchases: {}, frame: '', freezesBought: [], streakRepairs: [], comebackDays: [], // v10
+    questLog: {}, chests: {}, lpSeen: -1,
   });
   assert.deepEqual(getReviews(), {});
   assert.deepEqual(getActivity(), {});

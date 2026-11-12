@@ -1,0 +1,22 @@
+/* Einstieg für das CSS-Bundle (scripts/bundle.ts → dist/css/app.css). Reihenfolge = Kaskade. */
+@import "tokens.css";
+@import "base.css";
+@import "layout.css";
+@import "components.css";
+@import "views/today.css";
+@import "views/train.css";
+@import "views/progress.css";
+@import "views/achievements.css";
+@import "views/shop.css"; /* v10 P */
+@import "views/nav.css"; /* v11 N */
+@import "views/learn.css";
+@import "views/profile.css";
+@import "views/play.css";
+@import "views/compete.css";
+@import "views/duel.css"; /* v9 I */
+@import "views/race.css"; /* v12 R1, R3 */
+@import "views/quests.css"; /* v10 Q */
+@import "views/comeback.css"; /* v10 C */
+@import "views/tour.css";
+@import "views/goals.css"; /* v10 F */
+@import "exhibit.css";

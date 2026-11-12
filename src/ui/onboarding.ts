@@ -198,21 +198,23 @@ function showTourEnd(onAccount?: () => void, onPlacement?: () => void): void {
 }
 
 /**
- * Erster Start: Begrüßung mit dem Angebot des Rundgangs. Als gesehen gilt sie erst nach dem Rundgang (dann wieder auf den
- * echten Daten). Scheitert der Rundgang, übernimmt die Einführung als Dialog.
+ * Erster Start: Begrüßung mit dem Angebot des Rundgangs. Als gesehen gilt sie erst nach einer Wahl: „Selbst entdecken“
+ * oder der Rundgang selbst (dann wieder auf den echten Daten). Esc oder Tipp daneben zählt nicht – die Begrüßung kommt
+ * dann beim nächsten Start wieder. Scheitert der Rundgang, übernimmt die Einführung als Dialog.
  */
 export function showWelcome(onAccount?: () => void, onPlacement?: () => void): void {
   const remember = (): void => { if (!getSettings().onboardingDone) setSettings({ onboardingDone: true }); };
   let start = false;
+  let later = false;
   openModal({
     title: t('tour.welcomeTitle'),
     body: t('tour.welcomeText'),
     actions: [
-      { label: t('tour.welcomeLater') },
+      { label: t('tour.welcomeLater'), onClick: () => { later = true; } },
       { label: t('tour.welcomeStart'), primary: true, onClick: () => { start = true; } },
     ],
     onClose: () => {
-      if (!start) { remember(); return; }
+      if (!start) { if (later) remember(); return; }
       void import('../features/tour.ts').then((m) => {
         m.startTour('intro', {
           onEnd: (end) => {

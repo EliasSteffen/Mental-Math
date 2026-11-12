@@ -133,6 +133,8 @@ export const core: Record<keyof typeof De, string> = {
   'mode.custom': 'Custom training',
   'mode.challenge': 'Competition',
   'mode.placement': 'Placement test',
+  'mode.duel': 'Duel', // v9 I
+  'mode.warmup': 'Warm-up round', // v10 C
   'mode.sub': '{cat} · {sub}',
   'label.nullen': 'Zeros error',
   'label.ungenau': 'Inaccurate',

@@ -8,18 +8,19 @@ Minimalistischer Kopfrechen-Trainer für Case Interviews (Consulting). Er ist in
 - **Score pro Aufgabe** aus Ergebnis, Zeit im Verhältnis zur Zielzeit und Schwierigkeit
 - **Skill pro Kategorie und Aufgabentyp** (0–100) aus Genauigkeit und Tempo der letzten Versuche
 - **Schwächen-Erkennung** mit Diagnose (Nullen-Fehler, ungenau, zu langsam) und Tipps, dazu ein Modus „Schwächen trainieren“
-- **Analyse-Seite** mit Kategorien, Fehlermustern, Verlauf, letzten Fehlern und Export
+- **Statistik** (Erfolge → Statistik) mit Kategorien, Fehlermustern, Verlauf, letzten Fehlern und Export
 
 Details: [docs/SPEC.md](docs/SPEC.md)
 
 - **Lösungsweg mit den Zahlen der Aufgabe** nach jeder Antwort, dazu „Wie geht das?“ als Hilfe vor dem Antworten (halbe Punkte)
 - **Lernbereich** (`#/lernen`): Methode, Vorgehen, Trick und typische Fehler für alle Aufgabentypen, mit Beispiel zum Mitrechnen
+- **Navigation** (v11): vier Tabs *Heute · Lernen · Erfolge · Wettkampf*; Profil und Einstellungen liegen hinter dem Liga-Emblem oben rechts (iPad: Eintrag „Profil“ unten in der Seitenleiste)
 - **Optionale KI-Erklärungen** (Google Gemini, nur auf Knopfdruck) – siehe unten
-- **Tagesziel & Serie** (Minuten pro Tag, einstellbar), Aktivitäts-Heatmap, Level/XP
+- **Tagesziel & Serie** (Tagesziel in Runden, einstellbar; eine Runde am Tag hält die Serie, je 7 Tage gibt es einen automatischen Freeze), Aktivitäts-Heatmap, Level/XP
 - **Schwierigkeitsstufen** Leicht/Mittel/Schwer – fest oder „Auto“: je Aufgabentyp eine Treppe (3 sichere Treffer → schwerer, 2 Fehler unter den letzten 4 → leichter). Unter „Leicht“ übt die App dazwischen die Grundlage, auf der der Typ aufbaut (z. B. 2-stellig × 1-stellig → kleines 1×1), bis hinunter zu einem Einstiegs-1×1 mit ×2, ×5 und ×10 (`src/core/adaptive.ts`)
-- **Einstufungstest** am Ende des Onboardings (und unter Profil → Training): bis zu 10 Aufgaben auf einer Leiter vom kleinen 1×1 bis zu 2-stellig × 2-stellig und Prozent-Veränderungen – bestanden → höher, ein Patzer → zweite Chance, zwei Fehler → tiefer. Das Ergebnis (0–6, in den Einstellungen, synchronisiert) legt die Startstufe jedes Aufgabentyps fest (`src/core/placement.ts`, `startStep`)
+- **Einstufungstest** am Ende des Onboardings (und unter Profil → Training, erreichbar über das Liga-Emblem oben rechts): bis zu 10 Aufgaben auf einer Leiter vom kleinen 1×1 bis zu 2-stellig × 2-stellig und Prozent-Veränderungen – bestanden → höher, ein Patzer → zweite Chance, zwei Fehler → tiefer. Das Ergebnis (0–6, in den Einstellungen, synchronisiert) legt die Startstufe jedes Aufgabentyps fest (`src/core/placement.ts`, `startStep`)
 - **Fehler-Wiederholung über Tage** (Leitner-Boxen: 1, 2, 4, 7, 14 Tage) und eine **Tagesempfehlung** auf der Startseite
-- **Verlauf pro Kategorie** (14 Tage) auf der Analyse-Seite
+- **Verlauf pro Kategorie** (14 Tage) unter Erfolge → Statistik
 - **Themes** (Neon, OLED, Pastel, System), Einstellungen, Haptik/Sound, ±-Taste für Minus auf iOS
 - **PWA**: auf dem Handy installierbar, funktioniert offline (außer KI)
 - **iOS-App** aus demselben Code (Capacitor), gebaut und zu App Store Connect hochgeladen von GitHub Actions – siehe [iOS-App](#ios-app-app-store)
@@ -39,7 +40,7 @@ npm run dev:ai     # Build + http://localhost:8788 (mit KI-Function; liest GOOGL
 ```
 
 ```bash
-npm run build      # clean (dist/ leeren) → tsc (src → dist/js, sw.ts → dist/sw.js) → copy-static (public/ → dist/) → precache (dist/precache.json)
+npm run build      # clean (dist/ leeren) → tsc (Typprüfung, sw.ts → dist/sw.js) → copy-static (public/ → dist/) → pages → bundle (esbuild: src/app.ts → dist/js/app.js + Lazy-Chunks, CSS → dist/css/app.css; Einzelmodule entfallen) → precache (dist/precache.json)
 npm run clean      # löscht dist/
 npm run typecheck  # tsc über src, server, functions, tests, scripts
 npm test           # Tests (node --test, TypeScript direkt per Type-Stripping)
@@ -207,20 +208,36 @@ Pages Functions können keine eigenen Durable Objects definieren. Deshalb stellt
 3. Binding anlegen: *Workers & Pages → mental-math → Settings → Bindings → Add → Durable Object*, Variable `RATE_LIMITER`, Namespace `mental-math-rate-limiter_RateLimiter` – für Production (und bei Bedarf Preview), danach neu deployen.
 4. Optional zusätzlich: eine WAF-Rate-Limiting-Regel für `/api/` auf der Zone `elias-steffen.de` (Free Plan: 1 Regel, 10-Sekunden-Fenster).
 
+### Live-Rennen (einmalig einrichten)
+
+Live-Rennen in Gruppen (Raketen-Rennen, Lobby, gemeinsamer Countdown, Raketen der anderen in Echtzeit) brauchen einen WebSocket-Treffpunkt. Wie beim Rate-Limit stellt ein kleiner Worker (`workers/race-room`, Name `mental-math-race-room`, ohne öffentliche Route) das Durable Object `RaceRoom` bereit, eine Instanz je Rennen. Es ist nur Treffpunkt und Taktgeber (Lobby, Startzeit, Positionen); gewertet wird wie bei Geister-Rennen über `POST /api/challenge/race/:id/finish`. Ablauf: Die App holt per `POST /api/challenge/race/:id/ticket` ein 60 Sekunden gültiges, mit `AUTH_JWT_KEY` signiertes Ticket (nur Mitglieder, nur Live-Rennen), verbindet sich mit `wss://…/api/race/live/<id>?t=<ticket>`, und die Pages Function `functions/api/race/live` prüft das Ticket und reicht den Upgrade an das Durable Object weiter. Weil der Worker nur über das Binding erreichbar ist, vertraut das Durable Object den Headern dieser Function – **er braucht kein eigenes Secret**.
+
+1. API-Token mit **Account · Workers Scripts · Edit** (wie beim Rate-Limit; Dashboard → *My Profile → API Tokens*).
+2. Worker deployen: *Actions → Deploy Race Room → Run workflow* (läuft danach automatisch bei Änderungen unter `workers/race-room/`), oder lokal:
+
+   ```bash
+   npx wrangler deploy --config workers/race-room/wrangler.toml
+   ```
+
+3. Binding anlegen: *Workers & Pages → mental-math → Settings → Bindings → Add → Durable Object*, Variable `RACE_ROOM`, Namespace `mental-math-race-room_RaceRoom` – für Production **und** Preview, danach neu deployen. `AUTH_JWT_KEY` ist schon gesetzt (Konto-Anmeldung).
+4. Voraussetzung sind außerdem die Gruppen-Rennen (`sql/008_races.sql`, Paket R2).
+
+Ohne Worker bzw. Binding antwortet `/api/race/live/` mit `503 unavailable`, die App blendet „Live-Rennen“ aus; Geister-Rennen und „Reihum“ funktionieren weiter.
+
 ## Erinnerungen (Push-Benachrichtigungen)
 
-Unter *Profil → Erinnerungen* schaltet man Push-Benachrichtigungen pro Gerät ein. Ein Konto ist dafür nicht nötig.
+Unter *Profil → Erinnerungen* (Liga-Emblem oben rechts, auf dem iPad „Profil“ in der Seitenleiste) schaltet man Push-Benachrichtigungen pro Gerät ein. Ein Konto ist dafür nicht nötig.
 
 | Erinnerung | Wann | Entfällt, wenn … |
 |---|---|---|
-| **Täglich** | zur gewählten Uhrzeit an den gewählten Wochentagen | das Tagesziel heute schon erreicht ist (abschaltbar) |
-| **Serie retten** | um 20 Uhr | das Tagesziel erreicht ist oder keine Serie läuft |
+| **Täglich** | zur gewählten Uhrzeit an den gewählten Wochentagen | das Tagesziel (Runden) heute schon erreicht ist (abschaltbar) |
+| **Serie retten** | um 20 Uhr | heute schon eine Runde gespielt wurde oder keine Serie läuft |
 | **Wiederholungen** | sobald Leitner-Wiederholungen fällig sind, zwischen 9 und 20 Uhr, höchstens einmal am Tag | nichts fällig ist |
 | **Lern-Hinweis** | sonntags um 10 Uhr: ein Rechentrick, bevorzugt zu einer Schwäche | – |
 
 Zusätzlich gilt: keine Erinnerung, wenn die App in den letzten 20 Minuten offen war; zwischen zwei Benachrichtigungen liegen mindestens 90 Minuten (außer bei der täglichen). Uhrzeiten gelten in der Zeitzone des Geräts, auch über die Zeitumstellung hinweg.
 
-**So funktioniert es:** Die App abonniert Web Push (VAPID) und meldet Einstellungen, Zeitzone und einen knappen Lernstand (Serie, Tagesziel erreicht, fällige Wiederholungen, bis zu 3 schwache Aufgabentypen) an `/api/push` (`functions/api/push/[[path]].ts` → `server/push.ts`). Ein Supabase-Cron (`pg_cron` + `pg_net`) ruft jede Minute `/api/push/tick` auf; der Server holt die fälligen Abos, entscheidet (`src/core/reminders.ts`), verschlüsselt die Nachricht (RFC 8291, `server/push-crypto.ts`) und schickt sie an den Push-Dienst des Browsers. Der Service Worker zeigt sie an und öffnet beim Antippen die passende Seite. Das Gerät erzeugt eine zufällige ID und ein Geheimnis; gespeichert wird nur dessen SHA-256-Hash. Ausschalten löscht das Abo auf dem Server.
+**So funktioniert es:** Die App abonniert Web Push (VAPID) und meldet Einstellungen, Zeitzone und einen knappen Lernstand (Serie, Runden heute und Tagesziel in Runden, Serie gesichert, aktive Minuten, fällige Wiederholungen, bis zu 3 schwache Aufgabentypen; die Runden-Felder sind optional, damit ältere Clients und Server zusammenpassen) an `/api/push` (`functions/api/push/[[path]].ts` → `server/push.ts`). Ein Supabase-Cron (`pg_cron` + `pg_net`) ruft jede Minute `/api/push/tick` auf; der Server holt die fälligen Abos, entscheidet (`src/core/reminders.ts`), verschlüsselt die Nachricht (RFC 8291, `server/push-crypto.ts`) und schickt sie an den Push-Dienst des Browsers. Der Service Worker zeigt sie an und öffnet beim Antippen die passende Seite. Das Gerät erzeugt eine zufällige ID und ein Geheimnis; gespeichert wird nur dessen SHA-256-Hash. Ausschalten löscht das Abo auf dem Server.
 
 **Einrichten (einmalig):** Voraussetzung ist dasselbe Supabase-Projekt wie für das Konto, also die Pages-Secrets `SUPABASE_URL` und `SUPABASE_SERVICE_ROLE_KEY`. Dann im Supabase-SQL-Editor nacheinander ausführen:
 
@@ -321,13 +338,29 @@ values ('comp-prozente-kw47', 'competition', '{"de":"Prozente-Woche","en":"Perce
 
 **Moderation:** Name ausblenden mit `update public.challenge_profiles set listed = false where lower(display_name) = lower('…');`, einen Versuch aus der Wertung nehmen mit `update public.challenge_attempts set status = 'flagged' where …;`.
 
+## Ligen & Champion
+
+Die Liga (Bronze I … Meister) berechnet jedes Gerät aus dem eigenen Können (Wertung 0–1000 LP, `src/core/league.ts`). Über Meister gibt es **Champion**: nur die besten 10 Konten aller Meister. Dafür meldet die App mit Konto ihre Wertung an `/api/challenge/league` (höchstens alle 10 Minuten, nur bei Änderung, im Hintergrund); die Top-Liste steht im Wettkampf-Tab, „Champion · Platz n“ erscheint im Liga-Emblem unter Erfolge. Ohne Konto oder ohne Netz funktioniert alles wie bisher, nur ohne Champion.
+
+**Einrichten (einmalig):** `sql/007_league.sql` im Supabase-SQL-Editor ausführen, nach `sql/006_challenges.sql` (idempotent, rein hinzufügend, nur `service_role`; legt `public.league_scores`, `league_put` und `league_champions` an). Solange das SQL fehlt, antwortet der Server mit `503 unavailable` und die App blendet Champion aus – Vorschau und Produktion teilen dieselbe Datenbank, das Ausführen betrifft beide, ältere Versionen bemerken es nicht.
+
+**Anzahl der Champions:** Pages-Variable `CHAMPION_COUNT` (optional, Standard `10`, erlaubt 1–1000; Unsinn fällt auf 10 zurück). Eine Änderung braucht nur einen neuen Deploy bzw. das Neuladen der Variable, keinen Code.
+
+**Schutz gegen Manipulation:** Die Wertung kommt vom Gerät und lässt sich nicht beweisen. Deshalb gilt: der Server prüft Bereich und Stufe (`tier` muss zur Wertung passen); höchstens 150 LP Zuwachs pro Berliner Tag gegenüber dem Tagesstart (die erste Meldung zählt ab 0, Bestandsnutzer mit hoher Wertung steigen also über einige Tage ein; Abstieg gilt sofort); Champion zählt nur mit Wertung ≥ 780 (Meister), einer Meldung in den letzten 30 Tagen und mindestens 3 beendeten **gewerteten** Dailys in diesen 30 Tagen (die der Server selbst prüft und bewertet); bei Gleichstand gewinnt, wer die Wertung früher erreicht hat. Namen erscheinen nur bei Zustimmung („Anonym“ sonst, die eigene Zeile zeigt den eigenen Namen). Moderation: `delete from public.league_scores where user_id = '…';` nimmt ein Konto aus der Liste (es meldet sich beim nächsten Mal wieder an; dauerhaft per `update public.challenge_attempts set status = 'flagged' …`, dann fehlen die gewerteten Dailys).
+
+## Gruppen-Rennen (einmalig einrichten)
+
+Das **Raketen-Rennen** (`#/rennen`) hat drei Spielweisen: „Reihum“ (ein Gerät, ohne Konto, läuft immer), **Geister-Rennen** in Gruppen (jede und jeder spielt einmal, wann es passt, gegen die Raketen der anderen) und Live-Rennen. Ein Geister-Rennen wird im Wettkampf-Tab über die Gruppe angelegt (Gruppe → „Raketen-Rennen“, offen 1 h / 24 h / 48 h / 7 Tage, höchstens 5 offene Rennen je Gruppe). Der Server (`server/race.ts`, Routen `/api/challenge/race/*`) erzeugt die Aufgaben aus dem Seed, wertet jede Abgabe mit derselben Bewertung wie im Training neu und speichert nur die Zeitleiste. Er verwirft Antworten nach Dauer + 3 s, markiert unplausible Läufe (richtige Antwort unter 250 ms, Zeiten nicht aufsteigend, später datiert als Zeit verging) als `flagged` (zählt nicht in der Rangliste) und lässt je Person genau einen Lauf zu.
+
+**Einrichten (einmalig):** `sql/008_races.sql` im Supabase-SQL-Editor ausführen, nach `sql/006_challenges.sql` (idempotent, rein hinzufügend, nur `service_role`; legt `public.races`, `public.race_runs` und die Funktionen `race_*` an). Weitere Variablen braucht es nicht. Solange das SQL fehlt, antwortet der Server mit `503 unavailable` und die App blendet die Gruppen-Rennen aus – Vorschau und Produktion teilen dieselbe Datenbank. Beendete Rennen werden rund 120 Tage nach ihrem Ende beim Anlegen eines neuen Rennens gelöscht.
+
 ## Daten
 
 Fortschritt und Statistiken liegen lokal in IndexedDB. Ohne Konto bleibt alles auf dem Gerät, es gibt kein Tracking. Mit Konto (Passkey) werden die Trainingsdaten über Supabase zwischen deinen Geräten synchronisiert. In den Einstellungen lassen sich die Daten als JSON exportieren, importieren oder löschen.
 
 **Wiederherstellungscode:** Beim Anlegen des Kontos zeigt die App einmalig einen Code (20 Zeichen). Wer alle Passkeys verliert, legt damit unter *Einstellungen → Daten & Account → Passkey verloren?* einen neuen Passkey an; danach gibt es einen neuen Code. Gespeichert wird nur ein SHA-256-Hash.
 
-**Supabase-SQL (einmalig, in dieser Reihenfolge im SQL-Editor):** `packages/passkey-auth/sql/001_passkey_auth.sql`, `packages/offline-sync/sql/offline_sync_guard.sql`, `sql/002_training_data.sql`, `packages/passkey-auth/sql/003_recovery_codes.sql`, für Erinnerungen außerdem `sql/004_push.sql` und `sql/005_push_cron.sql`, für Ranglisten und Wettbewerbe `sql/006_challenges.sql`. Alle Skripte sind idempotent.
+**Supabase-SQL (einmalig, in dieser Reihenfolge im SQL-Editor):** `packages/passkey-auth/sql/001_passkey_auth.sql`, `packages/offline-sync/sql/offline_sync_guard.sql`, `sql/002_training_data.sql`, `packages/passkey-auth/sql/003_recovery_codes.sql`, für Erinnerungen außerdem `sql/004_push.sql` und `sql/005_push_cron.sql`, für Ranglisten und Wettbewerbe `sql/006_challenges.sql`, für Gruppen-Rennen `sql/008_races.sql`. Alle Skripte sind idempotent.
 
 **Update auf 1.14.0:** `packages/passkey-auth/sql/001_passkey_auth.sql` (Gnadenfrist und Wiederverwendungserkennung beim Refresh, Sitzungen höchstens 90 Tage) und `sql/002_training_data.sql` (Löschen samt Lösch-Markierung in einem Aufruf) erneut einspielen. Beide sind idempotent; ob zuerst SQL oder Server ausgerollt wird, ist egal.
 
@@ -343,7 +376,7 @@ src/
   features/         ai-client, activity, account, sync, reminder-input
   platform/         Website vs. iOS-App: index (einzige Schnittstelle), web, native (Capacitor),
                     reminders (web-push | native-reminders), native-auth
-  vendor/           esbuild-Einstiege: auth, storage, native (Capacitor-Plugins, nur in der App)
+  vendor/           Einstiege für scripts/bundle.ts: auth, storage, native (Capacitor-Plugins, nur in der App)
   views/            home, lernen, analyse, settings, daily, chain, train/
   router.ts  app.ts
   sw.ts             Service Worker (→ dist/sw.js)
@@ -363,6 +396,7 @@ ios/                        ← Xcode-Projekt der iOS-App (Capacitor), eigene Pl
 capacitor.config.json       ← App-ID, Name, WebView-Optionen
 sql/                        ← Supabase-SQL der App (Trainingsdaten, Push + Cron, Challenges)
 workers/rate-limiter/       ← Worker mit dem Durable Object RateLimiter (eigener Deploy-Workflow)
+workers/race-room/          ← Worker mit dem Durable Object RaceRoom für Live-Rennen (eigener Deploy-Workflow)
 tests/                      ← node --test (*.test.ts)
 docs/                       ← SPEC, ARCHITECTURE, PLAN-*
 .github/workflows/deploy.yml  ← CI/CD: Tests + Build + Deploy auf Cloudflare Pages (PR- und develop-Vorschau, Produktion mit Release-Gate, Live-Update-Manifest)

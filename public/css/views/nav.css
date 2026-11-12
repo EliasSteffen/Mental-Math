@@ -1,0 +1,72 @@
+/* Navigation (v11 N): Profil-Knopf mit Liga-Emblem oben rechts, „Schließen“ im Profil, Profil als Modal-Seite,
+   Eintrag „Profil“ unten in der iPad-Seitenleiste. */
+@layer views {
+  /* Large Title mit Knopf rechts: der Titel bricht vor dem Knopf um, der Knopf bleibt oben rechts */
+  .large-title.has-account, .large-title.has-action { position:relative; min-height:var(--hit-min); padding-right:calc(var(--hit-min) + var(--space-3)); }
+  .account-button, .modal-close {
+    position:absolute; top:0; right:0;
+    display:flex; align-items:center; justify-content:center;
+    width:var(--hit-min); height:var(--hit-min); border-radius:50%;
+    border:1px solid var(--border); background:var(--surface); color:var(--text);
+    box-shadow:var(--shadow-1, none); text-decoration:none; cursor:pointer;
+    transition:var(--press-transition), background-color var(--dur-state) var(--ease-out);
+  }
+  .account-button:hover, .modal-close:hover { background:var(--surface-2); }
+  .account-button svg { display:block; }
+
+  /* Profil als Modal-Seite: auf dem Telefon keine Tab-Leiste, die Seite gleitet von unten herein */
+  @media (max-width: 719px) {
+    body.is-modal .tabbar, body.is-modal .cta-float { display:none; }
+    body.is-modal .screen { padding-bottom:calc(var(--space-7) + env(safe-area-inset-bottom, 0px)); }
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    #app.modal-enter { animation:modal-in var(--dur-enter) var(--ease-out); }
+    @keyframes modal-in { from { transform:translateY(32px); opacity:0; } to { transform:none; opacity:1; } }
+  }
+
+  /* Zurück-Wisch vom linken Rand (ui/edge-swipe.ts, nur iOS-App): die Seite folgt dem Finger, links fällt ein leichter Schatten */
+  html.is-edge-swiping, html.is-edge-swiping body { overflow-x:hidden; }
+  #app.is-swiping { transform:translateX(var(--swipe-x, 0px)); box-shadow:-10px 0 28px -10px var(--scrim); will-change:transform; }
+  #app.is-swipe-settle { transition:transform var(--dur-enter) var(--ease-out); }
+  @media (prefers-reduced-motion: no-preference) {
+    #app.swipe-arrive { animation:swipe-arrive var(--dur-state) var(--ease-out); }
+    @keyframes swipe-arrive { from { transform:translateX(-14px); opacity:.6; } to { transform:none; opacity:1; } }
+  }
+
+  /* Seitenleiste: Eintrag „Profil“ nur ab 720 px, abgesetzt am unteren Rand */
+  .tabbar-profile { display:none; }
+  .tab-sub { display:none; }
+  @media (min-width: 720px) {
+    .large-title.has-account { padding-right:0; min-height:0; }
+    .account-button { display:none; }
+    .tabbar-profile { display:flex; margin-top:auto; border-top:1px solid var(--border); border-radius:0 0 var(--radius-key, 12px) var(--radius-key, 12px); padding-top:var(--space-2); min-height:68px; }
+    .tabbar-profile .tab-pill { height:30px; }
+  }
+  @media (min-width: 1024px) {
+    .tabbar-profile { border-radius:0; min-height:56px; }
+    .tabbar-profile .tab-label { display:flex; flex-direction:column; align-items:flex-start; line-height:1.2; }
+    .tab-sub { display:block; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:var(--text-sm); font-weight:var(--weight-regular, 400); color:var(--muted); }
+  }
+
+  /* Einmaliger Hinweis nach dem Update (ui/nav-hint.ts): Sprechblase unter dem Emblem bzw. neben dem Seitenleisten-Eintrag */
+  .nav-hint {
+    position:fixed; z-index:90; top:var(--hint-top, 72px); right:var(--gutter);
+    width:min(calc(100% - 2 * var(--gutter)), 320px); box-sizing:border-box;
+    display:flex; flex-direction:column; gap:var(--space-3); padding:var(--space-4);
+    border:1px solid var(--border); border-radius:var(--radius-md);
+    background:var(--surface); color:var(--text); box-shadow:var(--shadow-2);
+  }
+  .nav-hint::before {
+    content:""; position:absolute; top:-6px; right:18px; width:10px; height:10px; rotate:45deg;
+    background:var(--surface); border-left:1px solid var(--border); border-top:1px solid var(--border);
+  }
+  .nav-hint-text { margin:0; font-size:var(--text-sm); line-height:1.45; }
+  .nav-hint-ok { align-self:flex-end; }
+  @media (min-width: 720px) {
+    .nav-hint.is-side { top:auto; bottom:var(--gutter); right:auto; left:var(--hint-left, 120px); }
+    .nav-hint.is-side::before { top:auto; bottom:22px; left:-6px; right:auto; rotate:-45deg; }
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .nav-hint { animation:rise-in var(--dur-enter) var(--ease-out) both; }
+  }
+}

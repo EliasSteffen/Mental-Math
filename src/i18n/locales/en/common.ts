@@ -34,8 +34,13 @@ export const common: Record<keyof typeof De, string> = {
   tabToday: 'Today',
   tabLearn: 'Learn',
   tabCompete: 'Compete',
-  tabProgress: 'Progress',
-  tabProfile: 'Profile',
+  tabAchievements: 'Achievements',
+  profileButton: 'Profile and settings',
+  profileEntry: 'Profile',
+  navHintText: 'Reorganised: you now find Profile and settings behind your league emblem at the top right. Progress is now called Achievements.',
+  navHintTextSide: 'Reorganised: you now find Profile and settings down here in the sidebar. Progress is now called Achievements.',
+  navHintOk: 'OK',
+  profileClose: 'Close',
   // Themes
   themeSystem: 'System',
   themePaper: 'Paper',
@@ -43,6 +48,9 @@ export const common: Record<keyof typeof De, string> = {
   themeOled: 'OLED',
   themeAurora: 'Aurora',
   themeNeon: 'Neon',
+  themeSunset: 'Sunset',
+  themeSand: 'Sand',
+  themeOcean: 'Deep sea',
   // Sheets, focus mode, controls
   close: 'Close',
   exitFocus: 'Quit',
@@ -83,4 +91,12 @@ export const common: Record<keyof typeof De, string> = {
   crashCopied: 'Error report copied',
   crashReset: 'Clear app cache and reload',
   crashResetHelp: 'Loads the app fresh from the server. Training data and account stay.',
+  // v9 B: daily goal in rounds, streak, freeze
+  roundsOfGoal: '{done} / {goal} rounds',
+  roundsOfGoalOne: '{done} / {goal} round',
+  streakRun: '{n} in a row',
+  freezeAria: '{n} streak freezes',
+  freezeOneAria: '{n} streak freeze',
+  startHint: 'Start your streak today',
+  goalReached: 'Daily goal reached',
 };

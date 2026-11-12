@@ -15,19 +15,7 @@
   <link rel="apple-touch-icon" href="/icons/apple-touch-icon-180.png">
   <link rel="icon" type="image/svg+xml" href="/favicon.svg">
   <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png">
-  <link rel="stylesheet" href="css/tokens.css">
-  <link rel="stylesheet" href="css/base.css">
-  <link rel="stylesheet" href="css/layout.css">
-  <link rel="stylesheet" href="css/components.css">
-  <link rel="stylesheet" href="css/views/today.css">
-  <link rel="stylesheet" href="css/views/train.css">
-  <link rel="stylesheet" href="css/views/progress.css">
-  <link rel="stylesheet" href="css/views/learn.css">
-  <link rel="stylesheet" href="css/views/profile.css">
-  <link rel="stylesheet" href="css/views/play.css">
-  <link rel="stylesheet" href="css/views/compete.css">
-  <link rel="stylesheet" href="css/views/tour.css">
-  <link rel="stylesheet" href="css/exhibit.css">
+  <link rel="stylesheet" href="css/app.css">
   <script src="js/boot-guard.js" defer></script>
   <script type="module" src="js/app.js"></script>
 </head>
@@ -44,18 +32,15 @@
       <span class="tab-pill"><svg aria-hidden="true" focusable="false" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 6.5C10.5 5.3 8.4 4.75 4 4.75v13.5c4.4 0 6.5.55 8 1.75 1.5-1.2 3.6-1.75 8-1.75V4.75c-4.4 0-6.5.55-8 1.75Z"/><path d="M12 6.5V20"/></svg></span>
       <span class="tab-label">Lernen</span>
     </a>
+    <a class="tab press" href="#/erfolge" data-tab="achievements">
+      <span class="tab-pill"><svg aria-hidden="true" focusable="false" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="15" r="5.5"/><path d="M8.6 10.6L6.5 3.5h4l1.5 3.2 1.5-3.2h4l-2.1 7.1"/><path d="M12 12.6v4.8M10.6 14.2L12 12.6"/></svg></span>
+      <span class="tab-label">Erfolge</span>
+    </a>
     <a class="tab press" href="#/wettbewerbe" data-tab="compete">
       <span class="tab-pill"><svg aria-hidden="true" focusable="false" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M8 4h8v6a4 4 0 0 1-8 0z"/><path d="M8 6H4v1a4 4 0 0 0 4 4"/><path d="M16 6h4v1a4 4 0 0 1-4 4"/><path d="M12 14v4"/><path d="M8 21h8"/></svg></span>
       <span class="tab-label">Wettkampf</span>
     </a>
-    <a class="tab press" href="#/fortschritt" data-tab="progress">
-      <span class="tab-pill"><svg aria-hidden="true" focusable="false" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M5 19V11M12 19V5M19 19v-6"/></svg></span>
-      <span class="tab-label">Fortschritt</span>
-    </a>
-    <a class="tab press" href="#/profil" data-tab="profile">
-      <span class="tab-pill"><svg aria-hidden="true" focusable="false" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.5"/><path d="M5 19.5c1.2-3.3 3.8-5 7-5s5.8 1.7 7 5"/></svg></span>
-      <span class="tab-label">Profil</span>
-    </a>
+    <a class="tab tabbar-profile press" href="#/profil" aria-label="Profil und Einstellungen"><span class="tab-pill"></span><span class="tab-label">Profil</span></a>
   </nav>
   <noscript><p class="noscript">Diese App benötigt JavaScript.</p></noscript>
 </body>

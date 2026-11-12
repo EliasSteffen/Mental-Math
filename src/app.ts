@@ -8,13 +8,21 @@ import { detectLang, setLang } from './i18n/index.ts';
 import { restoreAccount, watchAccountRestore } from './features/account.ts';
 import { startSync } from './features/sync.ts';
 import { watchPending } from './features/challenge.ts';
+import { watchRacePending } from './features/race-sync.ts'; // v12 R2
 import { maybeShowWhatsNew } from './features/whats-new.ts';
 import { shouldShowOnboarding } from './features/onboarding.ts';
+import { markNavHintSeen } from './core/nav-hint.ts';
 import { showWelcome } from './ui/onboarding.ts';
 import { openAccountOnProfile } from './views/settings.ts';
 import { startPush } from './platform/reminders.ts';
 import { startAppUpdateCheck } from './features/app-store.ts';
 import { watchKeyboardInset } from './ui/keyboard-inset.ts';
+import { watchTextScale } from './ui/text-scale.ts';
+import { startEdgeSwipe } from './ui/edge-swipe.ts'; // Zurück-Wisch in der iOS-App
+import { startProgressRewards } from './features/rewards.ts'; // v9 J
+import { registerQuestHooks } from './features/quests.ts'; // v10 Q
+import { registerComebackHooks } from './features/comeback.ts'; // v10 C
+import { startLeagueSync } from './features/league-sync.ts'; // v9 K
 
 // iOS-App: vorgemerktes Live-Update anwenden, bevor etwas gezeichnet wird (docs/PLAN-live-updates.md). Lädt die WebView
 // nicht binnen 5 s neu, geht es mit dem laufenden Bundle weiter.
@@ -26,10 +34,10 @@ await initStorage();
 setPlacement(getSettings().placement?.theta ?? null);
 onChange(() => setPlacement(getSettings().placement?.theta ?? null));
 
-// Einführung nur bei Neuinstallation – vor maybeShowWhatsNew() entscheiden, das dabei lastSeenVersion setzt.
-// Beide schließen sich aus: „Was ist neu?“ bleibt bei Neuinstallationen stumm (merkt sich nur die Version).
-const { onboardingDone, lastSeenVersion } = getSettings();
-const firstRun = shouldShowOnboarding({ onboardingDone, lastSeenVersion, attempts: getAttempts().length });
+// Einführung, bis der Nutzer im Dialog gewählt hat (onboardingDone) – unabhängig von „Was ist neu?“. Bei Neuinstallationen
+// bleibt maybeShowWhatsNew() stumm (merkt sich nur die Version).
+const { onboardingDone } = getSettings();
+const firstRun = shouldShowOnboarding({ onboardingDone, attempts: getAttempts().length });
 
 /** Startschritt ausführen; ein Fehler darf die übrigen Schritte nicht verhindern (sonst bleibt die Seite leer). */
 const safely = (label: string, fn: () => unknown): void => {
@@ -37,17 +45,25 @@ const safely = (label: string, fn: () => unknown): void => {
 };
 
 safely('theme', () => initTheme(getSettings().theme));
+safely('text-scale', () => { watchTextScale(); }); // v9 G: Systemschrift → --type-scale, vor dem ersten Rendern
 safely('keyboard', () => { watchKeyboardInset(); }); // Sheets und Dialoge über der Bildschirmtastatur (iOS)
 safely('activity', startActivityTracker);
 safely('platform', startPlatform);
 safely('lang', () => setLang(detectLang(getSettings().lang)));
+safely('edge-swipe', startEdgeSwipe); // vor dem Router: meldet jede gezeichnete Seite dem Plugin bzw. führt die Web-Geste
 safely('router', startRouter); // zeichnet selbst fehlertolerant (Fehlerkarte statt leerer Seite)
 safely('account', () => { void restoreAccount(); });
 safely('account-watch', () => watchAccountRestore()); // Offline-Kaltstart: Anmeldung wiederherstellen, sobald das Netz zurück ist
+safely('race', () => watchRacePending()); // v12 R2: wartende Rennen-Abgabe senden
 safely('challenge', () => watchPending()); // Gewertete Challenge: offene Abgabe senden, sobald angemeldet bzw. wieder online
 safely('sync', startSync);
 safely('push', startPush);
+if (firstRun) markNavHintSeen(); // Neulinge bekommen die Einführung, nie den Hinweis „Neu sortiert“ (v11 T)
 safely('whats-new', maybeShowWhatsNew);
+safely('quest-hooks', registerQuestHooks); // v10 Q: Tagesquests und Wochentruhe (vor startProgressRewards)
+safely('comeback-hooks', registerComebackHooks); // v10 C: Comeback und Serie reparieren (vor startProgressRewards)
+safely('rewards', startProgressRewards); // v9 J: Liga, Orden, Karten still nachholen (Bestandsnutzer: einmal Hinweis)
+safely('league', () => startLeagueSync()); // v9 K: Liga-Wertung melden, Champion-Status holen (nur mit Konto, im Hintergrund)
 safely('app-store', startAppUpdateCheck); // nur iOS: neue Version im App Store
 appReady(); // nur iOS: Oberfläche läuft – bestätigt ein Live-Update, sucht nach neuen
 

@@ -26,6 +26,9 @@ export const home: Record<keyof typeof De, string> = {
   placementTitle: 'Placement test',
   placementSub: 'Finds your starting level',
   placementValue: 'about 2 min',
+  // v11 H: placement test as hero for new users
+  placementReason: 'Find your starting level in 2 minutes',
+  placementCta: 'Start test',
   dailyRanked: 'ranked · one attempt',
   dailyUnranked: 'unranked · sign in for the leaderboard',
   competeTitle: 'Competitions & leaderboards',
@@ -44,4 +47,12 @@ export const home: Record<keyof typeof De, string> = {
   categories: 'Categories',
   ctaPractice: 'Practice now',
   ctaMinutes: 'about {n} min',
+  // v9 C
+  caseTitle: 'Mini case',
+  caseSub: 'like the interview',
+  // v9 H
+  exampleLabel: 'For example',
+  exampleNames: 'In this round',
+  goalDotsAria: '{done} of {goal} rounds today',
+  goalDotsAriaOne: '{done} of {goal} round today',
 };

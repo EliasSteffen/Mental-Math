@@ -1,6 +1,6 @@
-// Namespace 'analyse' (Deutsch) – Tab „Fortschritt“; Schlüssel ohne Präfix, Zugriff über t('analyse.key')
+// Namespace 'analyse' (Deutsch) – Seite „Statistik“ (unter Erfolge); Schlüssel ohne Präfix, Zugriff über t('analyse.key')
 export const analyse = {
-  title: 'Fortschritt',
+  title: 'Statistik',
   sub: 'Letzte 7 Tage',
   // Fokus-Karte
   focusLabel: 'Dein Fokus diese Woche',
@@ -80,4 +80,12 @@ export const analyse = {
   trend: 'Verlauf',
   heatmapAria: 'Aktivität der letzten Wochen',
   minutes: '{n} min',
+  // v9 B
+  weekGoalRounds: 'Ziel {n} Runden / Tag',
+  weekGoalRoundsOne: 'Ziel {n} Runde / Tag',
+  weekAriaRounds: 'Runden pro Tag: {days}',
+  roundsOne: '{n} Runde',
+  roundsMany: '{n} Runden',
+  activityFreeze: '{n} Freeze',
+  activityFreezes: '{n} Freezes',
 } as const;

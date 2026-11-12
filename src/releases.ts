@@ -5,6 +5,55 @@ const DATE = '2026-10-30';
 
 export const RELEASES: Release[] = [
   {
+    version: '2.4.0', date: '2026-11-11',
+    title: { de: 'Raketen-Rennen mit deiner Gruppe', en: 'Rocket races with your group' },
+    highlights: [
+      { de: 'Neu: Raketen-Rennen in Gruppen. Lege im Gruppen-Fenster ein Rennen an – 30 bis 120 Sekunden, eine Kategorie oder gemischt, offen für 1 Stunde bis 7 Tage. Alle spielen dieselben Aufgaben, wann es passt, gegen die Raketen der anderen.', en: 'New: rocket races in groups. Start a race from the group sheet – 30 to 120 seconds, one category or mixed, open for 1 hour up to 7 days. Everyone plays the same tasks whenever it suits them, against the other rockets.' },
+      { de: 'Neu: Live-Rennen. Alle warten in der Lobby, starten gemeinsam auf ein Signal und sehen die Raketen der anderen in Echtzeit steigen. Bricht die Verbindung kurz ab, verbindet sich die App von selbst neu.', en: 'New: live races. Everyone waits in the lobby, starts together on one signal and sees the other rockets climb in real time. If the connection drops for a moment, the app reconnects on its own.' },
+      { de: 'Nach deinem Lauf siehst du Podest und Rangliste des Rennens und wer aus der Gruppe noch fehlt. Offene Rennen deiner Gruppen stehen direkt im Wettkampf-Tab, und jedes Rennen lässt sich per Link teilen.', en: 'After your run you see the race podium, the standings and who in the group is still missing. Open races of your groups appear right in the Compete tab, and every race can be shared with a link.' },
+      { de: 'Fair für alle: Jede Person fliegt ein Rennen genau einmal, und gewertet wird auf dem Server. Es zählen die richtigen Antworten, bei Gleichstand weniger Fehler.', en: 'Fair for everyone: each person flies a race exactly once, and scoring happens on the server. Correct answers count, with fewer mistakes breaking a tie.' },
+      { de: 'Behoben: Zurück-Wischen vom linken Rand klappt in der iPhone-App jetzt auf allen Unterseiten – Profil, Shop, Orden, Statistik, Quests und Rennen. Während einer Runde oder eines Rennens bleibt es bewusst aus.', en: 'Fixed: swiping back from the left edge in the iPhone app now works on every subpage – profile, shop, badges, statistics, quests and races. During a round or a race it stays off on purpose.' },
+      { de: 'Außerdem: Der Knopf der Daily im Wettkampf-Tab bricht auf schmalen iPhones nicht mehr unschön um.', en: 'Also: the daily challenge button in the Compete tab no longer wraps awkwardly on narrow iPhones.' },
+    ],
+  },
+  {
+    version: '2.3.0', date: '2026-11-11',
+    title: { de: 'Neu sortiert & Raketen-Rennen', en: 'Reorganized & rocket race' },
+    tour: 'v2',
+    highlights: [
+      { de: 'Neu: das Raketen-Rennen. Reihum auf einem Gerät bekommen alle dieselben Aufgaben – wer in 30 bis 120 Sekunden am meisten richtig löst, fliegt am höchsten. Danach Zeitraffer und Podest. Du findest es unter Wettkampf und auf Heute unter „Weitere Modi“.', en: 'New: the rocket race. Taking turns on one device, everyone gets the same tasks – whoever solves the most in 30 to 120 seconds flies highest. Then a time-lapse and a podium. Find it under Compete and on Today under “More modes”.' },
+      { de: 'Vier Tabs: Heute, Lernen, Erfolge und Wettkampf. Profil und Einstellungen findest du jetzt hinter deinem Liga-Emblem oben rechts, auf dem iPad unten in der Seitenleiste. „Schließen“ bringt dich zurück, wo du warst.', en: 'Four tabs: Today, Learn, Achievements and Compete. Your profile and settings now sit behind your league emblem at the top right, on iPad at the bottom of the sidebar. “Close” takes you back to where you were.' },
+      { de: 'Aus Fortschritt wird Erfolge: Spielerkarte, Quests, Liga, Orden, Trick-Karten und Shop auf einen Blick. Deine Statistik findest du unter Erfolge → Statistik.', en: 'Progress becomes Achievements: player card, quests, league, badges, trick cards and shop at a glance. Your statistics are under Achievements → Statistics.' },
+      { de: 'Heute hat eine eigene Kachel für den Mini-Case. Wer neu ist, bekommt den Einstufungstest gleich als Empfehlung.', en: 'Today has its own tile for the mini case. If you are new, the placement test is suggested right away.' },
+      { de: 'Shop neu abgestimmt: Themes, Rahmen und Freezes kosten mehr, damit sich das Sammeln über Wochen lohnt. Dafür bringen Quests, Wochentruhen und der Comeback-Bonus deutlich mehr XP. Was du schon gekauft hast, bleibt dir.', en: 'Shop rebalanced: themes, frames and freezes cost more, so collecting stays worthwhile for weeks. In return, quests, weekly chests and the comeback bonus give much more XP. Everything you already bought stays yours.' },
+      { de: 'Der Rundgang zeigt die neue Sortierung – jederzeit wieder unter Profil → Hilfe & Info.', en: 'The tour shows the new layout – any time again under Profile → Help & info.' },
+    ],
+  },
+  {
+    version: '2.2.0', date: '2026-11-11',
+    title: { de: 'Shop, Quests & Comeback', en: 'Shop, quests & comeback' },
+    highlights: [
+      { de: 'Neu: der Shop unter Fortschritt → Erfolge. Tausche deine XP gegen Streak-Freezes, drei neue Themes (Abendrot, Sand, Tiefsee) und Rahmen für dein Liga-Emblem. Dein Level sinkt dabei nie.', en: 'New: the shop under Progress → Achievements. Trade your XP for streak freezes, three new themes (Sunset, Sand, Deep sea) and frames for your league emblem. Your level never drops when you spend.' },
+      { de: 'Neu: jeden Tag drei Quests – leicht, mittel und schwer – mit XP als Belohnung. Jede erledigte Quest ist ein Stern; bei 5, 10 und 15 Sternen öffnest du die Wochentruhe in Bronze, Silber oder Gold.', en: 'New: three quests every day – easy, medium and hard – with XP as a reward. Every finished quest is a star; at 5, 10 and 15 stars you open the weekly chest in bronze, silver or gold.' },
+      { de: 'Schön, dass du wieder da bist: Nach ein paar Tagen Pause wartet eine leichte Aufwärmrunde mit Comeback-Bonus.', en: 'Good to have you back: after a few days off, an easy warm-up round with a comeback bonus is waiting.' },
+      { de: 'Serie gerissen? Am nächsten Tag holst du sie zurück – mit drei Runden oder mit XP.', en: 'Streak broken? The next day you can get it back – with three rounds or with XP.' },
+      { de: 'Nach jeder Runde siehst du die gewonnenen Ligapunkte und wie weit es bis zur nächsten Stufe ist. Auf Heute steht dein nächstes Ziel, zum Beispiel „Noch 36 LP bis Gold I“.', en: 'After every round you see the league points you gained and how far it is to the next tier. Today shows your next goal, for example “36 LP to Gold I”.' },
+      { de: 'Behoben: Wer mehr als 5.000 Aufgaben gelöst hatte, konnte Level verlieren. Dein Level zählt jetzt alle je verdienten XP.', en: 'Fixed: after more than 5,000 solved tasks you could lose levels. Your level now counts all XP you have ever earned.' },
+    ],
+  },
+  {
+    version: '2.1.0', date: '2026-11-11',
+    title: { de: 'Ligen, Orden & Mini-Cases', en: 'Leagues, badges & mini cases' },
+    highlights: [
+      { de: 'Neu: Ligen von Bronze bis Meister. Deine Liga folgt deinem Können über alle Aufgabentypen, und die besten 10 Meister werden Champion. Dazu 22 Orden in Bronze, Silber und Gold und eine Trick-Karte für jeden Aufgabentyp, den du sicher beherrschst – alles unter Fortschritt → Erfolge.', en: 'New: leagues from Bronze to Master. Your league follows your skill across all task types, and the best 10 Masters become Champion. Plus 22 badges in bronze, silver and gold, and a trick card for every task type you master – all under Progress → Achievements.' },
+      { de: 'Neu: Mini-Case. Ein Fall wie im Interview mit vier Rechenschritten, die aufeinander aufbauen, und am Ende eine Entscheidung. Acht Fälle von Marktgröße über Break-even bis zum Exhibit.', en: 'New: mini case. A case like in the interview, with four calculation steps that build on each other and a decision at the end. Eight cases, from market size and break-even to exhibits.' },
+      { de: 'Mehr Tempo, mehr Rückmeldung: Nach einer richtigen Antwort geht es von selbst weiter (abschaltbar unter Profil → Während der Runde). Das Ergebnis zeigt deine Bestzeit, den Vergleich mit der letzten Runde, wie sich dein Skill verändert hat und wie weit es bis zum nächsten Level ist.', en: 'More pace, more feedback: after a correct answer the next task follows on its own (you can turn this off under Profile → During a round). The result shows your best time, how you compare with your last round, how your skill changed and how far it is to the next level.' },
+      { de: 'Das Tagesziel zählt Runden statt Minuten. Eine Runde am Tag hält deine Serie, und für jede Woche am Stück bekommst du einen Freeze, der einen verpassten Tag überbrückt.', en: 'The daily goal counts rounds instead of minutes. One round a day keeps your streak, and for every week in a row you get a freeze that covers a missed day.' },
+      { de: 'Freund herausfordern: Spiel eine Runde und schick den Link. Dein Freund bekommt dieselben Aufgaben und sieht, wer gewonnen hat – auch mit der Daily und ganz ohne Konto.', en: 'Challenge a friend: play a round and send the link. Your friend gets the same tasks and sees who won – with the daily challenge too, and without an account.' },
+      { de: 'Außerdem: Spielerkarte im Profil, eine Lernkarte im Lernen-Tab, eine Beispielaufgabe in der Empfehlung, Schrift in der Textgröße deines iPhones, eine deutlich schneller startende Website und „Feedback senden“ unter Profil → Hilfe & Info.', en: 'Also: a player card in your profile, a learning map in the Learn tab, an example task in the recommendation, text that follows your iPhone’s text size, a much faster website start and “Send feedback” under Profile → Help & info.' },
+    ],
+  },
+  {
     version: '2.0.1', date: '2026-11-11',
     title: { de: 'Hinter den Kulissen', en: 'Behind the scenes' },
     highlights: [

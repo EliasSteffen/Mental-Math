@@ -1,0 +1,189 @@
+/* Raketen-Rennen (v12 R1): Rennbahn, Restzeit-Ring, Übergabe, Einrichten, Podest. Ruhig: nur Gleiten der Raketen, keine Dauer-Animation. */
+@layer views {
+  /* ---------- Karten und Übersicht ---------- */
+  .race-card { display:flex; flex-direction:column; gap:var(--space-3); }
+  .race-card-title { display:flex; align-items:center; gap:var(--space-2); font-size:var(--text-md); font-weight:var(--weight-bold); line-height:1.3; }
+  .race-card-text, .race-card-note, .race-note-line, .race-intro { font-size:var(--text-sm); line-height:1.5; color:var(--muted); }
+  .race-card-note { font-size:var(--text-xs); }
+  .race-rules { display:flex; flex-direction:column; gap:var(--space-2); margin:0; padding-left:1.2em; font-size:var(--text-sm); line-height:1.5; color:var(--muted); }
+
+  /* ---------- Rennbahn ---------- */
+  .race-stage { position:relative; justify-content:flex-start; gap:var(--space-3); padding-top:var(--space-2); padding-bottom:var(--space-2); }
+  .race-track {
+    --race-rocket-h:40px; --race-name-h:22px;
+    position:relative; flex:none; width:100%; max-width:560px; height:clamp(104px, 21dvh, 230px);
+    border-radius:var(--radius-md); overflow:hidden; background:var(--surface-2);
+    background-image:
+      radial-gradient(circle at 12% 22%, color-mix(in srgb, var(--muted) 38%, transparent) 1px, transparent 1.6px),
+      radial-gradient(circle at 47% 12%, color-mix(in srgb, var(--muted) 30%, transparent) 1px, transparent 1.6px),
+      radial-gradient(circle at 78% 34%, color-mix(in srgb, var(--muted) 34%, transparent) 1px, transparent 1.6px),
+      radial-gradient(circle at 91% 14%, color-mix(in srgb, var(--muted) 28%, transparent) 1px, transparent 1.6px),
+      radial-gradient(circle at 30% 52%, color-mix(in srgb, var(--muted) 26%, transparent) 1px, transparent 1.6px);
+  }
+  .race-track.is-big { height:clamp(220px, 46dvh, 380px); max-width:640px; }
+  .race-sky { position:absolute; inset:0 0 var(--race-name-h) 0; pointer-events:none; }
+  .race-mile {
+    position:absolute; left:0; right:0;
+    bottom:calc(var(--at, 0) * (100% - var(--race-rocket-h)) + var(--race-rocket-h) * .5);
+    border-top:1px dashed color-mix(in srgb, var(--muted) 45%, transparent);
+  }
+  .race-mile[hidden] { display:none; }
+  .race-mile-label { position:absolute; right:8px; bottom:2px; font-size:var(--text-xs); line-height:1; color:var(--muted); }
+  .race-lanes { position:absolute; inset:0; display:flex; justify-content:center; gap:2px; padding:6px 8px 0; }
+  .race-lane { display:flex; flex:1 1 0; flex-direction:column; min-width:0; max-width:120px; }
+  .race-lane-field { position:relative; flex:1; min-height:0; }
+  .race-rail {
+    position:absolute; top:4px; bottom:4px; left:50%; width:0; transform:translateX(-50%);
+    border-left:2px dotted color-mix(in srgb, var(--lane) 32%, transparent);
+  }
+  .race-lane.is-me .race-rail { border-left-style:solid; border-left-color:color-mix(in srgb, var(--lane) 40%, transparent); }
+  .race-rocket {
+    position:absolute; left:50%; width:28px; height:var(--race-rocket-h); margin-left:-14px;
+    bottom:calc(var(--alt, 0) * (100% - var(--race-rocket-h)));
+    transition:bottom 420ms var(--ease-out);
+  }
+  .race-track.is-instant .race-rocket { transition:none; }
+  .race-lane.is-me .race-rocket { filter:drop-shadow(0 0 5px color-mix(in srgb, var(--lane) 65%, transparent)); }
+  .race-rocket-svg { display:block; width:100%; height:100%; overflow:visible; }
+  .rk-body { fill:var(--lane, var(--accent)); }
+  .rk-fin { fill:color-mix(in srgb, var(--lane, var(--accent)) 72%, var(--text)); }
+  .rk-window { fill:var(--surface); stroke:color-mix(in srgb, var(--lane, var(--accent)) 60%, var(--text)); stroke-width:1; }
+  .rk-flame { fill:var(--warn); opacity:.9; }
+  .race-name {
+    flex:none; height:var(--race-name-h); padding-inline:2px; overflow:hidden; text-align:center; text-overflow:ellipsis; white-space:nowrap;
+    font-size:var(--text-xs); line-height:var(--race-name-h); color:var(--muted);
+  }
+  .race-lane.is-me .race-name { color:var(--text); font-weight:var(--weight-semibold); }
+
+  /* ---------- Kopf: Punktestand und Restzeit ---------- */
+  .race-head-gap { flex:1; }
+  .race-score { font-size:var(--text-lg); font-weight:var(--weight-bold); font-variant-numeric:tabular-nums; min-width:2ch; text-align:right; }
+  .race-score::after { content:"\2009\2713"; color:var(--good); }
+  .race-head-count { font-size:var(--text-sm); color:var(--muted); }
+  .race-clock { position:relative; flex:none; width:40px; height:40px; }
+  .race-clock svg { display:block; transform:rotate(-90deg); }
+  .race-clock-bg, .race-clock-fg { fill:none; stroke-width:4; }
+  .race-clock-bg { stroke:var(--border); }
+  .race-clock-fg { stroke:var(--accent); stroke-linecap:round; }
+  .race-clock.is-low .race-clock-fg { stroke:var(--bad); }
+  .race-clock-num { position:absolute; inset:0; display:grid; place-items:center; font-size:calc(13px * min(var(--type-scale, 1), 1.15)); font-weight:var(--weight-semibold); }
+  .race-clock.is-low .race-clock-num { color:var(--bad); }
+
+  /* ---------- Aufgabe ---------- */
+  .race-task {
+    display:flex; flex:1; flex-direction:column; align-items:center; justify-content:center; gap:var(--space-3);
+    width:100%; min-height:0; border-radius:var(--radius-md); transition:background var(--dur-state) var(--ease-out);
+  }
+  .race-stage.is-miss .race-task { background:var(--bad-soft); }
+  .race-big { font-size:var(--text-display); font-weight:var(--weight-bold); line-height:1; font-variant-numeric:tabular-nums; }
+  .race-big.is-end { font-size:var(--text-xl); }
+  .race-note {
+    position:absolute; top:calc(var(--space-2) + 4px); left:50%; z-index:2; transform:translateX(-50%);
+    padding:4px var(--space-3); border-radius:var(--radius-pill); background:var(--surface); box-shadow:var(--shadow-1);
+    font-size:var(--text-sm); font-weight:var(--weight-semibold); white-space:nowrap;
+  }
+  .race-note:empty { display:none; }
+  .race-dock-spacer { display:block; min-height:var(--hit-min); }
+  .race-dock-idle { opacity:.4; pointer-events:none; }
+
+  /* ---------- Übergabe ---------- */
+  .race-handover { gap:var(--space-3); }
+  .race-hand-label, .race-hand-meta, .race-hand-prev { color:var(--muted); font-size:var(--text-sm); }
+  .race-hand-name { max-width:100%; font-size:var(--text-display); font-weight:var(--weight-bold); line-height:1.1; overflow-wrap:anywhere; }
+  .race-hand-prev { margin-top:var(--space-3); }
+
+  /* ---------- Einrichten ---------- */
+  .race-setup { gap:var(--space-4); }
+  .race-players { display:flex; flex-direction:column; gap:var(--space-3); }
+  .race-players-rows { display:flex; flex-direction:column; gap:var(--space-2); }
+  .race-player { display:flex; align-items:center; gap:var(--space-2); }
+  .race-player-no {
+    display:grid; flex:none; place-items:center; width:28px; height:28px; border-radius:50%;
+    background:var(--surface-2); color:var(--muted); font-size:var(--text-sm); font-weight:var(--weight-semibold);
+  }
+  .race-player-input { flex:1; min-width:0; }
+  .race-player-remove {
+    display:grid; flex:none; place-items:center; width:var(--hit-min); height:var(--hit-min);
+    border:0; border-radius:var(--radius-pill); background:transparent; color:var(--muted); cursor:pointer;
+  }
+  .race-config { display:flex; flex-direction:column; gap:var(--space-4); }
+
+  /* ---------- Zeitraffer ---------- */
+  .race-replay { align-items:center; }
+  .race-replay-label { font-size:var(--text-sm); color:var(--muted); }
+  .race-replay-time { font-size:var(--text-lg); font-weight:var(--weight-semibold); font-variant-numeric:tabular-nums; }
+
+  /* ---------- Podest ---------- */
+  .race-podium { display:flex; align-items:flex-end; justify-content:center; gap:var(--space-3); padding-top:var(--space-2); }
+  .race-podium-col { display:flex; flex:1 1 0; flex-direction:column; align-items:center; gap:var(--space-1); min-width:0; max-width:130px; }
+  .race-podium-name { max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:var(--text-sm); font-weight:var(--weight-semibold); }
+  .race-podium-rocket { display:block; width:28px; height:40px; margin-bottom:2px; }
+  .race-podium-block {
+    display:grid; place-items:center; width:100%; height:54px; border-radius:var(--radius-sm) var(--radius-sm) 0 0;
+    background:color-mix(in srgb, var(--lane) 24%, var(--surface)); font-size:var(--text-xl); font-weight:var(--weight-bold);
+  }
+  .race-podium-col.is-p1 .race-podium-block { height:92px; }
+  .race-podium-col.is-p2 .race-podium-block { height:70px; }
+  .race-podium-col.is-me .race-podium-name { color:var(--accent-text); }
+  .race-podium-score { font-size:var(--text-sm); color:var(--muted); }
+  .race-rank-no {
+    display:grid; place-items:center; width:28px; height:28px; border:2px solid var(--lane, var(--border)); border-radius:50%;
+    font-size:var(--text-sm); font-weight:var(--weight-bold);
+  }
+  .race-rank-no.is-first { background:color-mix(in srgb, var(--lane) 22%, transparent); }
+
+  /* ---------- Aufgaben aufklappen ---------- */
+  .race-tasks-list { display:flex; flex-direction:column; gap:var(--space-2); }
+  .race-tasks { border-radius:var(--radius-md); background:var(--surface); }
+  .race-tasks-sum {
+    display:flex; align-items:center; gap:var(--space-2); min-height:var(--hit-min); padding:var(--space-2) var(--space-4);
+    list-style:none; cursor:pointer; border-radius:var(--radius-md);
+  }
+  .race-tasks-sum::-webkit-details-marker { display:none; }
+  .race-tasks-sum::after {
+    content:""; flex:none; width:8px; height:8px; margin-left:var(--space-1); border-right:2px solid var(--muted); border-bottom:2px solid var(--muted);
+    transform:translateY(-2px) rotate(45deg);
+  }
+  .race-tasks[open] > .race-tasks-sum::after { transform:translateY(2px) rotate(-135deg); }
+  .race-tasks-name { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:var(--weight-semibold); }
+  .race-tasks-meta { font-size:var(--text-sm); color:var(--muted); }
+  .race-tasks-body { padding:0 var(--space-2) var(--space-2); }
+
+  /* ---------- Gruppen-Rennen (R2): Vorschau, Hinweise, Sheet ---------- */
+  .stage.race-preview { align-items:center; justify-content:center; gap:var(--space-3); text-align:center; }
+  .race-preview-title { max-width:100%; font-size:var(--text-xl); font-weight:var(--weight-bold); line-height:1.15; overflow-wrap:anywhere; }
+  .race-preview-note { max-width:34ch; font-size:var(--text-sm); line-height:1.5; color:var(--muted); }
+  .race-preview .compete-notice { width:100%; max-width:420px; }
+  .race-extra { display:flex; flex-direction:column; gap:var(--space-2); }
+  .race-extra:empty { display:none; }
+  .race-extra-note { font-size:var(--text-sm); line-height:1.5; color:var(--muted); }
+  .race-extra-note.is-warn { color:var(--bad); }
+  .race-sheet-form { display:flex; flex-direction:column; gap:var(--space-4); }
+  .race-sheet-list { display:flex; flex-direction:column; gap:var(--space-4); margin-top:var(--space-4); }
+  .race-groups-block:empty { display:none; }
+  /* ---------- Live-Rennen (v12 R3) ---------- */
+  .race-live-entry[hidden] { display:none; }
+  .race-live-error { font-size:var(--text-sm); color:var(--bad); min-height:1.2em; }
+  .race-live-lobby { gap:var(--space-4); }
+  .race-live-lobby .row.is-away { opacity:.55; }
+  .race-live-hint { flex:1; text-align:center; font-size:var(--text-sm); line-height:1.4; color:var(--muted); }
+  .race-live-gone { align-items:center; justify-content:center; text-align:center; }
+  .race-live-gone-text { max-width:32ch; font-size:var(--text-md); line-height:1.5; color:var(--text); text-wrap:balance; }
+  .race-live-banner {
+    position:fixed; z-index:40; left:50%; top:calc(env(safe-area-inset-top, 0px) + 64px); transform:translateX(-50%);
+    max-width:min(92vw, 420px); padding:var(--space-2) var(--space-4); border-radius:var(--radius-pill, 999px);
+    background:var(--surface); color:var(--text); border:1px solid var(--bad); box-shadow:var(--shadow-md, 0 2px 10px rgb(0 0 0 / .18));
+    font-size:var(--text-sm); font-weight:var(--weight-semibold); text-align:center; pointer-events:none;
+  }
+  .race-live-banner[hidden] { display:none; }
+  .race-stage > .race-live-banner { position:static; transform:none; align-self:center; margin:calc(var(--space-2) * -1) 0 0; }
+
+  @media (min-width: 720px) {
+    .race-track { max-width:640px; height:clamp(200px, 32dvh, 340px); }
+    .race-lane { max-width:140px; }
+    .race-podium-col { max-width:160px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .race-rocket, .race-task { transition:none; }
+  }
+}

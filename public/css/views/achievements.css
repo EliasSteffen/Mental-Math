@@ -1,0 +1,146 @@
+/* Erfolge (v9 J): Liga-Emblem, Orden-Medaillen, Trick-Karten, Seite #/erfolge und Belohnungszeilen auf den Ergebnissen.
+   Farben nur über Tokens (--league-*, --rarity-*); dynamische Werte über CSS-Variablen (--medal-size, --w). */
+@layer views {
+  /* ---------- Emblem ---------- */
+  .league-emblem { flex:none; display:block; --lc:var(--league-bronze); }
+  .league-emblem.is-silver { --lc:var(--league-silver); }
+  .league-emblem.is-gold { --lc:var(--league-gold); }
+  .league-emblem.is-platinum { --lc:var(--league-platinum); }
+  .league-emblem.is-diamond { --lc:var(--league-diamond); }
+  .league-emblem.is-master { --lc:var(--league-master); }
+  .league-emblem.is-champion { --lc:var(--league-champion); }
+  .le-shield { fill:color-mix(in srgb, var(--lc) 18%, var(--surface)); stroke:var(--lc); stroke-width:2.5; stroke-linejoin:round; }
+  .le-inner { fill:none; stroke:var(--lc); stroke-width:1; stroke-opacity:.45; stroke-linejoin:round; }
+  .le-star, .le-crown { fill:var(--lc); stroke:var(--lc); stroke-width:1; stroke-linejoin:round; }
+  .le-step { fill:var(--lc); font-family:var(--font-num); font-size:17px; font-weight:700; letter-spacing:-.01em; }
+
+  /* ---------- Seite ---------- */
+  .ach-switch { margin-block:var(--space-2) var(--space-4); }
+  .ach-panel { min-width:0; }
+  .ach-view { display:flex; flex-direction:column; gap:var(--space-4); min-width:0; }
+  .ach-hero { display:flex; align-items:center; gap:var(--space-4); min-width:0; }
+  .ach-hero-text { min-width:0; display:flex; flex-direction:column; gap:var(--space-1); }
+  .ach-hero-name { font-size:var(--text-xl); font-weight:var(--weight-bold); line-height:1.15; text-wrap:balance; }
+  .ach-hero-rating { font-size:var(--text-sm); color:var(--muted); }
+  .ach-hero-card { gap:var(--space-4); }
+  .ach-hero-bar { display:flex; flex-direction:column; gap:var(--space-2); }
+  .ach-hero-line { font-size:var(--text-sm); }
+  .ach-peak { font-size:var(--text-xs); color:var(--muted); }
+  .ach-info { display:flex; flex-direction:column; gap:var(--space-2); font-size:var(--text-sm); line-height:1.5; color:var(--muted); padding-inline:var(--space-1); }
+  .ach-count { font-size:var(--text-sm); color:var(--muted); }
+  .ach-info-line { font-size:var(--text-xs); line-height:1.45; color:var(--muted); }
+  .ladder-row.is-current { background:var(--accent-soft); }
+  .ach-entry .league-emblem { margin-inline:2px; }
+
+  /* ---------- v11 E: Übersicht #/erfolge ---------- */
+  .card.ach-sec { display:flex; flex-direction:row; align-items:center; gap:var(--space-3); min-width:0; text-decoration:none; color:var(--text); -webkit-tap-highlight-color:transparent; }
+  .card.ach-sec:focus-visible { outline:3px solid color-mix(in srgb, var(--accent) 45%, transparent); outline-offset:2px; }
+  .ach-sec-body { flex:1; min-width:0; display:flex; flex-direction:column; gap:var(--space-3); }
+  .ach-sec-chevron { flex:none; display:flex; color:var(--muted); }
+  .ach-sec-main { font-size:var(--text-md); font-weight:var(--weight-semibold); line-height:1.3; overflow-wrap:anywhere; }
+  .ach-sec-meta { font-size:var(--text-sm); line-height:1.4; color:var(--muted); overflow-wrap:anywhere; }
+  .ach-league { display:flex; align-items:center; gap:var(--space-3); min-width:0; }
+  .ach-league-text { min-width:0; display:flex; flex-direction:column; gap:2px; }
+  .ach-medals { display:flex; flex-wrap:wrap; gap:var(--space-2); }
+  .ach-cards { display:flex; flex-direction:column; gap:var(--space-2); list-style:none; margin:0; padding:0; }
+  .ach-card-item { display:flex; align-items:center; gap:var(--space-3); min-width:0; }
+  .ach-card-name { font-size:var(--text-sm); font-weight:var(--weight-semibold); line-height:1.3; overflow-wrap:anywhere; }
+  .ach-quests { list-style:none; margin:0; padding:0; }
+  .ach-quest { align-items:center; padding:var(--space-2) 0; }
+  .ach-quest .quest-title { flex:1; min-width:0; font-size:var(--text-sm); }
+  .ach-quest-state { flex:none; font-size:var(--text-xs); color:var(--muted); white-space:nowrap; }
+  .ach-quest-week { display:flex; align-items:center; flex-wrap:wrap; gap:var(--space-2); font-size:var(--text-sm); color:var(--muted); }
+  .ach-chip { display:inline-flex; align-items:center; gap:4px; padding:2px var(--space-2); border-radius:var(--radius-pill); background:var(--accent-soft); color:var(--accent-text); font-size:var(--text-xs); font-weight:var(--weight-semibold); }
+
+  /* ---------- Medaille und Stufen-Punkte ---------- */
+  .medal {
+    --mc:var(--border); --medal-size:52px;
+    display:inline-grid; place-items:center; flex:none; width:var(--medal-size); height:var(--medal-size); border-radius:50%;
+    color:var(--mc); background:color-mix(in srgb, var(--mc) 16%, var(--surface)); box-shadow:inset 0 0 0 2px var(--mc);
+  }
+  .medal.is-t0 { --mc:var(--muted); background:var(--surface-2); box-shadow:none; border:2px dashed var(--border); opacity:.85; }
+  .medal.is-t1 { --mc:var(--league-bronze); }
+  .medal.is-t2 { --mc:var(--league-silver); }
+  .medal.is-t3 { --mc:var(--league-gold); }
+  .pips { display:inline-flex; gap:5px; align-items:center; }
+  .pip { width:8px; height:8px; border-radius:50%; box-shadow:inset 0 0 0 1.5px var(--muted); }
+  .pip.is-on { background:var(--accent-text); box-shadow:none; }
+
+  .badge-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(min(100%, 104px), 1fr)); gap:var(--space-3); }
+  .badge-tile {
+    display:flex; flex-direction:column; align-items:center; gap:var(--space-2); min-width:0; min-height:var(--hit-min);
+    padding:var(--space-3) var(--space-2); border-radius:var(--radius-md); background:var(--surface); box-shadow:var(--shadow-1);
+    text-align:center; color:var(--text); cursor:pointer;
+  }
+  .badge-tile.is-locked { color:var(--muted); }
+  .badge-tile-name { font-size:var(--text-xs); font-weight:var(--weight-semibold); line-height:1.25; overflow-wrap:anywhere; hyphens:auto; }
+
+  .badge-sheet-head { display:flex; align-items:center; gap:var(--space-4); }
+  .badge-sheet-tier { font-size:var(--text-md); font-weight:var(--weight-semibold); }
+  .badge-desc { font-size:var(--text-sm); line-height:1.5; color:var(--muted); }
+  .badge-ladder { display:flex; flex-direction:column; gap:var(--space-2); list-style:none; padding:0; margin:0; font-size:var(--text-sm); }
+  .badge-ladder li { display:flex; align-items:center; gap:var(--space-3); color:var(--muted); }
+  .badge-ladder li.is-on { color:var(--text); font-weight:var(--weight-semibold); }
+  .badge-ladder-at { margin-inline-start:auto; font-weight:var(--weight-regular); color:var(--muted); }
+  .badge-progress { display:flex; flex-direction:column; gap:var(--space-2); }
+  .badge-progress-line { font-size:var(--text-sm); }
+  .badge-done { display:flex; align-items:center; gap:var(--space-2); font-size:var(--text-sm); color:var(--good); }
+
+  /* ---------- Trick-Karten ---------- */
+  .trick-card {
+    --rc:var(--rarity-common);
+    display:flex; flex-direction:column; gap:var(--space-3); min-width:0; padding:var(--space-4);
+    border-radius:var(--radius-md); background:var(--surface); box-shadow:inset 0 0 0 2px var(--rc);
+  }
+  .trick-card.is-rare, .card-tile.is-rare, .card-mini.is-rare { --rc:var(--rarity-rare); }
+  .trick-card.is-epic, .card-tile.is-epic, .card-mini.is-epic { --rc:var(--rarity-epic); }
+  .tc-top { display:flex; justify-content:space-between; align-items:baseline; gap:var(--space-3); font-size:var(--text-xs); color:var(--muted); }
+  .tc-rarity { color:var(--rc); font-weight:var(--weight-semibold); text-align:end; }
+  .tc-name { font-size:var(--text-lg); font-weight:var(--weight-bold); line-height:1.25; overflow-wrap:anywhere; }
+  .tc-trick { font-size:var(--text-md); line-height:1.5; }
+  .tc-example { padding:var(--space-3); border-radius:var(--radius-key); background:var(--surface-2); font-size:var(--text-sm); line-height:1.5; overflow-wrap:anywhere; }
+  .tc-example-label { color:var(--muted); }
+  .trick-card.is-locked { box-shadow:inset 0 0 0 2px var(--border); }
+  .trick-card.is-locked .tc-name, .trick-card.is-locked .tc-rarity { color:var(--muted); }
+  .tc-silhouette {
+    display:grid; place-items:center; min-height:72px; border-radius:var(--radius-key); background:var(--surface-2);
+    font-family:var(--font-num); font-size:var(--text-display); font-weight:var(--weight-bold); line-height:1; color:var(--border);
+  }
+  .tc-progress { font-size:var(--text-sm); color:var(--muted); }
+
+  .card-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(min(100%, 148px), 1fr)); gap:var(--space-3); }
+  .card-tile {
+    --rc:var(--rarity-common);
+    display:flex; flex-direction:column; align-items:flex-start; gap:var(--space-2); min-width:0; min-height:var(--hit-min);
+    padding:var(--space-3); border-radius:var(--radius-md); background:var(--surface); box-shadow:inset 0 0 0 2px var(--rc);
+    text-align:start; color:var(--text); cursor:pointer;
+  }
+  .card-tile.is-locked { box-shadow:inset 0 0 0 2px var(--border); color:var(--muted); background:var(--surface-2); }
+  .card-tile-mark { font-family:var(--font-num); font-size:var(--text-lg); line-height:1; color:var(--rc); }
+  .card-tile.is-locked .card-tile-mark { color:var(--muted); }
+  .card-tile-name { font-size:var(--text-sm); font-weight:var(--weight-semibold); line-height:1.3; overflow-wrap:anywhere; hyphens:auto; }
+
+  .card-mini {
+    --rc:var(--rarity-common);
+    display:inline-grid; place-items:center; flex:none; width:26px; height:34px; border-radius:6px;
+    color:var(--rc); box-shadow:inset 0 0 0 2px var(--rc); background:var(--surface);
+  }
+
+  /* ---------- Belohnungszeilen auf den Ergebnissen ---------- */
+  .reward-block { display:flex; flex-direction:column; gap:var(--space-2); }
+  .reward-row .row-lead { width:34px; justify-content:center; }
+  .reward-row.is-good .row-label { color:var(--good); font-weight:var(--weight-semibold); }
+  .reward-row.is-quiet .row-label { color:var(--muted); }
+  /* v10: Symbol einer Erweiterungszeile */
+  .reward-icon { display:inline-flex; align-items:center; justify-content:center; width:30px; height:30px; border-radius:50%; background:var(--accent-soft); color:var(--accent-text); }
+  .reward-row.is-good .reward-icon { background:var(--good-soft); color:var(--good); }
+  .reward-more {
+    display:inline-flex; align-items:center; gap:2px; align-self:flex-end; min-height:var(--hit-min); padding-inline:var(--space-2);
+    font-size:var(--text-sm); font-weight:var(--weight-semibold); color:var(--accent-text);
+  }
+
+  @media (min-width: 720px) {
+    .badge-grid { grid-template-columns:repeat(auto-fill, minmax(124px, 1fr)); }
+    .card-grid { grid-template-columns:repeat(auto-fill, minmax(168px, 1fr)); }
+  }
+}

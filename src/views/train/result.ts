@@ -1,17 +1,24 @@
 // Rundenergebnis (Artboard „Ergebnis“): Kopf, Ergebnis-Segmente, Erkenntnis (E20), Status Line,
 // Aufgabenliste (falsche zuerst, richtige aufklappbar) und Dock mit „Fehler üben“ / „Fertig“ / „Ergebnis teilen“ / „Nochmal“.
+import type { Task } from '../../types.ts';
 import { fmt, fmtSeconds } from '../../core/numbers.ts';
 import { SUBTYPES } from '../../core/catalog.ts';
 import { getMethod } from '../../core/methods.ts';
 import { modeName } from '../../core/modes.ts';
 import { dayKey } from '../../core/progress.ts';
-import { addSession, getActivity, getSettings, setDailyResult } from '../../data/storage.ts';
+import { currentHabit } from '../../features/habit.ts'; // v9 B, v10
+import { confetti } from '../../ui/charts.ts'; // v9 B
+import { roundRecap, type RoundRecap } from '../../core/recap.ts'; // v9 A
+import { updateProgressRewards } from '../../features/rewards.ts'; // v9 J
+import { rewardBlock } from '../../ui/rewards.ts'; // v9 J
+import { addSession, getActivity, getAttempts, getSessions, getSettings, setDailyResult, setSettings } from '../../data/storage.ts';
 import { go, addCleanup } from '../../router.ts';
 import { toast } from '../../ui/toast.ts';
 import { h } from '../../ui/dom.ts';
 import { setTitle } from '../../ui/title.ts';
 import { isModalOpen } from '../../ui/modal.ts';
 import { button, group, icon, insight, list, resultRow, resultSegments, statusLine, steps } from '../../ui/kit.ts';
+import { progressBar } from '../../ui/charts.ts';
 import { dock } from '../../ui/dock.ts';
 import { isSheetOpen, openSheet } from '../../ui/sheet.ts';
 import { safeSteps } from '../../ui/widgets.ts';
@@ -24,6 +31,15 @@ import type { ChallengeResult } from '../../core/challenge.ts';
 import { maybeAskForReview } from '../../features/app-store.ts';
 import { buildShareCard } from '../../features/share-card.ts';
 import { shareCardButton } from '../../ui/share-card.ts';
+import { duelOutcome, type DuelStats } from '../../core/duel-link.ts'; // v9 I
+import { openDuelShare } from '../../features/duel.ts'; // v9 I
+import { startNewDuel } from '../duel.ts'; // v9 I
+import { xpView } from '../../features/xp.ts'; // v10 F
+import { currentGoals } from '../../features/goals.ts'; // v10 F
+import { nextGoalLine } from '../../ui/goals.ts'; // v10 F
+import { leagueEmblem, tierName } from '../../ui/league-badge.ts'; // v9 J, v10 F
+import { tierInfo, tierProgress } from '../../core/league.ts'; // v10 F
+import type { NextGoal } from '../../core/next-goal.ts'; // v10 F
 
 /** Gegebene Antwort als Text (Auswahl-Option oder Zahl mit Einheit, wie evaluate() sie gewertet hat). */
 function givenText(r: TrainResult): string {
@@ -47,19 +63,83 @@ function insightCard(ins: RoundInsight): HTMLElement {
   return insight({ icon: 'bulb', tone: 'warn', title, text: t('train.insightTip', { tip }) });
 }
 
-/** Lösungsweg einer Aufgabe im modalen Sheet. */
-function openTaskSheet(r: TrainResult): void {
-  const list = safeSteps(r.task);
+/** Vergleichszeile unter dem Durchschnitt: nur ab 0,1 s Unterschied (v9 A). */
+function vsLastLine(r: RoundRecap): HTMLElement | null {
+  const d = r.vsLast?.deltaAvgMs ?? 0;
+  if (Math.abs(d) < 100) return null;
+  return h('p', { class: `train-result-vs num${d < 0 ? ' is-good' : ''}` },
+    t(d < 0 ? 'recap.faster' : 'recap.slower', { time: fmtSeconds(Math.abs(d)) }));
+}
+
+/** Neue Bestzeit (v9 A). */
+function newBestCard(nb: NonNullable<RoundRecap['newBest']>): HTMLElement {
+  return insight({
+    icon: 'trophy', tone: 'good', title: t(nb.prevAvgMs === null ? 'recap.firstBest' : 'recap.newBest'),
+    text: nb.prevAvgMs === null
+      ? t('recap.newBestFirst', { time: fmtSeconds(nb.avgMs) })
+      : t('recap.newBestPrev', { time: fmtSeconds(nb.avgMs), prev: fmtSeconds(nb.prevAvgMs) }),
+  });
+}
+
+/** Liga-Zeile (v10 F): Emblem und Stufe, LP-Änderung, darunter „412 / 450 LP bis Gold III“ und der Balken. */
+function leagueRow(lp: RoundRecap['lp']): HTMLElement {
+  const { tier, after, delta } = lp;
+  const info = tierInfo(tier);
+  const emblem = leagueEmblem({ tier, size: 26, labelled: false });
+  if (info.next === null) {
+    // Meister: kein nächster Schritt, nur der Stand
+    return h('div', { class: 'recap-row recap-league' },
+      h('p', { class: 'recap-line' }, h('span', { class: 'recap-label recap-league-name' }, emblem, t('goals.masterLine', { name: tierName(tier), rating: after }))),
+      progressBar(100, { decorative: true }));
+  }
+  const change = delta > 0 ? t('goals.lpGain', { n: delta }) : delta < 0 ? t('goals.lpLoss', { n: -delta }) : null;
+  return h('div', { class: 'recap-row recap-league' },
+    h('p', { class: 'recap-line' },
+      h('span', { class: 'recap-label recap-league-name' }, emblem, tierName(tier)),
+      change ? h('span', { class: `recap-value num${delta > 0 ? ' is-good' : ' is-quiet'}` }, change) : null),
+    h('p', { class: 'recap-sub num' }, t('rewards.toNext', { rating: after, next: info.next, name: tierName(tier + 1) })),
+    progressBar(tierProgress(tier, after).fraction * 100, { decorative: true }));
+}
+
+/** Skill-Zeile, Level-Karte (v9 A, Level aus dem XP-Konto), Liga-Zeile (v10 F) und zuletzt das nächste Ziel (v10 F). */
+function recapBlock(r: RoundRecap, goal: NextGoal | null): HTMLElement {
+  const lv = r.level;
+  const rows: Array<HTMLElement | null> = [];
+  if (r.skill) {
+    const name = SUBTYPES[r.skill.subtype]?.name ?? r.skill.subtype;
+    const values = r.skill.before === null
+      ? t('recap.skillAfter', { after: r.skill.after })
+      : t('recap.skillChange', { before: r.skill.before, after: r.skill.after });
+    rows.push(h('div', { class: 'recap-row' },
+      h('p', { class: 'recap-line' }, h('span', { class: 'recap-label' }, t('recap.skill', { sub: name })), h('span', { class: 'recap-value num' }, values)),
+      progressBar(r.skill.after, { decorative: true })));
+  }
+  rows.push(h('div', { class: 'recap-row' },
+    h('p', { class: 'recap-line' },
+      h('span', { class: 'recap-label' }, t('recap.level', { level: lv.level })),
+      h('span', { class: 'recap-value num' }, t('recap.xpGained', { n: lv.gained }))),
+    progressBar((lv.into / lv.needed) * 100, { label: t('recap.levelProgress', { into: lv.into, needed: lv.needed }) }),
+    lv.levelUp ? h('p', { class: 'recap-up' }, t('recap.levelUp', { level: lv.level })) : null));
+  rows.push(leagueRow(r.lp));
+  if (goal) rows.push(nextGoalLine(goal));
+  return h('section', { class: 'recap' }, ...rows);
+}
+
+/** Lösungsweg einer Aufgabe im modalen Sheet (auch vom Raketen-Rennen genutzt). */
+export function openSolutionSheet(task: Task): void {
+  const list = safeSteps(task);
   openSheet({
-    title: r.task.prompt,
+    title: task.prompt,
     children: [
       list.length ? steps(list) : h('p', { class: 'train-sheet-empty' }, t('train.noSteps')),
-      SUBTYPES[r.task.subtype] && getMethod(r.task.subtype)
-        ? button({ label: t('train.openInLearn'), kind: 'link', icon: 'book', href: `#/lernen/${r.task.subtype}` })
+      SUBTYPES[task.subtype] && getMethod(task.subtype)
+        ? button({ label: t('train.openInLearn'), kind: 'link', icon: 'book', href: `#/lernen/${task.subtype}` })
         : null,
     ],
   });
 }
+
+const openTaskSheet = (r: TrainResult): void => openSolutionSheet(r.task);
 
 /** Zeile einer Aufgabe: Punkt (richtig/falsch), Aufgabe, darunter deine/richtige Antwort bzw. Zeit. */
 function taskRow(r: TrainResult): HTMLElement {
@@ -69,6 +149,22 @@ function taskRow(r: TrainResult): HTMLElement {
     ? `${fmtSeconds(r.timeMs)} · +${t('common.pointsValue', { n: r.ev.points })}`
     : r.given === null ? t('train.rowSkipped', { right }) : t('train.rowWrong', { given: givenText(r), right });
   return resultRow({ ok, label: r.task.prompt, sub, onClick: () => openTaskSheet(r) });
+}
+
+/** Vergleichskarte der Herausforderung (v9 I): „Gewonnen / Knapp verloren / Unentschieden“ mit beiden Ergebnissen. */
+function duelCard(ctx: TrainCtx, mine: DuelStats): HTMLElement | null {
+  const d = ctx.duel;
+  if (!d) return null;
+  if (!d.them) return insight({ icon: 'trophy', tone: 'accent', title: t('duel.readyTitle'), text: t('duel.readyText') });
+  const out = duelOutcome(mine, d.them);
+  const close = Math.abs(mine.c - d.them.c) <= 1;
+  const title = out === 'win' ? t('duel.win') : out === 'draw' ? t('duel.draw') : t(close ? 'duel.loseClose' : 'duel.lose');
+  const n = d.base.n;
+  return h('div', { class: 'duel-result' },
+    insight({
+      icon: 'trophy', tone: out === 'win' ? 'good' : 'accent', title,
+      text: `${t('duel.you', { correct: mine.c, n, time: fmtSeconds(mine.t) })}\n${t('duel.them', { name: d.them.name ?? t('duel.friend'), correct: d.them.c, n, time: fmtSeconds(d.them.t) })}`,
+    }));
 }
 
 /** Text der Platz-Karte zu einem (Server-)Ergebnis; null = noch nicht abgegeben (offline). */
@@ -151,6 +247,9 @@ export function showResult(ctx: TrainCtx): void {
   const totalMs = results.reduce((s, r) => s + r.timeMs, 0);
   const avg = n ? totalMs / n : 0;
 
+  // v9 A: Stand vor dieser Runde (für die Bilanz), bevor die Runde gespeichert wird
+  const sessionsBefore = getSessions();
+  const leagueTier = getSettings().league?.tier ?? null; // v10 F: Liga-Stufe vor dieser Runde (für die LP-Zeile)
   addSession({ id: ctx.sessionId, ts: ctx.startedAt, mode, n, correct, points: ctx.points, avgTimeMs: Math.round(avg) });
   if (ctx.ranked) {
     showRankedResult(ctx, { n, correct, totalMs, avg });
@@ -167,6 +266,24 @@ export function showResult(ctx: TrainCtx): void {
       marks: results.map((r) => r.ev.correct),
     }, publicUrl()))
     : null;
+
+  // v9 I: Ergebnis dieser Runde für Herausforderungen (Vergleich, Revanche, Daily-Link)
+  const mine: DuelStats = { c: correct, p: ctx.points, t: totalMs };
+  const duelBox = duelCard(ctx, mine);
+  const duelBtns: HTMLElement[] = [];
+  const wide = (b: HTMLElement): HTMLElement => { b.classList.add('duel-wide'); return b; };
+  if (ctx.duel && n) {
+    const base = ctx.duel.base;
+    duelBtns.push(wide(button({
+      label: t('duel.newChallenge'), kind: 'soft', icon: 'play', onClick: () => startNewDuel(base.kind === 'set' ? base.cat : 'all'),
+    })));
+  } else if (ctx.dailyKey && n) {
+    const day = ctx.dailyKey;
+    duelBtns.push(wide(button({
+      label: t('duel.challengeFriend'), kind: 'soft', icon: 'link',
+      onClick: () => openDuelShare({ kind: 'daily', day, cat: 'all', n: 15, lvl: 2 }, mine),
+    })));
+  }
 
   // Smart Retry: falsch, übersprungen oder deutlich zu langsam – angeboten wird es nur bei Fehlern
   const weak = results.filter((r) => !r.ev.correct || r.given === null || r.timeMs > 1.5 * r.task.targetMs).map((r) => r.task);
@@ -202,29 +319,63 @@ export function showResult(ctx: TrainCtx): void {
     }, label, h('span', { class: 'train-more-chevron' }, icon('chevron-down', 18)));
   }
 
+  const attemptsAfter = getAttempts();
   const settings = getSettings();
-  const todayMin = (getActivity()[dayKey(Date.now())] ?? 0) / 60000;
+  // v9 B: Runden heute (die eben gespeicherte Runde zählt mit); erreicht genau diese Runde das Ziel → Zeile, ggf. Konfetti
+  const habit = currentHabit(); // v10: mit gekauften Freezes und Reparaturen
+  const goalHit = habit.todayRounds === habit.goalRounds && dayKey(ctx.startedAt) === dayKey(Date.now());
+  if (goalHit && settings.celebrated !== dayKey(Date.now())) {
+    setSettings({ celebrated: dayKey(Date.now()) });
+    if (settings.confetti === true) confetti();
+  }
+  // v10 F: XP-Konto vor den Belohnungen (diese Runde inkl.) und danach (Geschenke dieser Runde inkl.)
+  const xpRound = xpView().lifetime;
+  const rewards = n ? rewardBlock(updateProgressRewards()) : null; // v9 J: Aufstieg, Orden, Karten dieser Runde
+  // Bilanz erst nach den Belohnungen: Liga, Orden und XP sind dann gespeichert
+  const recap = roundRecap({
+    mode, n, correct, avgMs: avg,
+    assistedAny: attemptsAfter.some((a) => a.sessionId === ctx.sessionId && a.assisted === true),
+    sessionsBefore,
+    attemptsBefore: attemptsAfter.filter((a) => a.sessionId !== ctx.sessionId),
+    attemptsAfter,
+    xp: { before: xpRound - ctx.points, after: xpView().lifetime },
+    leagueTier,
+  });
+  const goal = currentGoals(1)[0] ?? null; // v10 F: Zeile am Ende der Bilanz
+  const habitNow = currentHabit(); // v10 C: nach den Belohnungen (eine Reparatur durch Runden verlängert die Serie)
   const ins = roundInsight(results);
   const tasksText = n === 1 ? t('train.tasksOne') : t('train.tasksMany', { n });
 
   // Überschrift bekommt den Fokus: Screenreader lesen „8 von 10 richtig“, Enter = Nochmal, Esc = Übersicht
-  const title = h('h1', { class: 'train-result-title num', tabindex: '-1' }, t('train.resultScore', { good: correct, n }));
-  const again = button({ label: t('common.again'), kind: 'primary', full: true, onClick: () => go(ctx.restart) });
+  const title = h('h1', { class: 'train-result-title num', tabindex: '-1' }, recap.perfect ? t('recap.perfect', { n }) : t('train.resultScore', { good: correct, n }));
+  const again = ctx.duel && n
+    ? button({
+      label: t(ctx.duel.them ? 'duel.rematch' : 'duel.send'), kind: 'primary', full: true, icon: 'link',
+      onClick: () => ctx.duel && openDuelShare(ctx.duel.base, mine),
+    })
+    : button({ label: t('common.again'), kind: 'primary', full: true, onClick: () => go(ctx.restart) });
   root.replaceChildren(
     h('div', { class: 'stage is-start train-result' },
       h('header', { class: 'train-result-head' },
         h('p', { class: 'train-result-sub' }, `${modeName(mode)} · ${tasksText}`),
         title,
-        h('p', { class: 'train-result-avg num' }, t('train.avgPerTask', { time: fmtSeconds(avg) }))),
+        h('p', { class: 'train-result-avg num' }, t('train.avgPerTask', { time: fmtSeconds(avg) })),
+        vsLastLine(recap)),
       n ? resultSegments(results.map((r) => r.ev.correct)) : null,
+      duelBox, // v9 I
+      recap.newBest ? newBestCard(recap.newBest) : null,
       ins ? insightCard(ins) : null,
-      statusLine({ todayMin, goalMin: settings.dailyGoalMin || 15, xp: ctx.points }),
+      statusLine({ todayRounds: habitNow.todayRounds, goalRounds: habitNow.goalRounds, streak: habitNow.streak, freezes: habitNow.freezes }),
+      goalHit ? h('p', { class: 'goal-reached rise' }, icon('check', 16), t('common.goalReached')) : null,
+      n ? recapBlock(recap, goal) : null,
+      rewards,
       n ? group({ title: t('train.tasks'), meta: wrongRows.length ? t('train.wrongFirst') : undefined },
         list([...wrongRows, toggle, ...rightRows])) : null),
     dock(
       h('div', { class: 'train-result-actions' },
         retryBtn,
         button({ label: t('train.done'), href: '#/' }),
+        ...duelBtns, // v9 I
         shareBtn),
       again));
 
@@ -246,6 +397,6 @@ export function showResult(ctx: TrainCtx): void {
   setTitle(t('common.roundDone'));
   window.scrollTo(0, 0);
   title.focus({ preventScroll: true });
-  // Bitte um eine Bewertung (nur iOS, selten); ein Bestwert setzt hier ohnehin ≥ 80 % voraus (personalBest)
-  addCleanup(maybeAskForReview({ correct, n, newBest: false }));
+  // Bitte um eine Bewertung (nur iOS, selten)
+  addCleanup(maybeAskForReview({ correct, n, newBest: recap.newBest !== null }));
 }

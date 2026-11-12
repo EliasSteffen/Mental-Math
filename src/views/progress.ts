@@ -5,14 +5,17 @@ import type { Activity, Attempt, Settings } from '../types.ts';
 import { fmt } from '../core/numbers.ts';
 import { SUBTYPES, activeCategories } from '../core/catalog.ts';
 import { categoryStats, overall } from '../core/scoring.ts';
-import { streakInfo, heatmap, apmSeries, xpInfo, dayKey } from '../core/progress.ts';
+import { apmSeries, dayKey } from '../core/progress.ts';
+import { roundsHeatmap } from '../core/habit.ts'; // v9 B
+import { currentHabit } from '../features/habit.ts'; // v10
+import { xpView } from '../features/xp.ts'; // v10 P
 import { dueReviews, nextDue } from '../core/review.ts';
 import { getMethod } from '../core/methods.ts';
 import { lw } from '../core/l10n.ts';
-import { getAttempts, getSettings, getReviews, getActivity, getDailyResults } from '../data/storage.ts';
+import { getAttempts, getSettings, getReviews, getActivity, getDailyResults, getSessions } from '../data/storage.ts';
 import { heatmapGrid, progressBar, sparkline } from '../ui/charts.ts';
 import { app, h, appendChildren, type Child } from '../ui/dom.ts';
-import { barList, button, card, columns, group, icon, kpis, largeTitle, list, row, segmented, steps } from '../ui/kit.ts';
+import { backLink, barList, button, card, columns, group, icon, kpis, largeTitle, list, row, segmented, steps } from '../ui/kit.ts';
 import { openSheet } from '../ui/sheet.ts';
 import { setPrimaryAction } from '../ui/shell.ts';
 import { isTablet } from '../ui/viewport.ts';
@@ -20,7 +23,7 @@ import { safeSteps } from '../ui/widgets.ts';
 import { t, locale } from '../i18n/index.ts';
 import {
   accuracyOf, attemptsLastDays, dailyHistory, firstLast, fmtSec, focusOf, minutesLastDays, patternCounts, recentErrors,
-  relativeDay, rollingMean, trendOf, weekDays, weekScaleMax, type FocusState, type PatternCounts,
+  relativeDay, rollingMean, trendOf, weekRounds, weekRoundsScaleMax, type FocusState, type PatternCounts,
 } from './progress-data.ts';
 
 type View = 'overview' | 'categories' | 'history' | 'errors';
@@ -118,27 +121,27 @@ function weekdayShort(ts: number): string {
   return new Intl.DateTimeFormat(locale(), { weekday: 'short' }).format(new Date(ts)).replace(/\.$/, '').slice(0, 2);
 }
 
-function weekCard(activity: Activity, goalMin: number, now: number): HTMLElement {
-  const days = weekDays(activity, now);
-  const max = weekScaleMax(days, goalMin);
-  const share = (min: number): string => String(Math.round((min / max) * 1000) / 10);
+function weekCard(goalRounds: number, now: number): HTMLElement {
+  const days = weekRounds(getSessions(), getActivity(), now);
+  const max = weekRoundsScaleMax(days, goalRounds);
+  const share = (n: number): string => String(Math.round((n / max) * 1000) / 10);
   const goal = h('span', { class: 'prog-week-goal' });
-  goal.style.setProperty('--h', share(goalMin));
+  goal.style.setProperty('--h', share(goalRounds));
   const bars = h('div', { class: 'prog-week-bars' }, goal);
   const labels = h('div', { class: 'prog-week-days' });
   for (const d of days) {
-    const state = d.future ? ' is-future' : d.min >= goalMin ? ' is-met' : d.min === 0 ? ' is-zero' : '';
+    const state = d.future ? ' is-future' : d.rounds >= goalRounds ? ' is-met' : d.rounds === 0 ? ' is-zero' : '';
     const bar = h('span', { class: `prog-week-bar${state}` });
-    if (!d.future) bar.style.setProperty('--h', share(d.min));
+    if (!d.future) bar.style.setProperty('--h', share(d.rounds));
     bars.append(bar);
     labels.append(h('span', { class: d.today ? 'is-today' : null }, weekdayShort(d.ts)));
   }
-  const aria = t('analyse.weekAria', {
-    days: days.filter((d) => !d.future).map((d) => `${weekdayShort(d.ts)} ${d.min}`).join(', '),
+  const aria = t('analyse.weekAriaRounds', {
+    days: days.filter((d) => !d.future).map((d) => `${weekdayShort(d.ts)} ${d.rounds}`).join(', '),
   });
   return card([
     h('div', { class: 'prog-week', role: 'img', 'aria-label': aria }, bars, labels),
-  ], { title: t('analyse.weekTitle'), meta: t('analyse.weekGoal', { n: goalMin }) });
+  ], { title: t('analyse.weekTitle'), meta: t(goalRounds === 1 ? 'analyse.weekGoalRoundsOne' : 'analyse.weekGoalRounds', { n: goalRounds }) });
 }
 
 function overviewView(attempts: Attempt[], settings: Settings, now: number): HTMLElement {
@@ -156,16 +159,17 @@ function overviewView(attempts: Attempt[], settings: Settings, now: number): HTM
       sub: next !== null && next > now ? t('analyse.reviewsNext', { date: dateFmt.format(new Date(next)) }) : undefined,
     });
 
-  const xp = xpInfo(attempts);
+  const xp = xpView(); // v10 P: Level aus dem XP-Konto
   const level = h('div', { class: 'prog-level' },
     h('div', { class: 'prog-level-head' },
       h('span', { class: 'prog-level-label' }, t('analyse.level', { n: xp.level })),
       h('span', { class: 'prog-level-meta num' },
         t('analyse.xpToNext', { into: fmt(xp.into), needed: fmt(xp.needed), next: xp.level + 1 }))),
-    progressBar(xp.needed > 0 ? (xp.into / xp.needed) * 100 : 0, { decorative: true }));
+    progressBar(xp.needed > 0 ? (xp.into / xp.needed) * 100 : 0, { decorative: true }),
+    h('a', { class: 'prog-level-balance num', href: '#/erfolge/shop' }, t('shop.playerBalance', { n: fmt(xp.balance) }))); // v10 P
 
   return h('div', { class: 'prog-view' },
-    weekCard(getActivity(), settings.dailyGoalMin, now),
+    weekCard(settings.dailyGoalRounds, now),
     list([reviewRow, level]));
 }
 
@@ -222,19 +226,23 @@ function dailyGroup(now: number): HTMLElement {
 
 function historyView(attempts: Attempt[], settings: Settings, now: number): HTMLElement {
   const activity = getActivity();
-  const goalMs = settings.dailyGoalMin * 60000;
-  const st = streakInfo(activity, goalMs, now);
+  const sessions = getSessions();
+  const st = currentHabit(now); // v10
   const legend = h('p', { class: 'prog-heat-legend', 'aria-hidden': 'true' },
     t('analyse.less'),
     [0, 1, 2, 3].map((l) => h('span', { class: 'hm-cell is-legend', 'data-level': String(l) })),
     t('analyse.more'));
   const activityCard = card([
     h('div', { class: 'prog-heat' },
-      heatmapGrid(heatmap(activity, goalMs, now, 12), { label: t('analyse.activityAria'), today: dayKey(now) }),
+      heatmapGrid(roundsHeatmap(sessions, settings.dailyGoalRounds, now, 12, activity), { label: t('analyse.activityAria'), today: dayKey(now) }),
       legend),
   ], {
     title: t('analyse.activityTitle'),
-    meta: st.best > 0 ? t('analyse.activityStreak', { n: st.current, best: st.best }) : undefined,
+    meta: st.best > 0
+      ? [t('analyse.activityStreak', { n: st.streak, best: st.best }),
+        st.freezes > 0 ? t(st.freezes === 1 ? 'analyse.activityFreeze' : 'analyse.activityFreezes', { n: st.freezes }) : null]
+        .filter(Boolean).join(' · ')
+      : undefined,
   });
 
   // Tageswerte schwanken stark; die Kurve zeigt den 7-Tage-Mittelwert
@@ -312,11 +320,12 @@ export function renderAnalyse(): void {
   const attempts = getAttempts();
   const settings = getSettings();
   const now = Date.now();
-  const title = largeTitle(t('analyse.title'), t('analyse.sub'));
+  const back = backLink({ label: t('rewards.back'), href: '#/erfolge' }); // v11 E
+  const title = largeTitle(t('rewards.statsTitle'), t('analyse.sub'));
 
   // Noch nichts geübt: nur die ruhige Einladung, keine leeren Diagramme
   if (!attempts.length) {
-    appendChildren(app, [title, focusCard({ kind: 'few' })]);
+    appendChildren(app, [back, title, focusCard({ kind: 'few' })]);
     setPrimaryAction({ label: t('analyse.ctaStart'), href: '#/train/all', icon: 'play' });
     return;
   }
@@ -337,7 +346,7 @@ export function renderAnalyse(): void {
 
   // Ab 720 px ist genug Platz für alles auf einmal: Dashboard statt Umschalter
   if (isTablet()) {
-    appendChildren(app, [title, columns(
+    appendChildren(app, [back, title, columns(
       [focusCard(focus), overviewView(attempts, settings, now), categoriesView(attempts, settings), errorsView(attempts, now)],
       [card([kpiRow]), historyView(attempts, settings, now)],
     )]);
@@ -369,6 +378,6 @@ export function renderAnalyse(): void {
   });
 
   switcher.el.classList.add('prog-switch');
-  appendChildren(app, [title, focusCard(focus), kpiRow, switcher.el, panel]);
+  appendChildren(app, [back, title, focusCard(focus), kpiRow, switcher.el, panel]);
   setPrimaryAction(ctaAction);
 }

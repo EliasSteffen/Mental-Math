@@ -1,6 +1,8 @@
 // Reine Helfer für „Heute“ (ohne DOM, testbar): Begrüßung, Datum, Median-Zeit (E9), Ziel und Dauer der Empfehlung (E10).
 import { CATEGORIES, SUBTYPES, activeCategories } from '../core/catalog.ts';
-import type { Attempt, CategoryId, Recommendation, SubtypeId } from '../types.ts';
+import type { Attempt, CategoryId, DifficultySetting, Level, Recommendation, SubtypeId } from '../types.ts';
+import { generate } from '../core/generators/index.ts'; // v9 H
+import { mulberry32, seedFromString } from '../core/daily.ts'; // v9 H
 
 /* ---------- Large Title (E11) ---------- */
 
@@ -127,4 +129,99 @@ export function heroPlan(rec: Recommendation, o: {
     href: `#/train/${rec.mode}`, kind: 'round', tasks: length,
     minutes: minutesFor(typicalTargetMs(rec.mode, cats) * length),
   };
+}
+
+/* ---------- v9 H: Beispielaufgabe und Tagesziel-Punkte der Empfehlung ---------- */
+
+export type HeroExample =
+  /** Eine Aufgabe des empfohlenen Typs (Fragetext; bei Exhibits ohne Grafik) */
+  | { kind: 'task'; prompt: string }
+  /** Typen der Runde (Wiederholung, gemischt, Kategorie) */
+  | { kind: 'names'; names: string[] };
+
+/** Höchstzahl der Punkte; größere Ziele werden abgeschnitten. */
+export const MAX_GOAL_DOTS = 8;
+
+/** Tagesstabile Auswahl von höchstens n Einträgen (Seed aus Tag + Schlüssel). */
+function dayPick<T>(xs: readonly T[], n: number, seed: string): T[] {
+  const rng = mulberry32(seedFromString(seed));
+  const a = [...xs];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [a[i], a[j]] = [a[j] as T, a[i] as T];
+  }
+  return a.slice(0, n);
+}
+
+/**
+ * Beispiel für die Empfehlungskarte. Subtyp → Aufgabe mit Seed `dayKey + subtype` (springt beim Rendern nicht);
+ * sonst 2–3 Typnamen: fällige Wiederholungen, eine Kategorie oder ein Querschnitt der aktiven Kategorien.
+ * Null, wenn nichts Sinnvolles zu zeigen ist.
+ */
+export function heroExample(rec: Recommendation, o: {
+  dayKey: string;
+  level?: Level;
+  reviewSubtypes?: readonly SubtypeId[];
+  enabledCategories?: CategoryId[] | null;
+}): HeroExample | null {
+  const sub = rec.subtype ? SUBTYPES[rec.subtype] : undefined;
+  if (sub) {
+    try {
+      const task = generate(sub.id, mulberry32(seedFromString(o.dayKey + sub.id)), { level: o.level ?? 2 });
+      return task.prompt ? { kind: 'task', prompt: task.prompt } : null;
+    } catch {
+      return null;
+    }
+  }
+  const active = activeCategories(o.enabledCategories ?? null).map((c) => c.id as string);
+  let pool: SubtypeId[];
+  if (rec.kind === 'review') {
+    pool = [...new Set(o.reviewSubtypes ?? [])].filter((id) => SUBTYPES[id] && active.includes(SUBTYPES[id].category));
+  } else if (CATEGORIES.some((c) => c.id === rec.mode)) {
+    pool = Object.values(SUBTYPES).filter((s) => s.category === rec.mode).map((s) => s.id);
+  } else {
+    pool = Object.values(SUBTYPES).filter((s) => active.includes(s.category)).map((s) => s.id);
+  }
+  const names = dayPick(pool, 3, `${o.dayKey}|${rec.mode}`).map((id) => SUBTYPES[id]?.name ?? '').filter(Boolean);
+  return names.length >= 2 ? { kind: 'names', names } : null;
+}
+
+/** Tagesziel als Punkte: erreichte Runden gefüllt, Rest offen; Ziel auf MAX_GOAL_DOTS begrenzt. */
+export function goalDots(done: number, goal: number): { filled: number; total: number } {
+  const total = Math.min(MAX_GOAL_DOTS, Math.max(1, Math.round(goal) || 1));
+  return { filled: Math.min(total, Math.max(0, Math.round(done) || 0)), total };
+}
+
+/* ---------- v11 H: Auswahl der Empfehlung, Kacheln und Sheet-Zeilen (rein, testbar) ---------- */
+
+export interface PlacementState {
+  /** Einstufungstest bereits gemacht (settings.placement gesetzt) */
+  placement: boolean;
+  difficulty: DifficultySetting;
+  attempts: number;
+}
+
+/**
+ * Was der Hero zeigt: neue Nutzer (noch kein Test, Schwierigkeit Auto, 0 Versuche) bekommen den Einstufungstest
+ * als Empfehlung, alle anderen die normale Empfehlung.
+ */
+export function heroKind(s: PlacementState): 'placement' | 'recommendation' {
+  return !s.placement && s.difficulty === 'auto' && s.attempts === 0 ? 'placement' : 'recommendation';
+}
+
+/** Eintrag „Einstufungstest“ oben im Sheet „Weitere Modi“: nur solange kein Test gemacht ist und er nicht Hero ist. */
+export function showsPlacementRow(s: PlacementState): boolean {
+  return !s.placement && heroKind(s) === 'recommendation';
+}
+
+/** Kacheln auf dem Telefon in fester Reihenfolge (drei Reihen à zwei). */
+export type PhoneTile = 'daily' | 'quests' | 'case' | 'mixed' | 'categories' | 'modes';
+export const PHONE_TILES: readonly PhoneTile[] = ['daily', 'quests', 'case', 'mixed', 'categories', 'modes'];
+
+/** Zeilen im Sheet „Weitere Modi“ (Mini-Case gehört nicht hierher, sondern in eine eigene Kachel). */
+export type ModeRow = 'placement' | 'chain' | 'parallel' | 'estimate' | 'custom' | 'race';
+
+export function modeRows(o: { placementRow: boolean }): ModeRow[] {
+  const rest: ModeRow[] = ['chain', 'parallel', 'estimate', 'custom', 'race']; // v12 R1: Raketen-Rennen
+  return o.placementRow ? ['placement', ...rest] : rest;
 }

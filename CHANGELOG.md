@@ -4,6 +4,50 @@ Alle nennenswerten Änderungen an Mental Math. Format nach [Keep a Changelog](ht
 
 <!-- Automatisch erzeugt mit `npm run changelog` aus src/releases.ts – nicht von Hand bearbeiten. -->
 
+## [2.4.0] - 2026-11-11
+
+### Raketen-Rennen mit deiner Gruppe
+
+- Neu: Raketen-Rennen in Gruppen. Lege im Gruppen-Fenster ein Rennen an – 30 bis 120 Sekunden, eine Kategorie oder gemischt, offen für 1 Stunde bis 7 Tage. Alle spielen dieselben Aufgaben, wann es passt, gegen die Raketen der anderen.
+- Neu: Live-Rennen. Alle warten in der Lobby, starten gemeinsam auf ein Signal und sehen die Raketen der anderen in Echtzeit steigen. Bricht die Verbindung kurz ab, verbindet sich die App von selbst neu.
+- Nach deinem Lauf siehst du Podest und Rangliste des Rennens und wer aus der Gruppe noch fehlt. Offene Rennen deiner Gruppen stehen direkt im Wettkampf-Tab, und jedes Rennen lässt sich per Link teilen.
+- Fair für alle: Jede Person fliegt ein Rennen genau einmal, und gewertet wird auf dem Server. Es zählen die richtigen Antworten, bei Gleichstand weniger Fehler.
+- Behoben: Zurück-Wischen vom linken Rand klappt in der iPhone-App jetzt auf allen Unterseiten – Profil, Shop, Orden, Statistik, Quests und Rennen. Während einer Runde oder eines Rennens bleibt es bewusst aus.
+- Außerdem: Der Knopf der Daily im Wettkampf-Tab bricht auf schmalen iPhones nicht mehr unschön um.
+
+## [2.3.0] - 2026-11-11
+
+### Neu sortiert & Raketen-Rennen
+
+- Neu: das Raketen-Rennen. Reihum auf einem Gerät bekommen alle dieselben Aufgaben – wer in 30 bis 120 Sekunden am meisten richtig löst, fliegt am höchsten. Danach Zeitraffer und Podest. Du findest es unter Wettkampf und auf Heute unter „Weitere Modi“.
+- Vier Tabs: Heute, Lernen, Erfolge und Wettkampf. Profil und Einstellungen findest du jetzt hinter deinem Liga-Emblem oben rechts, auf dem iPad unten in der Seitenleiste. „Schließen“ bringt dich zurück, wo du warst.
+- Aus Fortschritt wird Erfolge: Spielerkarte, Quests, Liga, Orden, Trick-Karten und Shop auf einen Blick. Deine Statistik findest du unter Erfolge → Statistik.
+- Heute hat eine eigene Kachel für den Mini-Case. Wer neu ist, bekommt den Einstufungstest gleich als Empfehlung.
+- Shop neu abgestimmt: Themes, Rahmen und Freezes kosten mehr, damit sich das Sammeln über Wochen lohnt. Dafür bringen Quests, Wochentruhen und der Comeback-Bonus deutlich mehr XP. Was du schon gekauft hast, bleibt dir.
+- Der Rundgang zeigt die neue Sortierung – jederzeit wieder unter Profil → Hilfe & Info.
+
+## [2.2.0] - 2026-11-11
+
+### Shop, Quests & Comeback
+
+- Neu: der Shop unter Fortschritt → Erfolge. Tausche deine XP gegen Streak-Freezes, drei neue Themes (Abendrot, Sand, Tiefsee) und Rahmen für dein Liga-Emblem. Dein Level sinkt dabei nie.
+- Neu: jeden Tag drei Quests – leicht, mittel und schwer – mit XP als Belohnung. Jede erledigte Quest ist ein Stern; bei 5, 10 und 15 Sternen öffnest du die Wochentruhe in Bronze, Silber oder Gold.
+- Schön, dass du wieder da bist: Nach ein paar Tagen Pause wartet eine leichte Aufwärmrunde mit Comeback-Bonus.
+- Serie gerissen? Am nächsten Tag holst du sie zurück – mit drei Runden oder mit XP.
+- Nach jeder Runde siehst du die gewonnenen Ligapunkte und wie weit es bis zur nächsten Stufe ist. Auf Heute steht dein nächstes Ziel, zum Beispiel „Noch 36 LP bis Gold I“.
+- Behoben: Wer mehr als 5.000 Aufgaben gelöst hatte, konnte Level verlieren. Dein Level zählt jetzt alle je verdienten XP.
+
+## [2.1.0] - 2026-11-11
+
+### Ligen, Orden & Mini-Cases
+
+- Neu: Ligen von Bronze bis Meister. Deine Liga folgt deinem Können über alle Aufgabentypen, und die besten 10 Meister werden Champion. Dazu 22 Orden in Bronze, Silber und Gold und eine Trick-Karte für jeden Aufgabentyp, den du sicher beherrschst – alles unter Fortschritt → Erfolge.
+- Neu: Mini-Case. Ein Fall wie im Interview mit vier Rechenschritten, die aufeinander aufbauen, und am Ende eine Entscheidung. Acht Fälle von Marktgröße über Break-even bis zum Exhibit.
+- Mehr Tempo, mehr Rückmeldung: Nach einer richtigen Antwort geht es von selbst weiter (abschaltbar unter Profil → Während der Runde). Das Ergebnis zeigt deine Bestzeit, den Vergleich mit der letzten Runde, wie sich dein Skill verändert hat und wie weit es bis zum nächsten Level ist.
+- Das Tagesziel zählt Runden statt Minuten. Eine Runde am Tag hält deine Serie, und für jede Woche am Stück bekommst du einen Freeze, der einen verpassten Tag überbrückt.
+- Freund herausfordern: Spiel eine Runde und schick den Link. Dein Freund bekommt dieselben Aufgaben und sieht, wer gewonnen hat – auch mit der Daily und ganz ohne Konto.
+- Außerdem: Spielerkarte im Profil, eine Lernkarte im Lernen-Tab, eine Beispielaufgabe in der Empfehlung, Schrift in der Textgröße deines iPhones, eine deutlich schneller startende Website und „Feedback senden“ unter Profil → Hilfe & Info.
+
 ## [2.0.1] - 2026-11-11
 
 ### Hinter den Kulissen

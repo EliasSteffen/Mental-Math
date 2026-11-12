@@ -1,0 +1,42 @@
+/* v10 F: Sichtbarer Fortschritt – „Nächstes Ziel“ auf Heute und im Ergebnis, Liga-Zeile der Rundenbilanz (src/views/train/result.ts). */
+@layer views {
+  /* ---------- Heute: Status und Ziel untereinander; am breiten Layout rechts neben dem Titel ---------- */
+  .today-head-meta { display:flex; flex-direction:column; gap:var(--space-2); min-width:0; }
+  @media (min-width: 720px) {
+    .today-head-meta { flex:none; align-items:flex-end; max-width:50%; }
+    .today-head-meta .goal-next { justify-content:flex-end; }
+  }
+
+  /* ---------- Nächstes Ziel: eine Zeile (Symbol, Name, Text mit Ellipse, dünner Balken) ---------- */
+  .goal-next {
+    display:flex; align-items:center; gap:var(--space-2); min-width:0; width:100%;
+    font-size:var(--text-sm); line-height:1.3; color:var(--text); text-decoration:none;
+    -webkit-tap-highlight-color:transparent;
+  }
+  .goal-next:focus-visible { outline:3px solid color-mix(in srgb, var(--accent) 45%, transparent); outline-offset:2px; }
+  .goal-next-icon { display:inline-flex; flex:none; color:var(--accent-text); }
+  .goal-next-label { flex:none; color:var(--muted); white-space:nowrap; }
+  .goal-next-text {
+    flex:1 1 auto; min-width:0; font-weight:var(--weight-semibold);
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
+  .goal-next-meter { flex:0 0 56px; width:56px; }
+  .goal-next-meter .progress { height:4px; }
+  /* Heute auf dem Telefon: der Text bekommt die Breite, das Wort „Nächstes Ziel“ bleibt für Screenreader */
+  @media (max-width: 719px) {
+    .today-head-meta .goal-next-label {
+      position:absolute; width:1px; height:1px; margin:-1px; padding:0; overflow:hidden; clip-path:inset(50%); white-space:nowrap;
+    }
+  }
+  /* Große Schrift: die Zeile darf umbrechen, Heute scrollt ohnehin */
+  html.is-large-text .goal-next { align-items:flex-start; }
+  html.is-large-text .goal-next-text { white-space:normal; overflow:visible; text-overflow:clip; overflow-wrap:anywhere; }
+
+  /* ---------- Rundenbilanz: Liga-Zeile und nächstes Ziel als letzte Zeile ---------- */
+  .recap-league-name { display:inline-flex; align-items:center; gap:var(--space-2); min-width:0; }
+  .recap-league-name .league-emblem { flex:none; }
+  .recap-value.is-good { color:var(--good); }
+  .recap-value.is-quiet { color:var(--muted); }
+  .recap-sub { margin:0; font-size:var(--text-xs); line-height:1.3; color:var(--muted); }
+  .recap .goal-next { padding-top:var(--space-3); border-top:1px solid var(--border); }
+}

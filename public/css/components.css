@@ -108,6 +108,10 @@
   }
   .status-strong { color:var(--text); font-weight:var(--weight-semibold); }
   .status-streak { display:inline-flex; color:var(--streak); filter:var(--glow-icon); }
+  /* v9 B: „Tagesziel erreicht“ auf dem Ergebnis */
+  .goal-reached { display:flex; align-items:center; gap:var(--space-2); margin:0; font-size:var(--text-sm); font-weight:var(--weight-semibold); color:var(--good); }
+  /* v9 B: Freezes */
+  .status-freeze { display:inline-flex; align-items:center; gap:4px; color:var(--accent); }
   .mini-ring { flex:none; transform:rotate(-90deg); color:var(--accent); filter:var(--glow-icon); }
   .mini-ring-track { fill:none; stroke:var(--border); }
   .mini-ring-value { fill:none; stroke:var(--accent); transition:stroke-dashoffset var(--dur-progress) var(--ease-out); }
@@ -180,7 +184,7 @@
   .segmented > button:disabled:active { transform:none; filter:none; }
   /* Ab 4 Optionen: gleich breit, solange es passt, sonst nach Inhalt – Wörter werden nie getrennt */
   .segmented.is-dense { grid-template-columns:repeat(var(--n, 4), minmax(min-content, 1fr)); }
-  .segmented.is-dense > button { padding:0 var(--space-1); font-size:14px; hyphens:manual; overflow-wrap:normal; }
+  .segmented.is-dense > button { padding:0 var(--space-1); font-size:calc(14px * var(--type-scale, 1)); hyphens:manual; overflow-wrap:normal; }
   @media (max-width: 359px) {
     .segmented > button { padding-inline:var(--space-1); }
     .control.is-inline > .segmented > button { padding-inline:var(--space-2); }
@@ -363,14 +367,14 @@
   .numpad-key {
     display:flex; align-items:center; justify-content:center; min-width:0;
     border:0; border-radius:var(--radius-key); background:var(--surface-2); color:var(--text);
-    font-size:24px; font-weight:500; line-height:1; cursor:pointer;
+    font-size:calc(24px * var(--type-scale-cap, 1)); font-weight:500; line-height:1; cursor:pointer;
   }
   .numpad-key.is-aux { color:var(--muted); }
   .numpad-key.is-zeros { font-size:var(--text-lg); }
   .numpad-check {
     grid-row:span 2;
     background:var(--cta-bg); color:var(--on-accent); box-shadow:var(--cta-shadow);
-    font-size:var(--text-md); font-weight:var(--weight-semibold);
+    font-size:calc(17px * min(var(--type-scale, 1), 1.1)); font-weight:var(--weight-semibold);
     transition:var(--press-transition), opacity var(--dur-state) var(--ease-out);
   }
   .numpad-check:disabled { opacity:.45; cursor:default; }
@@ -382,8 +386,8 @@
   /* iPad: große Tasten, auch zum Tippen im Halten */
   @media (min-width: 720px) and (min-height: 641px) {
     .numpad { grid-auto-rows:68px; gap:var(--space-3); }
-    .numpad-key { font-size:32px; }
-    .numpad-key.is-zeros { font-size:24px; }
+    .numpad-key { font-size:calc(32px * var(--type-scale-cap, 1)); }
+    .numpad-key.is-zeros { font-size:calc(24px * var(--type-scale-cap, 1)); }
     .numpad-check { font-size:var(--text-lg); }
   }
   /* iPad quer mit Tastenfeld unter der Aufgabe: flachere Tasten, damit die Aufgabe genug Höhe behält */
@@ -669,6 +673,6 @@
   .crash-text, .crash-help { margin:0; font-size:var(--text-sm); line-height:1.5; color:var(--muted); }
   .crash-report {
     margin:0; padding:var(--space-3); max-height:40vh; overflow:auto; border-radius:var(--radius-md); background:var(--surface-2);
-    font-size:12px; line-height:1.45; white-space:pre-wrap; overflow-wrap:anywhere; user-select:text; -webkit-user-select:text;
+    font-size:calc(12px * var(--type-scale, 1)); line-height:1.45; white-space:pre-wrap; overflow-wrap:anywhere; user-select:text; -webkit-user-select:text;
   }
 }

@@ -5,7 +5,7 @@
 
 @layer tokens {
   /* ---------- Papier (Standard, auch ohne data-theme) ---------- */
-  :root {
+  :root, [data-preview="paper"] { /* v10 P: [data-preview] = Farbvorschau eines Themes (Shop, Theme-Auswahl) */
     color-scheme: light;
     --bg:#F6F4EF; --surface:#FFFFFF; --surface-2:#EEEBE4; --border:#E2DDD3;
     --text:#1E2227; --muted:#5C636D;
@@ -30,7 +30,7 @@
   }
 
   /* ---------- Nacht ---------- */
-  :root[data-theme="night"] {
+  :root[data-theme="night"], [data-preview="night"] {
     color-scheme: dark;
     --bg:#141619; --surface:#1B1E22; --surface-2:#23272C; --border:#2D3237;
     --text:#E9E7E2; --muted:#9DA3AA;
@@ -50,7 +50,7 @@
   }
 
   /* ---------- Aurora ---------- */
-  :root[data-theme="aurora"] {
+  :root[data-theme="aurora"], [data-preview="aurora"] {
     color-scheme: dark;
     --bg:#0B0A14; --surface:rgba(255,255,255,.06); --surface-2:rgba(255,255,255,.08); --border:rgba(255,255,255,.12);
     --text:#F5F3FF; --muted:#A9A6C4;
@@ -72,7 +72,7 @@
   }
 
   /* ---------- Neon ---------- */
-  :root[data-theme="neon"] {
+  :root[data-theme="neon"], [data-preview="neon"] {
     color-scheme: dark;
     --bg:#08090A; --surface:#121314; --surface-2:#1B1D1F; --border:#2A2D30;
     --text:#F2F4F0; --muted:#9BA19A;
@@ -90,6 +90,39 @@
     --glow-icon:drop-shadow(0 0 6px currentColor);
     --text-glow:0 0 24px rgba(212,255,58,.35);
     --pill-glow:0 0 18px rgba(212,255,58,.45),inset 0 0 0 1px rgba(212,255,58,.55);
+  }
+
+  /* ---------- v10 P: Abendrot (dunkel, warm) ---------- */
+  :root[data-theme="sunset"], [data-preview="sunset"] {
+    color-scheme: dark;
+    --bg:#1A1214; --surface:#241A1B; --surface-2:#2E2223; --border:#44332F;
+    --text:#F3E9E4; --muted:#B8A59E;
+    --accent:#F0A074; --accent-text:#F5B591; --on-accent:#2A140C;
+    --good:#8FC49A; --bad:#EE9A86; --warn:#E6BA6A; --streak:#F2B07A;
+    --shadow-1:none; --shadow-2:0 8px 24px rgb(0 0 0 / .38); --shadow-dock:0 -1px 0 var(--border); --scrim:rgb(0 0 0 / .58);
+    --bg-fill:radial-gradient(120% 40% at 50% -10%,rgba(240,160,116,.14),transparent 62%),#1A1214;
+  }
+
+  /* ---------- v10 P: Sand (hell, warm) ---------- */
+  :root[data-theme="sand"], [data-preview="sand"] {
+    color-scheme: light;
+    --bg:#F1E8D8; --surface:#FBF6EC; --surface-2:#E8DDC9; --border:#D6C8AD;
+    --text:#2B2318; --muted:#675A46;
+    --accent:#8A4F22; --accent-text:#7A441B; --on-accent:#FFFFFF;
+    --good:#3A6F4C; --bad:#A4432F; --warn:#8A5A08; --streak:#A95A20;
+    --shadow-1:0 1px 2px rgb(43 35 24 / .06); --shadow-2:0 8px 24px rgb(43 35 24 / .10);
+    --shadow-dock:0 -1px 0 var(--border),0 -12px 32px rgb(43 35 24 / .07); --scrim:rgb(43 35 24 / .34);
+  }
+
+  /* ---------- v10 P: Tiefsee (dunkel, kühl) ---------- */
+  :root[data-theme="ocean"], [data-preview="ocean"] {
+    color-scheme: dark;
+    --bg:#0B1820; --surface:#112430; --surface-2:#18303D; --border:#27495A;
+    --text:#E4F0F3; --muted:#97B1BB;
+    --accent:#5CC6D8; --accent-text:#7FD6E4; --on-accent:#06222A;
+    --good:#6FCFA0; --bad:#F0937F; --warn:#E3BE6A; --streak:#EBA56F;
+    --shadow-1:none; --shadow-2:0 8px 24px rgb(0 0 0 / .4); --shadow-dock:0 -1px 0 var(--border); --scrim:rgb(0 0 0 / .6);
+    --bg-fill:radial-gradient(120% 40% at 50% -10%,rgba(92,198,216,.13),transparent 62%),#0B1820;
   }
 
   /* ---------- Atmosphäre (neutral) und abgeleitete Farben ----------
@@ -111,11 +144,16 @@
     --font-num:ui-rounded,"SF Pro Rounded",system-ui,-apple-system,sans-serif;
     --font-mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
 
-    --text-xs:13px; --text-sm:15px; --text-md:17px; --text-lg:20px;
-    --text-xl:clamp(24px, 7vw, 30px);
-    --text-num:clamp(28px, 8vw, 36px);
-    --text-display:clamp(40px, 12vw, 72px);
-    --text-tab:12px; /* einzige Ausnahme unter 13 px */
+    /* Textgröße folgt der Systemeinstellung (src/ui/text-scale.ts setzt --type-scale auf <html>, 0,9–1,5; ohne JS 1).
+       Fließtext skaliert voll, große Zahlen und Tab-Labels höchstens 1,2× (--type-scale-cap). */
+    --type-scale:1;
+    --type-scale-cap:min(var(--type-scale, 1), 1.2);
+    --text-xs:calc(13px * var(--type-scale, 1)); --text-sm:calc(15px * var(--type-scale, 1));
+    --text-md:calc(17px * var(--type-scale, 1)); --text-lg:calc(20px * var(--type-scale, 1));
+    --text-xl:calc(clamp(24px, 7vw, 30px) * var(--type-scale-cap, 1));
+    --text-num:calc(clamp(28px, 8vw, 36px) * var(--type-scale-cap, 1));
+    --text-display:calc(clamp(40px, 12vw, 72px) * var(--type-scale-cap, 1));
+    --text-tab:calc(12px * var(--type-scale-cap, 1)); /* einzige Ausnahme unter 13 px */
     --weight-regular:400; --weight-semibold:600; --weight-bold:700;
 
     --space-1:4px; --space-2:8px; --space-3:12px; --space-4:16px;
@@ -133,8 +171,30 @@
     --gutter:16px;
     --tabbar-h:64px;
     --tabbar-bottom:max(16px, env(safe-area-inset-bottom, 0px));
-    --sidebar-w:84px; /* „Fortschritt“ passt ungekürzt (12 px, auch halbfett) */
+    --sidebar-w:calc(84px * var(--type-scale-cap, 1)); /* „Fortschritt“ passt ungekürzt (12 px, auch halbfett) */
     --content-max:640px;
     --focus-max:480px;
+  }
+}
+
+@layer tokens {
+  /* ---------- Ligen und Seltenheit (v9 J): je Theme ≥ 3:1 zu Fläche und Hintergrund ---------- */
+  :root {
+    --league-bronze:#9C5B25; --league-silver:#6B7684; --league-gold:#9A7000; --league-platinum:#2B7F91;
+    --league-diamond:#2F6FCB; --league-master:#7E45BD; --league-champion:#BE3455;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme]) {
+      --league-bronze:#D9935A; --league-silver:#B4BDC9; --league-gold:#E3B341; --league-platinum:#5CC3D6;
+      --league-diamond:#6FA3F0; --league-master:#B98AF0; --league-champion:#F0708D;
+    }
+  }
+  :root[data-theme="night"], :root[data-theme="oled"], :root[data-theme="aurora"], :root[data-theme="neon"],
+  :root[data-theme="sunset"], :root[data-theme="ocean"] {
+    --league-bronze:#D9935A; --league-silver:#B4BDC9; --league-gold:#E3B341; --league-platinum:#5CC3D6;
+    --league-diamond:#6FA3F0; --league-master:#B98AF0; --league-champion:#F0708D;
+  }
+  :root {
+    --rarity-common:var(--muted); --rarity-rare:var(--league-diamond); --rarity-epic:var(--league-master);
   }
 }

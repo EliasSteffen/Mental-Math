@@ -10,7 +10,7 @@
   .exhibit-title {
     margin: 0 0 8px;
     color: var(--muted);
-    font-size: 0.82rem;
+    font-size: calc(13.12px * var(--type-scale, 1));
     font-weight: 600;
   }
   .exhibit svg {
@@ -34,7 +34,7 @@
     width: 100%;
     border-collapse: collapse;
     font-variant-numeric: tabular-nums;
-    font-size: 0.92rem;
+    font-size: calc(14.72px * var(--type-scale, 1));
   }
   .ex-table th,
   .ex-table td {
@@ -44,7 +44,7 @@
   }
   .ex-table thead th {
     color: var(--muted);
-    font-size: 0.78rem;
+    font-size: calc(12.48px * var(--type-scale, 1));
     font-weight: 600;
   }
   .ex-table th:first-child { text-align: left; }

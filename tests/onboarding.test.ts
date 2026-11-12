@@ -6,22 +6,19 @@ import { DEVICE_LOCAL_SETTINGS, stripDeviceLocal } from '../src/data/sync-schema
 import { dict as de } from '../src/i18n/locales/de/index.ts';
 import { dict as en } from '../src/i18n/locales/en/index.ts';
 
-const fresh = { onboardingDone: false, lastSeenVersion: '', attempts: 0 };
+const fresh = { onboardingDone: false, attempts: 0 };
 
-test('shouldShowOnboarding: nur bei Neuinstallation', () => {
+test('shouldShowOnboarding: bis zur Wahl, ohne Trainingsdaten', () => {
   assert.equal(shouldShowOnboarding(fresh), true);
-  assert.equal(shouldShowOnboarding({ ...fresh, onboardingDone: true }), false, 'schon gesehen/übersprungen');
-  assert.equal(shouldShowOnboarding({ ...fresh, lastSeenVersion: '1.14.0' }), false, 'Bestandsnutzer (Update)');
+  assert.equal(shouldShowOnboarding({ ...fresh, onboardingDone: true }), false, 'schon gewählt/übersprungen');
   assert.equal(shouldShowOnboarding({ ...fresh, attempts: 1 }), false, 'Trainingsdaten vorhanden');
   // Defaults einer leeren Installation ergeben „zeigen“
-  assert.equal(shouldShowOnboarding({
-    onboardingDone: DEFAULT_SETTINGS.onboardingDone, lastSeenVersion: DEFAULT_SETTINGS.lastSeenVersion, attempts: 0,
-  }), true);
+  assert.equal(shouldShowOnboarding({ onboardingDone: DEFAULT_SETTINGS.onboardingDone, attempts: 0 }), true);
 });
 
-test('Schritte: Begrüßung, dann die vier Tabs in Leisten-Reihenfolge', () => {
-  assert.deepEqual(ONBOARDING_STEPS.map((s) => s.id), ['welcome', 'today', 'learn', 'progress', 'profile', 'placement']);
-  assert.deepEqual(ONBOARDING_STEPS.map((s) => s.tab), [null, 'today', 'learn', 'progress', 'profile', null]);
+test('Schritte: Begrüßung, die vier Tabs in Leisten-Reihenfolge, Profil, Einstufung', () => {
+  assert.deepEqual(ONBOARDING_STEPS.map((s) => s.id), ['welcome', 'today', 'learn', 'achievements', 'compete', 'profile', 'placement']);
+  assert.deepEqual(ONBOARDING_STEPS.map((s) => s.tab), [null, 'today', 'learn', 'achievements', 'compete', null, null]);
   assert.equal(new Set(ONBOARDING_STEPS.map((s) => s.icon)).size, ONBOARDING_STEPS.length, 'Icons verschieden');
 });
 

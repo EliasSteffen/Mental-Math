@@ -17,7 +17,8 @@ const TIMEOUT_MS = 15_000;
 export type ChallengeErrorCode =
   | 'invalid' | 'unauthorized' | 'not_found' | 'already_played' | 'closed' | 'upcoming' | 'not_member' | 'not_owner'
   | 'name_taken' | 'name_invalid' | 'no_profile' | 'full' | 'too_many' | 'rate_limited' | 'server_error' | 'no_attempt'
-  | 'network';
+  | 'network' | 'unavailable' // v9 K: unavailable (Liga-SQL fehlt)
+  | 'already' | 'no_run' | 'not_started'; // v12 R2: Raketen-Rennen
 
 export class ChallengeError extends Error {
   readonly code: ChallengeErrorCode;
@@ -30,7 +31,8 @@ export class ChallengeError extends Error {
 
 const KNOWN: readonly string[] = [
   'invalid', 'unauthorized', 'not_found', 'already_played', 'closed', 'upcoming', 'not_member', 'not_owner', 'name_taken',
-  'name_invalid', 'no_profile', 'full', 'too_many', 'rate_limited', 'server_error', 'no_attempt',
+  'name_invalid', 'no_profile', 'full', 'too_many', 'rate_limited', 'server_error', 'no_attempt', 'unavailable',
+  'already', 'no_run', 'not_started', // v12 R2
 ];
 
 export function challengeErrorCode(e: unknown): ChallengeErrorCode {
@@ -296,3 +298,6 @@ export function watchPending(win: Pick<EventTarget, 'addEventListener'> | undefi
   win.addEventListener('online', () => { void flushPending(); });
   onAccountChange((st) => { if (st.status === 'signed-in') void flushPending(); });
 }
+
+/** Für weitere Teile der Challenge-API (v9 K: Liga/Champion) – gleiche Anmeldung, Zeitlimit und Fehlercodes. */
+export { request as challengeRequest };

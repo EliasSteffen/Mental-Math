@@ -5,10 +5,10 @@ import { writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { RELEASES } from '../src/releases.ts';
 import type { Release } from '../src/types.ts';
+import { CONTACT, contactDisplay } from '../src/core/contact.ts';
 
 const DIST: string = fileURLToPath(new URL('../dist/', import.meta.url));
 
-export const CONTACT = { name: 'Elias Steffen', email: 'mail(at)elias-steffen.de' };
 /** Stand der Datenschutzerklärung – bei inhaltlichen Änderungen anpassen */
 export const PRIVACY_DATE = { de: '1. November 2026', en: 'November 1, 2026' };
 const SOURCE_URL = 'https://github.com/EliasSteffen/Mental-Math';
@@ -52,7 +52,7 @@ export function layout(p: Page): string {
 </main>
 <footer class="foot">
   <a href="/">Zur App · Open the app</a>
-  <span>${esc(CONTACT.name)} · ${esc(CONTACT.email)}</span>
+  <span>${esc(CONTACT.name)} · ${esc(contactDisplay())}</span>
 </footer>
 </body>
 </html>
@@ -99,7 +99,7 @@ export function helpPage(): string {
     description: 'Hilfe zu Mental Math: Konto, Passkeys, Erinnerungen, Daten übertragen und löschen – und wie du mich erreichst.',
     de: `<h1>Hilfe &amp; Kontakt</h1>
       <p class="lead">Mental Math trainiert Kopfrechnen für Case Interviews. Fragen, Fehler oder Ideen? Schreib mir.</p>
-      <div class="contact"><strong>Kontakt</strong><span>${esc(CONTACT.name)}</span><span>E-Mail: ${esc(CONTACT.email)}</span></div>
+      <div class="contact"><strong>Kontakt</strong><span>${esc(CONTACT.name)}</span><span>E-Mail: ${esc(contactDisplay())}</span></div>
       <h2>Häufige Fragen</h2>
       <h3>Brauche ich ein Konto?</h3>
       <p>Nein. Alles funktioniert ohne Konto, deine Daten bleiben dann auf dem Gerät. Ein Konto brauchst du nur, wenn du mehrere Geräte synchronisieren oder gewertet in Ranglisten und Gruppen spielen willst.</p>
@@ -108,7 +108,7 @@ export function helpPage(): string {
       <h3>Wie lade ich Freunde in eine Gruppe ein?</h3>
       <p>Tab Wettkampf → Gruppe erstellen, dann in der Gruppe „Einladen“. Andere treten mit dem Link oder dem sechsstelligen Code bei. Wer die Gruppe angelegt hat, kann dort eigene Wettbewerbe starten (1–7 Tage, Kategorie, Anzahl, Stufe).</p>
       <h3>Wie melde ich mich an?</h3>
-      <p>Mit einem Passkey (Face ID, Touch ID oder Gerätecode), ohne E-Mail und Passwort: Profil → Anmelden oder Konto erstellen.</p>
+      <p>Mit einem Passkey (Face ID, Touch ID oder Gerätecode), ohne E-Mail und Passwort: Profil (Emblem oben rechts) → Anmelden oder Konto erstellen.</p>
       <h3>Ich habe meinen Passkey verloren.</h3>
       <p>Beim Anlegen des Kontos zeigt die App einmalig einen Wiederherstellungscode. Damit legst du unter Profil → Daten &amp; Account → „Passkey verloren?“ einen neuen Passkey an.</p>
       <h3>Wie übertrage ich meine Daten auf ein neues Gerät?</h3>
@@ -123,7 +123,7 @@ export function helpPage(): string {
       <p><a href="/neuigkeiten">Neuigkeiten</a> · <a href="/datenschutz">Datenschutz</a> · <a href="${SOURCE_URL}">Quellcode auf GitHub</a></p>`,
     en: `<h1>Help &amp; contact</h1>
       <p class="lead">Mental Math trains mental arithmetic for case interviews. Questions, bugs or ideas? Write to me.</p>
-      <div class="contact"><strong>Contact</strong><span>${esc(CONTACT.name)}</span><span>Email: ${esc(CONTACT.email)}</span></div>
+      <div class="contact"><strong>Contact</strong><span>${esc(CONTACT.name)}</span><span>Email: ${esc(contactDisplay())}</span></div>
       <h2>FAQ</h2>
       <h3>Do I need an account?</h3>
       <p>No. Everything works without an account; your data then stays on your device. You only need an account to sync several devices or to play ranked on leaderboards and in groups.</p>
@@ -132,7 +132,7 @@ export function helpPage(): string {
       <h3>How do I invite friends to a group?</h3>
       <p>Compete tab → Create group, then “Invite” in the group. Others join with the link or the six-character code. The person who created the group can start its own competitions there (1–7 days, category, number, level).</p>
       <h3>How do I sign in?</h3>
-      <p>With a passkey (Face ID, Touch ID or device passcode) – no email, no password: Profile → Sign in or create account.</p>
+      <p>With a passkey (Face ID, Touch ID or device passcode) – no email, no password: Profile (emblem at the top right) → Sign in or create account.</p>
       <h3>I lost my passkey.</h3>
       <p>When you create your account, the app shows a recovery code once. Use it under Profile → Data &amp; account → “Lost your passkey?” to create a new passkey.</p>
       <h3>How do I move my data to a new device?</h3>
@@ -160,7 +160,7 @@ export function privacyPage(): string {
       <p class="date">Stand: ${PRIVACY_DATE.de}</p>
 
       <h2>1. Verantwortlicher</h2>
-      <div class="contact"><span>${esc(CONTACT.name)}</span><span>E-Mail: ${esc(CONTACT.email)}</span></div>
+      <div class="contact"><span>${esc(CONTACT.name)}</span><span>E-Mail: ${esc(contactDisplay())}</span></div>
 
       <h2>2. Aufruf der Website und der App</h2>
       <p>Website und Server-Schnittstellen werden von Cloudflare, Inc. (101 Townsend St, San Francisco, CA 94107, USA) ausgeliefert. Dabei verarbeitet Cloudflare technisch notwendige Verbindungsdaten (IP-Adresse, Zeitpunkt, aufgerufene Adresse, Browser- bzw. App-Kennung), um die Inhalte auszuliefern und Angriffe abzuwehren. Rechtsgrundlage ist Art. 6 Abs. 1 lit. f DSGVO (sicherer und stabiler Betrieb). Cloudflare kann Daten auch in den USA verarbeiten und ist nach dem EU-US Data Privacy Framework zertifiziert.</p>
@@ -202,7 +202,7 @@ export function privacyPage(): string {
       <p class="date">Last updated: ${PRIVACY_DATE.en}</p>
 
       <h2>1. Controller</h2>
-      <div class="contact"><span>${esc(CONTACT.name)}</span><span>Email: ${esc(CONTACT.email)}</span></div>
+      <div class="contact"><span>${esc(CONTACT.name)}</span><span>Email: ${esc(contactDisplay())}</span></div>
 
       <h2>2. Using the website and the app</h2>
       <p>The website and server interfaces are delivered by Cloudflare, Inc. (101 Townsend St, San Francisco, CA 94107, USA). Cloudflare processes technically necessary connection data (IP address, time, requested address, browser or app identifier) to deliver content and fend off attacks. The legal basis is Art. 6(1)(f) GDPR (secure and stable operation). Cloudflare may also process data in the USA and is certified under the EU-US Data Privacy Framework.</p>
