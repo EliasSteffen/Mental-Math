@@ -4,6 +4,15 @@ Alle nennenswerten Änderungen an Mental Math. Format nach [Keep a Changelog](ht
 
 <!-- Automatisch erzeugt mit `npm run changelog` aus src/releases.ts – nicht von Hand bearbeiten. -->
 
+## [2.4.1] - 2026-11-12
+
+### Ein ruhigerer Rundgang
+
+- Der Rundgang ist ruhiger: Seine Texte stehen jetzt direkt neben der Stelle, um die es gerade geht, und zeigen mit einem Pfeil darauf. Statt zwischen oberem und unterem Rand zu springen, gleiten sie sanft zum nächsten Ziel.
+- Wenn im Rundgang getippt wird, bleibt das Antwortfeld frei – du siehst immer, was im Feld steht. Und das Kapitel Lernen öffnet auf dem iPhone wieder den Lernen-Tab.
+- Im Browser auf iPhone und iPad weist die Website jetzt auf die App im App Store hin – höchstens dreimal und nie mitten in einer Runde.
+- Behoben: Im Theme Aurora schien die Seite durch den Hinweis „Neu sortiert“ und durch das Banner im Live-Rennen. Beide sind jetzt gut lesbar, und der Hinweis liegt nicht mehr unter einer anderen Meldung.
+
 ## [2.4.0] - 2026-11-11
 
 ### Raketen-Rennen mit deiner Gruppe

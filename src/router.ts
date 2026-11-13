@@ -32,6 +32,7 @@ import { initShell, setPrimaryAction, setShell } from './ui/shell.ts';
 import { LAST_TAB_KEY, lastTabHash, shellOf, type ShellState, type TabId } from './core/nav.ts'; // v11 N
 import { mountAccountButton, paintSidebarProfile } from './ui/account-button.ts'; // v11 N
 import { maybeShowNavHint } from './ui/nav-hint.ts'; // v11 T
+import { scheduleAppOffer } from './features/app-offer.ts';
 import { onLayoutChange } from './ui/viewport.ts';
 import { renderCrash } from './ui/crash.ts';
 import { recordRoute, setSwipeBackBlocked } from './core/swipe-back.ts'; // Zurück-Wisch: Verlauf der Seiten
@@ -362,6 +363,8 @@ export function render({ keepScroll = false, replace = false }: RenderOptions = 
     if (isTabStart(route) && !app.querySelector('.crash')) mountAccountButton(app);
     // v11 T: einmaliger Hinweis nach dem Update – erst kurz nach dem Zeichnen (Dialoge/Rundgang-Ende haben dann ihren Stand)
     scheduleNavHint(tab === null && !shell.modal);
+    // Website auf iPhone/iPad: Hinweis auf die iOS-App – nur auf Tab-Startseiten, ein paar Sekunden nach dem Zeichnen
+    scheduleAppOffer(isTabStart(route) && !app.querySelector('.crash'));
     // Für den Start-Wächter (public/js/boot-guard.js): Die App hat gezeichnet
     document.documentElement.dataset['booted'] = '1';
     const y = keepY ?? (key !== null && key !== prevKey ? (scrollByKey.get(key) ?? 0) : 0);

@@ -510,6 +510,18 @@
   .modal-actions { flex:none; display:flex; flex-wrap:wrap; justify-content:flex-end; gap:var(--space-2); margin-top:var(--space-1); }
   .modal-actions > .btn.primary { min-height:var(--hit-min); padding:0 var(--space-5); border-radius:var(--radius-key); font-size:var(--text-sm); }
 
+  /* Hinweis auf die iOS-App (features/app-offer.ts): App-Symbol, ein Satz, drei Vorteile */
+  .app-offer { display:flex; flex-direction:column; gap:var(--space-4); }
+  .app-offer-head { display:flex; align-items:center; gap:var(--space-3); }
+  .app-offer-icon { flex:none; width:56px; height:56px; border-radius:13px; box-shadow:0 0 0 1px var(--border); }
+  .app-offer-lead { font-size:var(--text-sm); color:var(--muted); text-wrap:pretty; }
+  .app-offer-perks { display:flex; flex-direction:column; gap:var(--space-2); }
+  .app-offer-perk { display:flex; align-items:flex-start; gap:var(--space-2); }
+  .app-offer-perk-icon {
+    flex:none; display:grid; place-items:center; width:28px; height:28px; margin-top:-3px;
+    border-radius:var(--radius-pill); background:var(--accent-soft); color:var(--accent-text);
+  }
+
   /* „Was ist neu?“ (features/whats-new.ts) im Dialog */
   .releases { display:flex; flex-direction:column; gap:var(--space-5); }
   .release { display:flex; flex-direction:column; gap:var(--space-2); }

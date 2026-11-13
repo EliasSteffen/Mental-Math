@@ -7,7 +7,11 @@ import { isSheetOpen } from './sheet.ts';
 import { lockScroll } from './scroll-lock.ts';
 import { t } from '../i18n/index.ts';
 
-export interface ModalAction { label: string; onClick?: () => void; primary?: boolean; danger?: boolean; closes?: boolean }
+export interface ModalAction {
+  label: string; onClick?: () => void; primary?: boolean; danger?: boolean; closes?: boolean;
+  /** Externer Link statt Knopf: neuer Tab, in der iOS-App der In-App-Browser */
+  href?: string;
+}
 export interface ModalOptions { title: string; body: Node | string; actions?: ModalAction[]; onClose?: () => void }
 
 /** Ausblenden (--dur-exit) plus Puffer, danach wird der Dialog geschlossen und entfernt. */
@@ -72,6 +76,7 @@ export function openModal(o: ModalOptions): { close(): void } {
       kind: a.danger ? 'soft' : a.primary ? 'primary' : 'quiet',
       tone: a.danger ? 'danger' : undefined,
       cta: false,
+      ...(a.href ? { href: a.href, target: '_blank' } : {}),
       onClick: () => {
         if (state !== 'open') return; // Ausblendphase: z. B. zweiter Tipp auf „Löschen“
         a.onClick?.();
